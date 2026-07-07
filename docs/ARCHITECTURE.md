@@ -56,6 +56,34 @@ static, curated data, not a live provider response. It is designed to be
 *joined* with the live pipeline later (registry entries already carry
 provider identifiers for this purpose), but today the two are independent.
 
+```mermaid
+flowchart TD
+    subgraph UI["UI Layer"]
+        A["app/ (routes)"] --> B["components/ (dashboard, landing, ui)"]
+    end
+    subgraph Hooks["Hooks Layer"]
+        C["lib/hooks/ (client-side polling)"]
+    end
+    subgraph Services["Services Layer"]
+        D["lib/data/aggregate.ts"]
+    end
+    subgraph Providers["Providers Layer"]
+        E["lib/data/providers/*"]
+    end
+    subgraph External["External APIs"]
+        F["CoinGecko · DexScreener · DefiLlama<br/>Blockscout · Base RPC · GitHub"]
+    end
+    subgraph Registry["Project Registry"]
+        G["data/projects/ (static, versioned, typed)"]
+    end
+
+    B -->|"reads typed data, never fetches directly"| C
+    C --> D
+    D --> E
+    E --> F
+    B -.->|"future join"| G
+```
+
 ## Folder Structure
 
 ```
@@ -117,6 +145,27 @@ live provider actually responds:
         │ returns { ...data, source: "live" | "mock" }
         ▼
  Widget renders the data, and can show its source honestly
+```
+
+```mermaid
+sequenceDiagram
+    participant Widget as Widget (Server Component)
+    participant Agg as Aggregator (aggregate.ts)
+    participant Prov as Provider(s)
+    participant Ext as External API
+
+    Widget->>Agg: await getX()
+    Agg->>Prov: call provider function(s)
+    Prov->>Ext: fetch()
+    alt API responds
+        Ext-->>Prov: data
+        Prov-->>Agg: typed result
+        Agg-->>Widget: { ...live data, source: "live" }
+    else API fails or times out
+        Ext-->>Prov: error / timeout
+        Prov-->>Agg: null
+        Agg-->>Widget: { ...mock data, source: "mock" }
+    end
 ```
 
 Two properties make this resilient:
@@ -322,3 +371,49 @@ without restructuring what already exists:
 - **Wallet connect** — would introduce a new, genuinely client-side data
   source (the connected wallet) that the Portfolio and Watchlist widgets are
   already shaped to accept in place of their current mock data.
+
+## Future Intelligence Engine
+
+[docs/ROADMAP.md](ROADMAP.md) names an "Intelligence Engine" milestone
+sitting between the current per-widget Services Layer and the future
+Projects Explorer/Research pillars described in
+[PRODUCT_VISION.md](PRODUCT_VISION.md#product-pillars). This section
+describes, at a planning level, what that would extend rather than
+replace.
+
+Today, `getIntelligenceBrief()` in `lib/data/aggregate.ts` is the closest
+thing to an "intelligence" function in the codebase: it composes four other
+aggregator results (`getKpis`, `getMarketOverview`, `getWelcomeStats`,
+`getSignals`) into a handful of human-readable points. It is a fixed,
+hand-written composition — not a general engine.
+
+A future Intelligence Engine would generalize that composition step into
+its own layer:
+
+```mermaid
+flowchart TD
+    Prov["Providers Layer<br/>lib/data/providers/*"] --> Eng["Intelligence Engine (planned)"]
+    Reg["Project Registry<br/>data/projects/"] --> Eng
+    Eng --> Brief["Intelligence Brief"]
+    Eng --> Signals["Signals & Alerts"]
+    Eng --> Spotlight["Project Spotlight / Research views"]
+```
+
+Planning notes (not implemented, no timeline):
+
+- It would sit **above** the Services Layer, not replace it — individual
+  aggregator functions would remain the source of truth for a single
+  widget's data; the engine's job would be cross-cutting synthesis (e.g.
+  "this project's TVL growth plus its GitHub activity plus its narrative
+  category together suggest X").
+- It is the natural home for the "narrative/category classification"
+  gap already called out in [docs/API.md](API.md#future-provider-interfaces)
+  — today `getTrendingNarratives()` and `getNarrativeHeatmap()` return
+  curated mock data specifically because no such classification exists yet.
+- It would be the first consumer that reads **both** the Project Registry
+  and the live Providers Layer in the same function, using the
+  `providerIds` already defined on every `Project` — the join point
+  [docs/ARCHITECTURE.md](#project-registry) already anticipates.
+- Signals & Alerts (see [docs/ROADMAP.md](ROADMAP.md)) would likely be
+  built as a consumer of this engine rather than a standalone
+  DexScreener-only function like today's `getSignals()`.

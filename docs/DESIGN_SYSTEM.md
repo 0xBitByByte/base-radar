@@ -44,12 +44,27 @@ scale directly (`gap-1`, `gap-1.5`, `gap-2`, `gap-2.5`, `gap-3`, `px-4`,
 - **Section rhythm**: `gap-4`–`gap-8` between stacked blocks on a page (e.g. the dashboard page's widget grid uses `gap-5`).
 - **Sidebar item padding**: consistent `px-3 py-2`-scale hit targets for nav rows.
 
-Border radius follows the CSS custom-property scale defined in
-`app/globals.css` (`--radius-sm` through `--radius-4xl`, derived from a
-single `--radius` base), plus direct Tailwind radius utilities in
-components: `rounded-lg`/`rounded-xl` for buttons and inputs, `rounded-2xl`
-for widget cards, `rounded-3xl` for the landing page's `GlassCard`, and
-`rounded-full` for badges, avatars, and the theme-toggle switch.
+## Border Radius
+
+Radius follows a single CSS custom-property scale defined in
+`app/globals.css`, all derived from one `--radius` base (`0.625rem`):
+
+| Token | Formula | Used for |
+| --- | --- | --- |
+| `--radius-sm` | `radius * 0.6` | shadcn-derived small controls |
+| `--radius-md` | `radius * 0.8` | shadcn-derived `Button` sizes (`xs`/`sm`) |
+| `--radius-lg` | `radius` (base) | shadcn-derived default controls |
+| `--radius-xl` | `radius * 1.4` | — |
+| `--radius-2xl` | `radius * 1.8` | — |
+| `--radius-3xl` | `radius * 2.2` | — |
+| `--radius-4xl` | `radius * 2.6` | — |
+
+Alongside this scale, components also reach directly for Tailwind's radius
+utilities rather than the custom properties above: `rounded-lg`/`rounded-xl`
+for buttons and inputs, `rounded-2xl` for `WidgetCard`, `rounded-3xl` for
+the landing page's `GlassCard`, and `rounded-full` for badges, avatars, and
+the theme-toggle switch. In practice, larger surfaces get more rounding
+(cards > buttons > badges/pills, which go fully round).
 
 ## Cards
 
@@ -219,6 +234,22 @@ Hover treatments are consistent by element type:
   `text-radar-white`/`text-radar-light-text`), no background change.
 
 ## Animations
+
+### Animation Principles
+
+Distilled from how animation is actually used across the codebase, not
+written down elsewhere as a formal spec:
+
+1. **Motion confirms, it doesn't decorate.** Entrance animations mark
+   content as newly rendered; hover motion confirms an element is
+   interactive; count-up numbers confirm a value just loaded. Nothing
+   animates purely for spectacle.
+2. **Short and physical.** Durations cluster around `0.15`–`0.6s`, and
+   interactive elements use spring physics (`type: "spring"`) rather than
+   linear/eased timing, so motion feels responsive rather than decorative.
+3. **Reduced motion is a first-class state, not an afterthought** — see
+   [Reduced Motion](#reduced-motion): every animation path has a defined
+   reduced-motion behavior, not just a global disable switch.
 
 Animation is built on **Framer Motion** throughout, not CSS keyframes,
 with two recurring patterns:

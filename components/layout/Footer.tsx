@@ -1,7 +1,57 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
-import { Radar } from "lucide-react";
+import { Radar, Send } from "lucide-react";
 
+import { cn } from "@/lib/utils";
 import { FOOTER_LINK_GROUPS, SITE } from "@/constants/site";
+import { GithubMark, XMark, DiscordMark, LinktreeMark } from "@/components/ui/BrandIcons";
+import { Tooltip } from "@/components/ui/Tooltip";
+
+type CommunityLink = {
+  label: string;
+  ariaLabel: string;
+  href: string;
+  icon: ReactNode;
+  hoverClassName: string;
+};
+
+const COMMUNITY_LINKS: CommunityLink[] = [
+  {
+    label: "GitHub",
+    ariaLabel: "Visit Base Radar GitHub",
+    href: SITE.social.github,
+    icon: <GithubMark className="size-4" />,
+    hoverClassName: "hover:bg-white/10 hover:text-white",
+  },
+  {
+    label: "X (Twitter)",
+    ariaLabel: "Follow Base Radar on X",
+    href: SITE.social.x,
+    icon: <XMark className="size-4" />,
+    hoverClassName: "hover:bg-white/10 hover:text-white",
+  },
+  {
+    label: "Discord",
+    ariaLabel: "Join Base Radar on Discord",
+    href: SITE.social.discord,
+    icon: <DiscordMark className="size-4" />,
+    hoverClassName: "hover:bg-[#5865F2]/10 hover:text-[#5865F2]",
+  },
+  {
+    label: "Telegram",
+    ariaLabel: "Join Base Radar Telegram",
+    href: SITE.social.telegram,
+    icon: <Send className="size-4" />,
+    hoverClassName: "hover:bg-[#26A5E4]/10 hover:text-[#26A5E4]",
+  },
+  {
+    label: "Linktree",
+    ariaLabel: "Visit Base Radar Linktree",
+    href: SITE.social.linktree,
+    icon: <LinktreeMark className="size-4" />,
+    hoverClassName: "hover:bg-[#43E660]/10 hover:text-[#43E660]",
+  },
+];
 
 export function Footer() {
   const year = new Date().getFullYear();
@@ -39,6 +89,32 @@ export function Footer() {
               </ul>
             </div>
           ))}
+
+          <div className="flex flex-col gap-3">
+            <span className="text-xs font-semibold tracking-wider text-radar-white/80 uppercase">
+              Community
+            </span>
+            <div className="flex items-center gap-1 -ml-2">
+              {COMMUNITY_LINKS.map((link) => (
+                <Tooltip key={link.label} content={link.label}>
+                  <a
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={link.ariaLabel}
+                    className={cn(
+                      "flex size-9 items-center justify-center rounded-lg text-radar-muted outline-none transition-all duration-200",
+                      "hover:scale-110 hover:shadow-[0_0_14px_-3px_currentColor] motion-reduce:hover:scale-100",
+                      "focus-visible:ring-2 focus-visible:ring-radar-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-radar-bg",
+                      link.hoverClassName
+                    )}
+                  >
+                    {link.icon}
+                  </a>
+                </Tooltip>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="mt-12 border-t border-white/5 pt-8">
