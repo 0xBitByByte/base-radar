@@ -100,6 +100,39 @@ APIs more often than each provider's own revalidate window already allows,
 and a longer-TTL or event-invalidated cache for registry reads once the
 registry itself moves off static files.
 
+## Future Redis Cache
+
+Planning note, not implemented. A dedicated Redis (or equivalent in-memory
+store) layer would most likely sit between the Services Layer and the
+Providers Layer — the same seam `aggregate.ts` already owns:
+
+```mermaid
+flowchart LR
+    Agg["Services Layer<br/>lib/data/aggregate.ts"] --> Cache{Redis cache hit?}
+    Cache -->|hit| Return[Return cached value]
+    Cache -->|miss| Prov["Providers Layer<br/>lib/data/providers/*"]
+    Prov --> Ext[External API]
+    Ext --> Write[Write-through to Redis]
+    Write --> Return
+```
+
+Candidate uses, each independent and adoptable on its own:
+
+- **Provider response cache** — keyed by provider + query params, TTL
+  matched to (or slightly longer than) each provider's existing
+  `revalidate` window, reducing redundant calls across concurrent requests
+  and multiple server instances (Next's `fetch` cache is per-instance;
+  Redis would be shared across a horizontally scaled deployment).
+- **Rate-limit protection** — a shared cache is the natural place to
+  enforce a soft rate limit against providers with strict caps (GitHub's
+  60 req/hour unauthenticated limit, see [API.md](API.md#github)), since it
+  can coordinate across server instances in a way per-instance `fetch`
+  caching cannot.
+- **Session/derived-data cache** — once accounts or wallet connect exist
+  (see the Portfolio milestone in [ROADMAP.md](ROADMAP.md)), short-lived
+  per-user computed data would be a natural fit for Redis rather than
+  Postgres.
+
 ## Indexes
 
 There are no indexes today, because there is no database. The Project
@@ -141,6 +174,104 @@ relationships (`project_categories` / `project_tags` join tables against
 small lookup tables mirroring today's `PROJECT_CATEGORIES` /
 `PROJECT_TAGS` enums), preserving the "closed vocabulary" property the
 current `as const` tuples enforce at the type level.
+
+```mermaid
+erDiagram
+    PROJECTS ||--o{ PROJECT_CONTRACTS : has
+    PROJECTS ||--o{ PROJECT_CATEGORIES : "tagged with"
+    PROJECTS ||--o{ PROJECT_TAGS : "tagged with"
+    PROJECTS ||--|| PROJECT_VERIFICATION : has
+    PROJECTS ||--|| PROJECT_PROVIDER_IDS : has
+    PROJECTS ||--o| PROJECT_GITHUB : has
+
+    PROJECTS {
+        string id PK
+        string slug
+        string name
+        string status
+    }
+    PROJECT_CONTRACTS {
+        string project_id FK
+        string chain
+        string address
+        string type
+    }
+    PROJECT_VERIFICATION {
+        string project_id FK
+        string status
+        string verified_at
+        string source
+    }
+    PROJECT_PROVIDER_IDS {
+        string project_id FK
+        string coingecko_id
+        string defillama_slug
+        string blockscout_address
+    }
+```
+
+## Future Search Index
+
+Planning note. `searchProjects()` today is a linear, in-memory substring
+match over ~20 rows (see [API.md](API.md#registry-api--dataprojectshelpersts))
+— adequate at the current registry size, but not something that scales to
+a large registry or to fuzzy/typo-tolerant search, both of which the
+planned Projects Explorer milestone (see [ROADMAP.md](ROADMAP.md)) would
+need.
+
+Two upgrade paths, in increasing order of capability:
+
+- **PostgreSQL full-text search** (`tsvector`/`tsquery`, already listed
+  under [Indexes](#indexes)) — the smallest step up, no new infrastructure
+  beyond the planned Postgres database itself. Sufficient for
+  keyword-style search over name/description/tags.
+- **A dedicated search engine** (e.g. Meilisearch, Typesense, or
+  Elasticsearch/OpenSearch) — worth considering only if search needs grow
+  beyond what Postgres full-text search comfortably handles (typo
+  tolerance, faceted filtering by category/tag/chain at scale, ranking
+  tuned independently of the primary datastore).
+
+No decision has been made between these — Postgres full-text search is the
+lower-risk default until there's a concrete reason to run a second
+datastore just for search.
+
+## Future Vector Database
+
+Planning note, tied to the AI Research pillar in
+[PRODUCT_VISION.md](PRODUCT_VISION.md#product-pillars). A vector database
+(or a vector extension on Postgres, e.g. `pgvector`) would only become
+relevant once Base Radar needs **semantic** rather than keyword matching —
+for example:
+
+- Finding projects "similar to X" by embedding `shortDescription` /
+  `description` rather than matching on shared tags/categories.
+- Powering a natural-language research assistant over the Project
+  Registry and Intelligence Engine output (see
+  [ARCHITECTURE.md](ARCHITECTURE.md#future-intelligence-engine)).
+
+This is speculative and has no concrete design yet — it is listed here
+because it's a predictable next step for the AI Research milestone in
+[ROADMAP.md](ROADMAP.md), not because any embedding pipeline exists today.
+
+## Future Analytics Database
+
+Planning note. Every value the dashboard shows today (TVL, gas, KPIs,
+signals) is a **current snapshot** — nothing is persisted over time, so
+there is no way to answer "what was TVL yesterday" from Base Radar itself
+(historical sparklines in `lib/data/mock.ts` are illustrative mock data,
+not stored history). A future analytics store would change that:
+
+- **Likely shape**: a time-series-oriented store (e.g. TimescaleDB as a
+  Postgres extension, or a dedicated columnar store like ClickHouse if
+  volume grows beyond what Postgres comfortably handles) recording periodic
+  snapshots of KPI/TVL/signal values keyed by timestamp.
+- **Would power**: real historical sparklines (replacing today's mock
+  `SparklinePoint[]` data with real series), trend analysis in the
+  Intelligence Engine, and the Signals & Alerts milestone's need to detect
+  a *change* over time rather than a single point-in-time read.
+- **Relationship to caching**: distinct from the Redis cache above — a
+  cache stores the *latest* value for a short time; an analytics database
+  would durably store *every* observed value for historical analysis.
 
 ## Future Tables
 

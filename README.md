@@ -54,12 +54,14 @@ anyone building on, trading on, or researching Base.
 
 | | |
 | --- | --- |
-| **Current Milestone** | Milestone 5 — Project Intelligence Platform |
+| **Completed Through** | Milestone 4 — Project Registry |
+| **Next Milestone** | Milestone 5 — Provider Layer (not yet started) |
 | **Version** | `0.1.0` |
 
 Base Radar is under active development and follows a milestone-based
-roadmap. See [Roadmap](#roadmap) below and [docs/CHANGELOG.md](docs/CHANGELOG.md)
-for what's shipped so far.
+roadmap. See [docs/ROADMAP.md](docs/ROADMAP.md) for the full milestone
+breakdown and [docs/CHANGELOG.md](docs/CHANGELOG.md) for what's shipped so
+far.
 
 ## Tech Stack
 
@@ -140,45 +142,26 @@ npm run lint     # run ESLint
 
 All project documentation lives in [`/docs`](docs):
 
+See [docs/README.md](docs/README.md) for the full documentation index with a
+description of every file. Highlights:
+
 | Document | Description |
 | --- | --- |
-| [Project Registry](docs/PROJECT_REGISTRY.md) | Schema, folder structure, naming conventions, and how to add a project |
+| [Architecture](docs/ARCHITECTURE.md) | System layers, data flow, dashboard architecture |
+| [Design System](docs/DESIGN_SYSTEM.md) | Typography, color, components, accessibility |
+| [API](docs/API.md) | Internal function reference and provider details |
+| [Project Registry](docs/PROJECT_REGISTRY.md) | Schema, conventions, and how to add a project |
+| [Product Vision](docs/PRODUCT_VISION.md) | Mission, target users, product pillars |
+| [Roadmap](docs/ROADMAP.md) | Completed and planned milestones |
 | [Changelog](docs/CHANGELOG.md) | Release history |
-| [Product Vision](docs/PRODUCT_VISION.md) | _(Planned)_ |
-| [Roadmap](docs/ROADMAP.md) | _(Planned)_ |
-| [Architecture](docs/ARCHITECTURE.md) | _(Planned)_ |
-| [Design System](docs/DESIGN_SYSTEM.md) | _(Planned)_ |
-| [API](docs/API.md) | _(Planned)_ |
-| [Database](docs/DATABASE.md) | _(Planned)_ |
-| [Claude Rules](docs/CLAUDE_RULES.md) | _(Planned)_ |
-| [docs/README.md](docs/README.md) | _(Planned)_ |
 
 ## Roadmap
 
-**Shipped (v0.1.0)**
-- Landing page
-- Dashboard shell
-- Unified navigation between landing page and dashboard
-- Project Registry foundation
-- Documentation foundation
-
-**Up next**
-- Wallet connect, to power a real Portfolio and Watchlist instead of mock data
-- Narrative/category classification service to replace curated narrative data
-- Deeper provider coverage for widgets that are still mock-only (whale-transfer indexing, portfolio balances)
-
-See [docs/CHANGELOG.md](docs/CHANGELOG.md) for release history.
-
-## Upcoming
-
-The following milestones are **planned work** and are not yet implemented:
-
-- **Provider Layer** — expanded, first-class provider integrations beyond the current dashboard data layer
-- **Aggregator Engine** — a more general aggregation service sitting on top of the Project Registry and live providers
-- **Projects Explorer** — a browsable, searchable view over the Project Registry
-- **AI Research Center** — dedicated research tooling for AI-native Base projects
-- **Portfolio Intelligence** — wallet-connected, real portfolio tracking and analysis
-- **Signals & Alerts** — configurable, notification-driven market and on-chain signals
+Base Radar has completed Milestones 1–4 (Repository Foundation, Landing
+Page, Dashboard, Project Registry) and is planning Milestone 5 (Provider
+Layer) next. See [docs/ROADMAP.md](docs/ROADMAP.md) for the full,
+authoritative milestone breakdown and [docs/CHANGELOG.md](docs/CHANGELOG.md)
+for release history — this README doesn't duplicate that detail.
 
 ## Contributing
 
@@ -192,6 +175,17 @@ The following milestones are **planned work** and are not yet implemented:
    ```
 4. Open a pull request describing what changed and why.
 
+## Community
+
+These are the official Base Radar community channels — the same links
+surfaced in the app's footer and dashboard sidebar:
+
+- [GitHub](https://github.com/0xbitbybyte/base-radar) — source code, issues, and pull requests
+- [X (Twitter)](https://x.com/TheBaseRadar) — announcements and updates
+- [Discord](https://discord.gg/yRBnkhjCd6) — community discussion and support
+- [Telegram](https://t.me/+3yysanqJlDE1Y2Y1) — community chat
+- [Linktree](https://linktr.ee/thebaseradarofficial) — all official links in one place
+
 ## License
 
-MIT — see [LICENSE](LICENSE) _(to be added)_.
+MIT — see [LICENSE](LICENSE).

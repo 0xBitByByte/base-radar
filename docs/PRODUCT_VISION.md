@@ -87,26 +87,53 @@ afterthoughts.
    the broader ecosystem view, so the dashboard is personal as well as
    informational.
 
+## Community
+
+Base Radar is building more than a dashboard — it's building an open
+community around the Base ecosystem. The product and the community around
+it are meant to reinforce each other: the dashboard surfaces what's
+happening on Base, and the community is where that surfaces into
+conversation, feedback, and shared discovery.
+
+The official channels are:
+
+- **[Discord](https://discord.gg/yRBnkhjCd6)** — the primary hub for
+  community discussion, support, and direct feedback on the product.
+- **[Telegram](https://t.me/+3yysanqJlDE1Y2Y1)** — a lighter-weight chat for
+  quicker updates and conversation.
+- **[X (Twitter)](https://x.com/TheBaseRadar)** — announcements, ecosystem
+  commentary, and public updates.
+
+These are the same official links surfaced throughout the product itself
+(dashboard sidebar, landing page footer) and centralized in
+`constants/site.ts` — see [CLAUDE_RULES.md](CLAUDE_RULES.md#documentation-rules)
+for why this repository treats a single source of truth for links as a
+hard rule rather than a convention.
+
 ## Long-Term Roadmap
 
 Base Radar's roadmap is milestone-based rather than date-based, reflecting
 that quality and correctness take priority over shipping speed.
 
-- **Foundation** — landing experience, dashboard shell, and unified
-  navigation that establish the product's identity and information
-  architecture.
-- **Project Intelligence Platform** *(current milestone)* — the canonical
-  Project Registry and the data foundation it depends on, built to be
-  reliable enough for every later pillar to stand on.
-- **Live Aggregation** — deepening the connection between the Registry and
-  real-time data providers, so registry entries carry live market and
-  developer-activity context.
-- **Discovery & Explorer** — a fully browsable, searchable view into the
-  Project Registry for anyone evaluating the ecosystem.
-- **Research & Signals** — dedicated tooling for narrative tracking, AI-agent
-  research, and early-signal detection.
-- **Personalization** — wallet-aware portfolio intelligence and
-  user-configurable alerts.
+- **Foundation** *(shipped — Milestones 1–3)* — landing experience,
+  dashboard shell, and unified navigation that establish the product's
+  identity and information architecture.
+- **Project Intelligence Platform** *(shipped — Milestone 4)* — the
+  canonical Project Registry and the data foundation it depends on, built
+  to be reliable enough for every later pillar to stand on.
+- **Live Aggregation** *(next — Milestones 5–6)* — deepening the connection
+  between the Registry and real-time data providers, so registry entries
+  carry live market and developer-activity context.
+- **Discovery & Explorer** *(planned — Milestone 7)* — a fully browsable,
+  searchable view into the Project Registry for anyone evaluating the
+  ecosystem.
+- **Research & Signals** *(planned — Milestones 8, 10)* — dedicated tooling
+  for narrative tracking, AI-agent research, and early-signal detection.
+- **Personalization** *(planned — Milestone 9)* — wallet-aware portfolio
+  intelligence and user-configurable alerts.
+
+See [docs/ROADMAP.md](ROADMAP.md) for the numbered milestone breakdown this
+maps to.
 
 ## Future Monetization
 

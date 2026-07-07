@@ -32,6 +32,21 @@ each function actually takes and returns.
                                                     of the above, for polling
 ```
 
+```mermaid
+flowchart TD
+    W["Widget (Server Component)"] --> S["Services API<br/>lib/data/aggregate.ts"]
+    S --> P["Providers API<br/>lib/data/providers/*"]
+    P --> CG[CoinGecko]
+    P --> DS[DexScreener]
+    P --> DL[DefiLlama]
+    P --> BS[Blockscout]
+    P --> RPC[Base RPC]
+    P --> GH[GitHub]
+    S -. "no live data available" .-> M["Typed mock baseline<br/>lib/data/mock.ts"]
+    R["Registry API<br/>data/projects/helpers.ts"] --> RD[("Project Registry<br/>data/projects/seed/*.ts")]
+    H["Hooks API<br/>lib/hooks/*"] -->|polls| P
+```
+
 Three properties hold across every internal API in this system:
 
 - **Providers never throw.** Every provider function resolves to `null` on
@@ -131,6 +146,96 @@ Pure functions, not part of the data-flow API, but used throughout the UI
 layer to render values consistently: `formatCompactCurrency`,
 `formatPrice`, `formatCompactNumber`, `formatNumber`, `formatGwei`,
 `formatPercent`, `formatRelativeTime`.
+
+## Provider Layer
+
+Each provider module wraps exactly one external API. This section documents
+what each one is used for, which endpoints it calls, its current caching
+window, and what's known about its rate limits. See
+[docs/DATABASE.md](DATABASE.md#caching-strategy) for the full caching
+strategy discussion.
+
+### CoinGecko
+
+- **Module**: `lib/data/providers/coingecko.ts`
+- **Used for**: Base-ecosystem market data (`getBaseEcosystemMarkets`), major
+  asset prices (`getMajorPrices`, `getEthPrice`)
+- **Endpoint base**: `https://api.coingecko.com/api/v3` (public, free tier,
+  no API key)
+- **Cache window**: 90s (`next: { revalidate: 90 }`)
+- **Rate limits**: CoinGecko's public free-tier API enforces a per-minute
+  call budget (their own docs are the source of truth for the current
+  number, since free-tier limits change over time). Base Radar does not
+  authenticate, so it shares the anonymous/IP-based limit. The 90s cache
+  window keeps this comfortably under typical free-tier budgets for a
+  single-server deployment.
+
+### DexScreener
+
+- **Module**: `lib/data/providers/dexscreener.ts`
+- **Used for**: Trending Base pairs (`getBaseTrendingPairs`) — powers
+  Signals and part of the Activity Feed
+- **Endpoint base**: DexScreener's public API (no key required)
+- **Cache window**: 60s
+- **Rate limits**: Not authenticated; subject to DexScreener's public rate
+  limiting for unauthenticated clients. Mitigated the same way — via the
+  60s revalidate window rather than a bespoke client-side limiter.
+
+### DefiLlama
+
+- **Module**: `lib/data/providers/defillama.ts`
+- **Used for**: Base chain TVL, stablecoin market cap, protocol list, and
+  top-protocol lookup (`getBaseChainTvl`, `getBaseStablecoinMcap`,
+  `getBaseProtocols`, `getTopBaseProtocol`, `getBaseProjectCount`)
+- **Endpoint base**: `https://api.llama.fi` (free, no API key)
+- **Cache window**: 120s for most calls. The `/protocols` payload is
+  multi-megabyte and deliberately **not cached** (`cache: "no-store"`) —
+  see [docs/DATABASE.md](DATABASE.md#caching-strategy) for why.
+- **Rate limits**: DefiLlama's free API has no documented hard rate limit
+  at the time of writing, but the `/protocols` endpoint being uncached
+  means every call to functions that depend on it hits the network fresh —
+  this is a deliberate size/cache tradeoff, not a rate-limit workaround.
+
+### Blockscout
+
+- **Module**: `lib/data/providers/blockscout.ts`
+- **Used for**: Chain stats (`getChainStats`) and recently verified
+  contracts (`getRecentlyVerifiedContract`)
+- **Endpoint base**: `https://base.blockscout.com/api/v2` (Base's public
+  Blockscout instance, no API key)
+- **Cache window**: 60s
+- **Rate limits**: Public instance rate limiting applies; no API key is
+  used, so requests share the anonymous quota for `base.blockscout.com`.
+
+### Base RPC
+
+- **Module**: `lib/data/providers/baseRpc.ts`
+- **Used for**: Live network status — gas price, block height, tx count,
+  estimated TPS (`getBaseNetworkStatus`)
+- **Endpoint**: `https://mainnet.base.org` (Base's public JSON-RPC
+  endpoint, no API key)
+- **Cache window**: 20s — the shortest of any provider, since gas price and
+  block height are the most time-sensitive values in the dashboard.
+- **Rate limits**: Public node providers typically apply IP-based request
+  limits; see
+  [docs.base.org/base-chain/tools/node-providers](https://docs.base.org/base-chain/tools/node-providers)
+  for current guidance. A dedicated/paid RPC provider would be a natural
+  upgrade if this endpoint's shared limits become a bottleneck.
+
+### GitHub
+
+- **Module**: `lib/data/providers/github.ts`
+- **Used for**: Repository stats and release activity (`getRepoStats`) for
+  known Base protocol repos and the Activity Feed
+- **Endpoint base**: `https://api.github.com` (public REST API, called
+  **unauthenticated**)
+- **Cache window**: 600s (10 minutes) — the longest of any provider, since
+  repo stats change slowly
+- **Rate limits**: GitHub's unauthenticated REST API is capped at **60
+  requests/hour per IP** — explicit and enforced. The long cache window
+  exists specifically to stay well under this limit. Adding a GitHub token
+  (raising the limit to 5,000 requests/hour) is a natural future change,
+  but is not required today at current traffic levels.
 
 ## Future Provider Interfaces
 

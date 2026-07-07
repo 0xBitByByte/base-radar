@@ -1,7 +1,57 @@
-export const SITE = {
+export type SocialLinks = {
+  github: string;
+  x: string;
+  discord: string;
+  telegram: string;
+  linktree: string;
+};
+
+export type SiteContact = {
+  email: string;
+  /** Not live yet — placeholder for a future dedicated docs site. */
+  docs: string | null;
+  /** Not live yet — placeholder for a future blog. */
+  blog: string | null;
+};
+
+/**
+ * Single source of truth for Base Radar's branding and official community
+ * links. Every part of the app (landing footer, dashboard sidebar, docs)
+ * should import from here rather than hardcoding a URL.
+ */
+export type SiteConfig = {
+  name: string;
+  shortName: string;
+  tagline: string;
+  description: string;
+  /** Relative — no production domain is configured yet. */
+  website: string;
+  social: SocialLinks;
+  contact: SiteContact;
+};
+
+export const SITE: SiteConfig = {
   name: "Base Radar",
-  tagline: "Built for the Base ecosystem.",
-} as const;
+  shortName: "BaseRadar",
+  tagline: "The Intelligence Layer for the Base Ecosystem",
+  description: "Open-source crypto intelligence platform for the Base ecosystem.",
+
+  website: "/",
+
+  social: {
+    github: "https://github.com/0xbitbybyte/base-radar",
+    x: "https://x.com/TheBaseRadar",
+    discord: "https://discord.gg/yRBnkhjCd6",
+    telegram: "https://t.me/+3yysanqJlDE1Y2Y1",
+    linktree: "https://linktr.ee/thebaseradarofficial",
+  },
+
+  contact: {
+    email: "thebaseradarofficial@gmail.com",
+    docs: null,
+    blog: null,
+  },
+};
 
 export type NavLink = {
   label: string;
@@ -38,13 +88,6 @@ export const FOOTER_LINK_GROUPS: FooterLinkGroup[] = [
     links: [
       { label: "Privacy", href: "#" },
       { label: "Terms", href: "#" },
-    ],
-  },
-  {
-    title: "Connect",
-    links: [
-      { label: "GitHub", href: "#" },
-      { label: "Twitter", href: "#" },
     ],
   },
 ];
