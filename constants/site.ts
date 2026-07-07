@@ -10,7 +10,7 @@ export type NavLink = {
 
 export const NAV_LINKS: NavLink[] = [
   { label: "Features", href: "#features" },
-  { label: "Dashboard", href: "#" },
+  { label: "Dashboard", href: "/dashboard" },
   { label: "Roadmap", href: "#" },
   { label: "Docs", href: "#" },
   { label: "GitHub", href: "#" },

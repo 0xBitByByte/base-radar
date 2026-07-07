@@ -59,6 +59,16 @@
   --color-radar-danger: #ff5a6f;
   --color-radar-white: #f7fafc;
   --color-radar-muted: #93a4c5;
+  --color-radar-purple: #a78bfa;
+  --color-radar-orange: #ff8a3d;
+
+  /* Premium light-theme surfaces — warm neutrals, never stark white. */
+  --color-radar-light-bg: #f7f8fa;
+  --color-radar-light-card: #ffffff;
+  --color-radar-light-surface: #f2f4f7;
+  --color-radar-light-border: #e4e7ec;
+  --color-radar-light-text: #1e293b;
+  --color-radar-light-muted: #64748b;
 }
 
 :root {

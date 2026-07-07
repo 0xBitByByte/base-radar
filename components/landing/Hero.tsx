@@ -90,8 +90,8 @@ export function Hero() {
               transition={{ duration: 0.5 }}
               className="flex flex-col gap-4 sm:flex-row"
             >
-              <GradientButton href="#" variant="primary">
-                Open Dashboard
+              <GradientButton href="/dashboard" variant="primary">
+                Explore Dashboard
                 <ArrowRight className="size-4" />
               </GradientButton>
               <GradientButton href="#" variant="secondary">
