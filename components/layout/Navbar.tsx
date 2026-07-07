@@ -71,7 +71,7 @@ export function Navbar() {
         </div>
 
         <div className="hidden md:block">
-          <GradientButton href="#" className="px-5 py-2.5 text-sm">
+          <GradientButton href="/dashboard" className="px-5 py-2.5 text-sm">
             Launch App
           </GradientButton>
         </div>
@@ -108,7 +108,7 @@ export function Navbar() {
                 </Link>
               ))}
               <div className="mt-2">
-                <GradientButton href="#" className="w-full">
+                <GradientButton href="/dashboard" className="w-full">
                   Launch App
                 </GradientButton>
               </div>

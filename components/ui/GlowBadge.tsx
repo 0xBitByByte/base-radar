@@ -2,8 +2,10 @@ import type { ComponentProps } from "react";
 
 import { cn } from "@/lib/utils";
 
+export type GlowBadgeColor = "primary" | "accent" | "success" | "warning" | "danger" | "muted";
+
 type GlowBadgeProps = ComponentProps<"span"> & {
-  color?: "primary" | "accent" | "success" | "warning" | "danger" | "muted";
+  color?: GlowBadgeColor;
   dot?: boolean;
 };
 
