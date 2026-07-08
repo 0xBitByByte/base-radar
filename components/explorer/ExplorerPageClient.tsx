@@ -6,7 +6,7 @@ import { ExplorerHeader } from "@/components/explorer/ExplorerHeader";
 import { ExplorerSearch } from "@/components/explorer/ExplorerSearch";
 import { ExplorerSort } from "@/components/explorer/ExplorerSort";
 import { ExplorerIdentityList } from "@/components/explorer/ExplorerIdentityList";
-import { searchProjects } from "@/components/explorer/search";
+import { normalizeSearch, searchProjects } from "@/components/explorer/search";
 import { sortProjects, DEFAULT_SORT, type SortState } from "@/components/explorer/sort";
 import type { ProjectIntelligence } from "@/lib/intelligence/types";
 
@@ -28,7 +28,11 @@ export function ExplorerPageClient({ projects, generatedAt }: ExplorerPageClient
 
   const visibleProjects = useMemo(() => {
     const matched = searchProjects(projects, query);
-    return sortProjects(matched, sort);
+    // An active query orders by search relevance (name/tag/category/description
+    // rank, per docs/explorer/02 §5); with no query, the explicit Sort control
+    // governs order, exactly as before search ranking existed.
+    const hasQuery = normalizeSearch(query).length > 0;
+    return hasQuery ? matched : sortProjects(matched, sort);
   }, [projects, query, sort]);
 
   return (
