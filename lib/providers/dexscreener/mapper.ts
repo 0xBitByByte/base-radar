@@ -1,3 +1,5 @@
+/** Raw DexScreener responses → domain models. Pure functions, no I/O. */
+
 import type { RawDexScreenerPair } from "@/lib/providers/dexscreener/client";
 
 export type Pair = {

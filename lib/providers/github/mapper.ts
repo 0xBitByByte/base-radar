@@ -1,3 +1,5 @@
+/** Raw GitHub responses → domain models. Pure functions, no I/O. */
+
 import type { RawRelease, RawRepo } from "@/lib/providers/github/client";
 
 export type RepoStats = {

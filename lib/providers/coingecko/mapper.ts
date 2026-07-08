@@ -1,3 +1,5 @@
+/** Raw CoinGecko responses → domain models. Pure functions, no I/O. */
+
 import type { RawCoinGeckoMarket, RawSimplePrice } from "@/lib/providers/coingecko/client";
 
 export type CoinMarket = {

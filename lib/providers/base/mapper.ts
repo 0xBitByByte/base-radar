@@ -1,3 +1,5 @@
+/** Raw Base RPC responses → domain models. Pure functions, no I/O. */
+
 import type { RawRpcBlock } from "@/lib/providers/base/client";
 import { hexToNumber } from "@/lib/providers/common/utilities";
 

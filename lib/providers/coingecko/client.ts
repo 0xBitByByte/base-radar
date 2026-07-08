@@ -1,10 +1,6 @@
 /**
  * CoinGecko public API — free tier, no key required.
  * https://www.coingecko.com/en/api/documentation
- *
- * Raw fetch layer only: talks to CoinGecko and returns its response shapes
- * unchanged. Never imported outside this provider's own service.ts —
- * callers get mapped domain types from `./mapper` instead.
  */
 
 import { fetchJson } from "@/lib/providers/common/utilities";

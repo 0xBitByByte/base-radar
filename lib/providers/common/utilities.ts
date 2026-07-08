@@ -1,5 +1,5 @@
 import { ProviderHttpError, ProviderParseError, toProviderError } from "@/lib/providers/common/errors";
-import type { ProviderName } from "@/lib/providers/common/types";
+import type { ProviderName, ProviderResult } from "@/lib/providers/common/types";
 
 const DEFAULT_TIMEOUT_MS = 8_000;
 
@@ -50,11 +50,21 @@ export function hexToNumber(hex: string): number {
   return Number(BigInt(hex));
 }
 
-export function toNumberOrNull(value: unknown): number | null {
-  if (typeof value === "number") return Number.isFinite(value) ? value : null;
-  if (typeof value === "string" && value.trim() !== "") {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : null;
+/**
+ * Runs `fn` and wraps the outcome as a `ProviderResult<T>` — success tagged
+ * with the provider name and a fetch timestamp, failure normalized via
+ * `toProviderError`. Every `service.ts` export should be a thin call to
+ * this rather than repeating its own try/catch, so the success/failure
+ * envelope shape is defined once for the whole provider layer.
+ */
+export async function toProviderResult<T>(
+  provider: ProviderName,
+  fn: () => Promise<T>
+): Promise<ProviderResult<T>> {
+  try {
+    const data = await fn();
+    return { ok: true, data, source: provider, fetchedAt: nowIso() };
+  } catch (err) {
+    return { ok: false, source: provider, error: toProviderError(provider, err) };
   }
-  return null;
 }

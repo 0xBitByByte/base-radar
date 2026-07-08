@@ -1,3 +1,10 @@
+/**
+ * Typed error hierarchy for the provider layer. Every provider surfaces
+ * failures as one of these instead of a bare `Error`, so `service.ts`
+ * functions (and anything that later consumes a `ProviderResult`) can
+ * branch on `.code` without needing to know which provider raised it.
+ */
+
 import type { ProviderErrorInfo, ProviderName } from "@/lib/providers/common/types";
 
 export type ProviderErrorCode = "http_error" | "timeout" | "rate_limited" | "parse_error" | "network_error";

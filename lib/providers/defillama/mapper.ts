@@ -1,3 +1,5 @@
+/** Raw DefiLlama responses → domain models. Pure functions, no I/O. */
+
 import type {
   RawHistoricalTvlPoint,
   RawLlamaProtocol,

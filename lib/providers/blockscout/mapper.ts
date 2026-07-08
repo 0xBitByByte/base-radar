@@ -1,3 +1,5 @@
+/** Raw Blockscout responses → domain models. Pure functions, no I/O. */
+
 import type { RawChainStats, RawSmartContractsResponse } from "@/lib/providers/blockscout/client";
 
 export type ChainStats = {

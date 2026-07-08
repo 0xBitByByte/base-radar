@@ -7,6 +7,9 @@
  * uses this against (e.g. GitHub's 60 req/hour unauthenticated cap).
  */
 
+import { ProviderRateLimitError } from "@/lib/providers/common/errors";
+import type { ProviderName } from "@/lib/providers/common/types";
+
 type Bucket = {
   count: number;
   windowStart: number;
@@ -39,6 +42,19 @@ export function tryAcquire(key: string, config: RateLimitConfig): boolean {
 
   bucket.count += 1;
   return true;
+}
+
+/**
+ * Throwing convenience wrapper around `tryAcquire`, keyed by provider.
+ * This is what every provider's `service.ts` calls before an actual
+ * network request — centralized here so the "not allowed → throw
+ * `ProviderRateLimitError`" behavior is defined once instead of being
+ * repeated per provider.
+ */
+export function assertRateLimit(provider: ProviderName, config: RateLimitConfig): void {
+  if (!tryAcquire(provider, config)) {
+    throw new ProviderRateLimitError(provider);
+  }
 }
 
 /** Clears a single key's budget. Primarily useful for tests. */
