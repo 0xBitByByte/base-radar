@@ -4,16 +4,32 @@ import type { ProjectIntelligence } from "@/lib/intelligence/types";
 
 type ExplorerIdentityListProps = {
   projects: ProjectIntelligence[];
+  hasQuery: boolean;
+  hasFilters: boolean;
   onClearSearch: () => void;
+  onClearFilters: () => void;
 };
 
 /**
  * PR1's entire Results Area — a plain identity list. Grid View and Table
  * View (docs/explorer/03 §8/§9) are later PRs; this renders neither.
  */
-export function ExplorerIdentityList({ projects, onClearSearch }: ExplorerIdentityListProps) {
+export function ExplorerIdentityList({
+  projects,
+  hasQuery,
+  hasFilters,
+  onClearSearch,
+  onClearFilters,
+}: ExplorerIdentityListProps) {
   if (projects.length === 0) {
-    return <NoResultsState onClearSearch={onClearSearch} />;
+    return (
+      <NoResultsState
+        hasQuery={hasQuery}
+        hasFilters={hasFilters}
+        onClearSearch={onClearSearch}
+        onClearFilters={onClearFilters}
+      />
+    );
   }
 
   return (

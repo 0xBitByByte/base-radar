@@ -8,6 +8,11 @@ const STATUS_STYLE: Record<VerificationStatus, { label: string; color: GlowBadge
   flagged: { label: "Flagged", color: "danger" },
 };
 
+/** The single source of truth for verification status display text — reused by the Filter Bar so the label never drifts from the badge. */
+export function verificationStatusLabel(status: VerificationStatus): string {
+  return STATUS_STYLE[status].label;
+}
+
 type VerificationBadgeProps = {
   status: VerificationStatus;
   className?: string;
