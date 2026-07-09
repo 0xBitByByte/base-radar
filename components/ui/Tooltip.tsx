@@ -14,9 +14,15 @@ type TooltipProps = {
 export function Tooltip({ content, children, className }: TooltipProps) {
   return (
     <TooltipPrimitive.Root>
+      {/* `display: contents` here previously made this element generate no
+          box of its own — `getBoundingClientRect()` on a `contents` element
+          resolves to `{0,0,0,0}`, so the Positioner anchored every tooltip
+          to the viewport's top-left corner instead of the trigger. `inline-flex`
+          gives the Positioner a real rect to anchor against, sized tightly to
+          the trigger content with no stray inline-baseline whitespace. */}
       <TooltipPrimitive.Trigger
         delay={150}
-        render={<span className={cn("contents", className)} />}
+        render={<span className={cn("inline-flex items-center", className)} />}
       >
         {children}
       </TooltipPrimitive.Trigger>

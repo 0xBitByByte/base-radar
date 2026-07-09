@@ -1,11 +1,13 @@
+import { BadgeCheck, CircleAlert, Flag, Users, type LucideIcon } from "lucide-react";
+
 import { GlowBadge, type GlowBadgeColor } from "@/components/ui/GlowBadge";
 import type { VerificationStatus } from "@/data/projects/enums";
 
-const STATUS_STYLE: Record<VerificationStatus, { label: string; color: GlowBadgeColor }> = {
-  verified: { label: "Verified", color: "success" },
-  community: { label: "Community", color: "primary" },
-  unverified: { label: "Unverified", color: "muted" },
-  flagged: { label: "Flagged", color: "danger" },
+const STATUS_STYLE: Record<VerificationStatus, { label: string; color: GlowBadgeColor; icon: LucideIcon }> = {
+  verified: { label: "Verified", color: "success", icon: BadgeCheck },
+  community: { label: "Community", color: "primary", icon: Users },
+  unverified: { label: "Unverified", color: "muted", icon: CircleAlert },
+  flagged: { label: "Flagged", color: "danger", icon: Flag },
 };
 
 /** The single source of truth for verification status display text — reused by the Filter Bar so the label never drifts from the badge. */
@@ -20,9 +22,10 @@ type VerificationBadgeProps = {
 
 /** Renders `community.verificationStatus` — never `Identity` (see docs/explorer/05 §4). */
 export function VerificationBadge({ status, className }: VerificationBadgeProps) {
-  const { label, color } = STATUS_STYLE[status];
+  const { label, color, icon: Icon } = STATUS_STYLE[status];
   return (
     <GlowBadge color={color} className={className}>
+      <Icon className="size-3 shrink-0" aria-hidden="true" />
       {label}
     </GlowBadge>
   );

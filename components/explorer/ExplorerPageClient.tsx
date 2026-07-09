@@ -7,6 +7,8 @@ import { ExplorerSearch } from "@/components/explorer/ExplorerSearch";
 import { ExplorerSort } from "@/components/explorer/ExplorerSort";
 import { ExplorerFilterBar } from "@/components/explorer/ExplorerFilterBar";
 import { ExplorerGrid } from "@/components/explorer/ExplorerGrid";
+import { ExplorerTable } from "@/components/explorer/ExplorerTable";
+import { ViewToggle, type ExplorerView } from "@/components/explorer/ViewToggle";
 import { normalizeSearch, searchProjects } from "@/components/explorer/search";
 import { sortProjects, DEFAULT_SORT, type SortState } from "@/components/explorer/sort";
 import { EMPTY_FILTERS, filterProjects, hasActiveFilters, type ExplorerFilters } from "@/components/explorer/filters";
@@ -30,6 +32,7 @@ export function ExplorerPageClient({ projects, generatedAt }: ExplorerPageClient
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
   const [filters, setFilters] = useState<ExplorerFilters>(EMPTY_FILTERS);
   const [filterBarExpanded, setFilterBarExpanded] = useState(false);
+  const [view, setView] = useState<ExplorerView>("grid");
 
   const hasQuery = normalizeSearch(query).length > 0;
   const filtersActive = hasActiveFilters(filters);
@@ -61,6 +64,7 @@ export function ExplorerPageClient({ projects, generatedAt }: ExplorerPageClient
         <div className="flex flex-col gap-3 sm:flex-row">
           <ExplorerSearch value={query} onChange={setQuery} className="sm:flex-1" />
           <ExplorerSort value={sort} onChange={setSort} />
+          <ViewToggle value={view} onChange={setView} />
         </div>
 
         <ExplorerFilterBar
@@ -74,13 +78,25 @@ export function ExplorerPageClient({ projects, generatedAt }: ExplorerPageClient
         />
       </div>
 
-      <ExplorerGrid
-        projects={visibleProjects}
-        hasQuery={hasQuery}
-        hasFilters={filtersActive}
-        onClearSearch={clearSearch}
-        onClearFilters={clearFilters}
-      />
+      {view === "grid" ? (
+        <ExplorerGrid
+          projects={visibleProjects}
+          hasQuery={hasQuery}
+          hasFilters={filtersActive}
+          onClearSearch={clearSearch}
+          onClearFilters={clearFilters}
+        />
+      ) : (
+        <ExplorerTable
+          projects={visibleProjects}
+          hasQuery={hasQuery}
+          hasFilters={filtersActive}
+          onClearSearch={clearSearch}
+          onClearFilters={clearFilters}
+          sort={sort}
+          onSortChange={setSort}
+        />
+      )}
     </div>
   );
 }

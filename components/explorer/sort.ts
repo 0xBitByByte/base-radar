@@ -1,12 +1,13 @@
 import type { ProjectIntelligence } from "@/lib/intelligence/types";
 
 /**
- * PR1's sort surface only — the fields the Implementation Roadmap scopes
- * for the Explorer Shell (name, TVL, Health, Confidence, GitHub stars).
- * Market Cap and Verification-status grouping are real, documented sort
- * fields (docs/explorer/02 §7) but belong to a later PR.
+ * `price` and `changePct24h` (PR5) are reachable only via Table View's
+ * `SortableHeader` — `ExplorerSort`'s dropdown intentionally never lists
+ * them (docs/explorer/06 PR5 scope). Market Cap and Verification-status
+ * grouping remain real, documented sort fields (docs/explorer/02 §7) not
+ * yet wired to any control.
  */
-export type SortField = "name" | "tvl" | "health" | "confidence" | "githubStars";
+export type SortField = "name" | "tvl" | "health" | "confidence" | "githubStars" | "price" | "changePct24h";
 export type SortDirection = "asc" | "desc";
 
 export type SortState = {
@@ -61,7 +62,42 @@ function sortValue(project: ProjectIntelligence, field: SortField): number | str
       return project.confidence.score;
     case "githubStars":
       return project.github.stars;
+    case "price":
+      return project.market.priceUsd;
+    case "changePct24h":
+      return project.market.changePct24h;
   }
+}
+
+/** First-click direction per field — magnitude fields lead with their highest values, mirroring `SORT_OPTIONS`' own ordering (tvl-desc before tvl-asc, etc.); Name leads alphabetically. */
+const DEFAULT_DIRECTION: Record<SortField, SortDirection> = {
+  name: "asc",
+  tvl: "desc",
+  health: "desc",
+  confidence: "desc",
+  githubStars: "desc",
+  price: "desc",
+  changePct24h: "desc",
+};
+
+/**
+ * Column-header click behavior — a three-state cycle per field: first
+ * click sorts by that field's own default direction, a second click
+ * reverses it, and a third click resets to `DEFAULT_SORT` (unsorting that
+ * column) rather than cycling forever. A different field always restarts
+ * the cycle at its own default direction. Shared by `SortableHeader` so
+ * the rule lives in one place rather than being re-decided per header.
+ */
+export function toggleSort(current: SortState, field: SortField): SortState {
+  const defaultDirection = DEFAULT_DIRECTION[field];
+
+  if (current.field !== field) {
+    return { field, direction: defaultDirection };
+  }
+  if (current.direction === defaultDirection) {
+    return { field, direction: defaultDirection === "asc" ? "desc" : "asc" };
+  }
+  return DEFAULT_SORT;
 }
 
 /**

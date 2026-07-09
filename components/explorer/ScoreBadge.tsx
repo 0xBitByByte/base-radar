@@ -1,5 +1,8 @@
+import { Info } from "lucide-react";
+
 import { cn } from "@/lib/utils";
 import { formatLabel } from "@/components/explorer/format";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 type ScoreBadgeType = "health" | "confidence";
 
@@ -8,6 +11,10 @@ type ScoreBadgeProps = {
   score: number;
   label: string;
   className?: string;
+  /** Grid shows the "Health"/"Confidence" label; Table hides it since the column header already identifies it. */
+  showLabel?: boolean;
+  /** One-sentence explanation shown via an info icon — Grid only; omit to render no icon. */
+  infoTooltip?: string;
 };
 
 const TYPE_TITLE: Record<ScoreBadgeType, string> = {
@@ -39,7 +46,7 @@ const CONFIDENCE_COLOR: Record<string, string> = {
  * by the Intelligence Engine (`scoring.ts`/`confidence.ts`) — never
  * derived or recomputed here.
  */
-export function ScoreBadge({ type, score, label, className }: ScoreBadgeProps) {
+export function ScoreBadge({ type, score, label, className, showLabel = true, infoTooltip }: ScoreBadgeProps) {
   const color =
     (type === "health" ? HEALTH_COLOR[label] : CONFIDENCE_COLOR[label]) ??
     "text-radar-light-muted dark:text-radar-muted";
@@ -51,7 +58,23 @@ export function ScoreBadge({ type, score, label, className }: ScoreBadgeProps) {
         className
       )}
     >
-      <span className="text-[10.5px] text-radar-light-muted dark:text-radar-muted">{TYPE_TITLE[type]}</span>
+      {showLabel && (
+        <span className="flex items-center gap-1 text-[10.5px] text-radar-light-muted dark:text-radar-muted">
+          {TYPE_TITLE[type]}
+          {infoTooltip && (
+            <Tooltip content={infoTooltip}>
+              <button
+                type="button"
+                onClick={(event) => event.stopPropagation()}
+                aria-label={`About ${TYPE_TITLE[type]}`}
+                className="text-radar-light-muted/60 outline-none transition-colors hover:text-radar-light-muted focus-visible:text-radar-light-muted dark:text-radar-muted/50 dark:hover:text-radar-muted dark:focus-visible:text-radar-muted"
+              >
+                <Info className="size-3" aria-hidden="true" />
+              </button>
+            </Tooltip>
+          )}
+        </span>
+      )}
       <span className={cn("text-sm font-semibold tabular-nums", color)}>
         {formatLabel(label)} <span className="text-radar-light-muted dark:text-radar-muted">· {score}</span>
       </span>
