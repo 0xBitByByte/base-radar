@@ -38,8 +38,8 @@ export function ExplorerTable({
   const [isStuck, setIsStuck] = useState(false);
 
   // A 1px sentinel just above the table, observed against this table's own
-  // scroll container (not the page): once it scrolls out of view, the
-  // sticky header has "landed" — the trigger for its subtle scroll shadow.
+  // scroll container: once it scrolls out of view, the sticky header has
+  // "landed" — the trigger for its subtle scroll shadow.
   useEffect(() => {
     const sentinel = sentinelRef.current;
     const root = scrollRef.current;
@@ -61,16 +61,17 @@ export function ExplorerTable({
   }
 
   return (
-    // Bounded height, scrolling on both axes in the same element: per the CSS
-    // Overflow spec, `overflow-x: auto` with `overflow-y: visible` isn't a
-    // real state — the visible axis is always coerced to `auto`, so a
-    // capped-height, internally-scrolling region (matching docs/explorer/03
-    // §9's "rows scroll beneath" the header) is what makes `<thead>`'s
-    // `sticky top-0` actually stick, rather than travelling with an
-    // uncapped-height div that never scrolls internally at all.
+    // Bounded height so the table (not the page) is what scrolls vertically
+    // — the only way `<thead>`'s `sticky top-0` has a real scroll container
+    // to stick against (see `ExplorerTableHeader`). The bound itself isn't
+    // an arbitrary number: `4rem` is exactly `Topbar`'s own declared `h-16`
+    // sticky height (components/dashboard/Topbar.tsx) — the one truly fixed
+    // piece of chrome in this layout — so the table claims every viewport
+    // pixel below it rather than an arbitrary fraction like the old 70vh.
+    // `dvh` (not `vh`) matches `DashboardLayout`'s own `min-h-dvh` convention.
     <div
       ref={scrollRef}
-      className="max-h-[70vh] overflow-auto rounded-2xl border border-radar-light-border dark:border-white/10"
+      className="max-h-[calc(100dvh-4rem)] overflow-auto rounded-2xl border border-radar-light-border dark:border-white/10"
     >
       <div ref={sentinelRef} aria-hidden="true" />
       <table aria-label="Projects" className="w-full border-collapse">
