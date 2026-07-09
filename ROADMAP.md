@@ -40,6 +40,16 @@
 
 ---
 
+## 🎨 Brand Identity Enhancement (Future)
+
+- Project logos across the application
+- Token logos
+- Chain logos with official brand colors
+- Verification provider icons
+- Social platform icons
+- Optimized asset loading
+- Consistent fallback placeholders
+
 ## Product Principles
 
 - Ship small, polished features.
