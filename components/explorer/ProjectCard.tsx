@@ -73,8 +73,18 @@ function ProjectCardComponent({ project, onActivate }: ProjectCardProps) {
       <ProjectCategoryChips categories={identity.categories} tags={identity.tags} />
 
       <ProjectMetricsGrid>
-        <ScoreBadge type="health" score={health.score} label={health.label} />
-        <ScoreBadge type="confidence" score={confidence.score} label={confidence.level} />
+        <ScoreBadge
+          type="health"
+          score={health.score}
+          label={health.label}
+          infoTooltip="A 0–100 score blending live market, TVL, and GitHub activity signals into one health read."
+        />
+        <ScoreBadge
+          type="confidence"
+          score={confidence.score}
+          label={confidence.level}
+          infoTooltip="A 0–100 score reflecting how much live data and registry verification back this record."
+        />
         <MetricItem
           label="TVL"
           value={tvlAvailable ? formatCompactCurrency(tvl.tvlUsd as number) : undefined}
@@ -84,6 +94,7 @@ function ProjectCardComponent({ project, onActivate }: ProjectCardProps) {
           label="GitHub Stars"
           value={githubAvailable ? formatCompactNumber(github.stars as number) : undefined}
           unavailable={!githubAvailable}
+          infoTooltip="The project's GitHub star count, sourced live from the GitHub API."
         />
       </ProjectMetricsGrid>
 

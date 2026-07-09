@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Filter } from "lucide-react";
 
@@ -69,6 +70,35 @@ export function ExplorerFilterBar({
 }: ExplorerFilterBarProps) {
   const activeCount = countActiveFilters(filters);
 
+  // Closes the expanded panel on a genuine outside click only. `rowRef`
+  // covers the toggle row (button, chips, Clear filters); `panelRef` covers
+  // the expanded panel. A click on any interactive child of either is
+  // protected — but a click on the row's own empty background (e.g.
+  // clicking beside the Filters button, still technically inside that flex
+  // row) must NOT be protected, or the panel could never be closed from
+  // within its own toolbar row. `target !== rowRef.current` is what draws
+  // that line: a background click's target IS the row div itself, while a
+  // click on the button/a chip/Clear filters has a target that's a
+  // descendant of it, not the row div itself.
+  const rowRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!expanded) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node;
+      const clickedRowChild = !!rowRef.current?.contains(target) && target !== rowRef.current;
+      const clickedPanel = !!panelRef.current?.contains(target);
+      if (!clickedRowChild && !clickedPanel) {
+        onToggleExpanded();
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [expanded, onToggleExpanded]);
+
   const filterSections: FilterSectionConfig[] = [
     { key: "categories", label: "Category", options: availableCategories(projects), formatOption: formatLabel },
     {
@@ -101,7 +131,7 @@ export function ExplorerFilterBar({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
+      <div ref={rowRef} className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={onToggleExpanded}
@@ -139,6 +169,7 @@ export function ExplorerFilterBar({
       <AnimatePresence initial={false}>
         {expanded && (
           <motion.div
+            ref={panelRef}
             id={FILTER_PANEL_ID}
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}

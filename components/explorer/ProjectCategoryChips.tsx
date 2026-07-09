@@ -1,5 +1,6 @@
 import { formatLabel } from "@/components/explorer/format";
 import { GlowBadge } from "@/components/ui/GlowBadge";
+import { Tooltip } from "@/components/ui/Tooltip";
 import type { ProjectCategory, ProjectTag } from "@/data/projects/enums";
 
 type ProjectCategoryChipsProps = {
@@ -25,6 +26,7 @@ export function ProjectCategoryChips({ categories, tags }: ProjectCategoryChipsP
   // with no trace they existed.
   const visibleChips = hasOverflow ? allChips.slice(0, MAX_CHIPS - 1) : allChips.slice(0, MAX_CHIPS);
   const overflowCount = allChips.length - visibleChips.length;
+  const hiddenChips = allChips.slice(visibleChips.length);
 
   if (visibleChips.length === 0) return null;
 
@@ -36,9 +38,15 @@ export function ProjectCategoryChips({ categories, tags }: ProjectCategoryChipsP
         </GlowBadge>
       ))}
       {overflowCount > 0 && (
-        <GlowBadge color="muted" className="px-2 py-0.5 text-[10.5px]">
-          +{overflowCount}
-        </GlowBadge>
+        <Tooltip content={hiddenChips.map(formatLabel).join(", ")}>
+          <GlowBadge
+            color="muted"
+            tabIndex={0}
+            className="cursor-default px-2 py-0.5 text-[10.5px] outline-none focus-visible:ring-2 focus-visible:ring-radar-primary/50"
+          >
+            +{overflowCount}
+          </GlowBadge>
+        </Tooltip>
       )}
     </div>
   );
