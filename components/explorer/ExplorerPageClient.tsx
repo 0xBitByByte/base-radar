@@ -8,6 +8,7 @@ import { ExplorerSort } from "@/components/explorer/ExplorerSort";
 import { ExplorerFilterBar } from "@/components/explorer/ExplorerFilterBar";
 import { ExplorerGrid } from "@/components/explorer/ExplorerGrid";
 import { ExplorerTable } from "@/components/explorer/ExplorerTable";
+import { QuickViewDrawer } from "@/components/explorer/QuickViewDrawer";
 import { ViewToggle, type ExplorerView } from "@/components/explorer/ViewToggle";
 import { normalizeSearch, searchProjects } from "@/components/explorer/search";
 import { sortProjects, DEFAULT_SORT, type SortState } from "@/components/explorer/sort";
@@ -33,6 +34,8 @@ export function ExplorerPageClient({ projects, generatedAt }: ExplorerPageClient
   const [filters, setFilters] = useState<ExplorerFilters>(EMPTY_FILTERS);
   const [filterBarExpanded, setFilterBarExpanded] = useState(false);
   const [view, setView] = useState<ExplorerView>("grid");
+  /** `null` means the drawer is closed — the one piece of Quick View state this component owns (docs/explorer/05 §15); never a separate `drawerOpen` boolean that could drift out of sync with it. */
+  const [selectedProject, setSelectedProject] = useState<ProjectIntelligence | null>(null);
 
   const hasQuery = normalizeSearch(query).length > 0;
   const filtersActive = hasActiveFilters(filters);
@@ -54,6 +57,10 @@ export function ExplorerPageClient({ projects, generatedAt }: ExplorerPageClient
 
   function clearFilters() {
     setFilters(EMPTY_FILTERS);
+  }
+
+  function closeDrawer() {
+    setSelectedProject(null);
   }
 
   return (
@@ -85,6 +92,7 @@ export function ExplorerPageClient({ projects, generatedAt }: ExplorerPageClient
           hasFilters={filtersActive}
           onClearSearch={clearSearch}
           onClearFilters={clearFilters}
+          onActivate={setSelectedProject}
         />
       ) : (
         <ExplorerTable
@@ -95,8 +103,11 @@ export function ExplorerPageClient({ projects, generatedAt }: ExplorerPageClient
           onClearFilters={clearFilters}
           sort={sort}
           onSortChange={setSort}
+          onActivate={setSelectedProject}
         />
       )}
+
+      <QuickViewDrawer project={selectedProject} onClose={closeDrawer} />
     </div>
   );
 }

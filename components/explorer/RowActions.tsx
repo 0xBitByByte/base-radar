@@ -1,5 +1,5 @@
 type RowActionsProps = {
-  /** No-op until Quick View exists (Milestone 7, PR6) — docs/explorer/06 §4. */
+  /** Opens Quick View for this row's project — docs/explorer/06 §4 (PR6). */
   onActivate?: () => void;
 };
 

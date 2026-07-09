@@ -15,6 +15,8 @@ type ScoreBadgeProps = {
   showLabel?: boolean;
   /** One-sentence explanation shown via an info icon — Grid only; omit to render no icon. */
   infoTooltip?: string;
+  /** The Engine's own plain-English reasoning behind the score — Quick View only; omit to render none (Grid/Table never pass this). */
+  factors?: string[];
 };
 
 const TYPE_TITLE: Record<ScoreBadgeType, string> = {
@@ -46,7 +48,7 @@ const CONFIDENCE_COLOR: Record<string, string> = {
  * by the Intelligence Engine (`scoring.ts`/`confidence.ts`) — never
  * derived or recomputed here.
  */
-export function ScoreBadge({ type, score, label, className, showLabel = true, infoTooltip }: ScoreBadgeProps) {
+export function ScoreBadge({ type, score, label, className, showLabel = true, infoTooltip, factors }: ScoreBadgeProps) {
   const color =
     (type === "health" ? HEALTH_COLOR[label] : CONFIDENCE_COLOR[label]) ??
     "text-radar-light-muted dark:text-radar-muted";
@@ -78,6 +80,16 @@ export function ScoreBadge({ type, score, label, className, showLabel = true, in
       <span className={cn("text-sm font-semibold tabular-nums", color)}>
         {formatLabel(label)} <span className="text-radar-light-muted dark:text-radar-muted">· {score}</span>
       </span>
+      {factors && factors.length > 0 && (
+        <ul className="mt-1 flex flex-col gap-1 text-xs text-radar-light-muted dark:text-radar-muted">
+          {factors.map((factor) => (
+            <li key={factor} className="flex gap-1.5">
+              <span aria-hidden="true">·</span>
+              <span>{factor}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

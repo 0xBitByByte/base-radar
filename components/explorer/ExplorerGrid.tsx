@@ -9,13 +9,12 @@ type ExplorerGridProps = {
   hasFilters: boolean;
   onClearSearch: () => void;
   onClearFilters: () => void;
+  onActivate?: (project: ProjectIntelligence) => void;
 };
 
 /**
  * Explorer's Results Area (docs/explorer/03-screen-specifications.md §8) —
- * replaces PR1's plain identity list. Table View (03 §9) is a later PR;
- * this renders Grid only. `onActivate` is intentionally not passed to
- * `ProjectCard` yet — Quick View (PR6) doesn't exist, per docs/explorer/06 §4.
+ * replaces PR1's plain identity list.
  */
 export function ExplorerGrid({
   projects,
@@ -23,6 +22,7 @@ export function ExplorerGrid({
   hasFilters,
   onClearSearch,
   onClearFilters,
+  onActivate,
 }: ExplorerGridProps) {
   if (projects.length === 0) {
     return (
@@ -38,7 +38,11 @@ export function ExplorerGrid({
   return (
     <ExplorerGridLayout>
       {projects.map((project) => (
-        <ProjectCard key={project.identity.id} project={project} />
+        <ProjectCard
+          key={project.identity.id}
+          project={project}
+          onActivate={onActivate ? () => onActivate(project) : undefined}
+        />
       ))}
     </ExplorerGridLayout>
   );
