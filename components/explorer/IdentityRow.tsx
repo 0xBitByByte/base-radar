@@ -10,8 +10,11 @@ type IdentityRowProps = {
 };
 
 /**
+ * Superseded by `ProjectCard` (PR4 — Grid View). Retained temporarily,
+ * unreferenced, for rollback safety — scheduled for removal in a
+ * follow-up cleanup PR once Grid View has been merged and verified.
+ *
  * PR1's entire per-project surface: logo, name, category, verification.
- * Nothing else — Grid cards, table rows, and Quick View are later PRs.
  */
 export function IdentityRow({ project }: IdentityRowProps) {
   const { identity, community } = project;

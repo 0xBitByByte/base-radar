@@ -11,8 +11,11 @@ type ExplorerIdentityListProps = {
 };
 
 /**
- * PR1's entire Results Area — a plain identity list. Grid View and Table
- * View (docs/explorer/03 §8/§9) are later PRs; this renders neither.
+ * Superseded by `ExplorerGrid` (PR4 — Grid View). Retained temporarily,
+ * unreferenced, for rollback safety — scheduled for removal in a
+ * follow-up cleanup PR once Grid View has been merged and verified.
+ *
+ * PR1's entire Results Area — a plain identity list.
  */
 export function ExplorerIdentityList({
   projects,
