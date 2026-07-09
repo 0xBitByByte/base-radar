@@ -1,7 +1,13 @@
+// `minimumFractionDigits` is pinned to match `maximumFractionDigits` here —
+// left unset, compact notation's trailing-zero trimming can resolve
+// differently between Node's SSR ICU and the browser's CSR ICU for the
+// same input (e.g. "$12.4B" vs "$12.40B"), causing a hydration mismatch.
+// Pinning both forces identical, deterministic output in every environment.
 const compactCurrency = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
   notation: "compact",
+  minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 

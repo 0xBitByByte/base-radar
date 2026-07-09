@@ -6,7 +6,7 @@ import { ExplorerHeader } from "@/components/explorer/ExplorerHeader";
 import { ExplorerSearch } from "@/components/explorer/ExplorerSearch";
 import { ExplorerSort } from "@/components/explorer/ExplorerSort";
 import { ExplorerFilterBar } from "@/components/explorer/ExplorerFilterBar";
-import { ExplorerIdentityList } from "@/components/explorer/ExplorerIdentityList";
+import { ExplorerGrid } from "@/components/explorer/ExplorerGrid";
 import { normalizeSearch, searchProjects } from "@/components/explorer/search";
 import { sortProjects, DEFAULT_SORT, type SortState } from "@/components/explorer/sort";
 import { EMPTY_FILTERS, filterProjects, hasActiveFilters, type ExplorerFilters } from "@/components/explorer/filters";
@@ -74,7 +74,7 @@ export function ExplorerPageClient({ projects, generatedAt }: ExplorerPageClient
         />
       </div>
 
-      <ExplorerIdentityList
+      <ExplorerGrid
         projects={visibleProjects}
         hasQuery={hasQuery}
         hasFilters={filtersActive}
