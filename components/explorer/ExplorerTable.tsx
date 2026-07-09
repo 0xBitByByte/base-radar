@@ -16,6 +16,7 @@ type ExplorerTableProps = {
   onClearFilters: () => void;
   sort: SortState;
   onSortChange: (next: SortState) => void;
+  onActivate?: (project: ProjectIntelligence) => void;
 };
 
 /**
@@ -32,6 +33,7 @@ export function ExplorerTable({
   onClearFilters,
   sort,
   onSortChange,
+  onActivate,
 }: ExplorerTableProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -76,7 +78,7 @@ export function ExplorerTable({
       <div ref={sentinelRef} aria-hidden="true" />
       <table aria-label="Projects" className="w-full border-collapse">
         <ExplorerTableHeader sort={sort} onSortChange={onSortChange} isStuck={isStuck} />
-        <ExplorerTableBody projects={projects} />
+        <ExplorerTableBody projects={projects} onActivate={onActivate} />
       </table>
     </div>
   );

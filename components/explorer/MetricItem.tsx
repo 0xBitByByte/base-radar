@@ -10,6 +10,8 @@ type MetricItemProps = {
   className?: string;
   /** One-sentence explanation shown via an info icon beside the label; omit to render no icon. */
   infoTooltip?: string;
+  /** Renders as a plain label+value stack with no border/background/padding of its own — for a group of metrics that already sit inside one shared card (Quick View). Grid/Table never pass this. */
+  bare?: boolean;
 };
 
 /**
@@ -20,13 +22,14 @@ type MetricItemProps = {
  * component's — it only ever renders a string it's given, or an explicit
  * "unavailable" treatment, never a fabricated placeholder.
  */
-export function MetricItem({ label, value, unavailable, className, infoTooltip }: MetricItemProps) {
+export function MetricItem({ label, value, unavailable, className, infoTooltip, bare }: MetricItemProps) {
   const isUnavailable = unavailable || !value;
 
   return (
     <div
       className={cn(
-        "flex flex-col gap-0.5 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 dark:border-white/10 dark:bg-white/[0.02]",
+        "flex flex-col gap-0.5",
+        !bare && "rounded-xl border border-radar-light-border bg-radar-light-surface p-3 dark:border-white/10 dark:bg-white/[0.02]",
         className
       )}
     >

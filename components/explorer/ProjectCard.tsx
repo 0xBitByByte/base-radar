@@ -15,7 +15,7 @@ import type { ProjectIntelligence } from "@/lib/intelligence/types";
 
 type ProjectCardProps = {
   project: ProjectIntelligence;
-  /** No-op until Quick View exists (Milestone 7, PR6) — docs/explorer/06 §4. */
+  /** Opens Quick View for this project — docs/explorer/06 §4 (PR6). */
   onActivate?: () => void;
 };
 
