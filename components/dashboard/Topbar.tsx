@@ -5,6 +5,7 @@ import { ChevronRight, Menu, Sparkles, Bell, GitCompare, Wallet } from "lucide-r
 
 import { cn } from "@/lib/utils";
 import { useLiveNetworkStatus } from "@/lib/hooks/useLiveNetworkStatus";
+import { formatGwei } from "@/lib/data/format";
 import { ChainBadge } from "@/components/branding/ChainBadge";
 import { SearchBar } from "@/components/dashboard/SearchBar";
 import { UserMenu } from "@/components/dashboard/UserMenu";
@@ -38,7 +39,7 @@ function NetworkBadge() {
       <ChainBadge chain="base" size="sm" bare />
       {status && (
         <span className="text-radar-light-muted dark:text-radar-muted/70">
-          · {status.gasGwei.toFixed(3)} gwei
+          · {formatGwei(status.gasGwei)}
         </span>
       )}
     </div>
@@ -54,7 +55,7 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
         type="button"
         onClick={onOpenMobileNav}
         aria-label="Open navigation menu"
-        className="flex size-9 shrink-0 items-center justify-center rounded-lg text-radar-light-muted outline-none transition-colors hover:bg-slate-900/5 focus-visible:ring-2 focus-visible:ring-radar-primary/50 lg:hidden dark:text-radar-muted dark:hover:bg-white/5"
+        className="flex size-9 shrink-0 items-center justify-center rounded-lg text-radar-light-muted outline-none transition-colors hover:bg-radar-light-surface focus-visible:ring-2 focus-visible:ring-radar-primary/50 lg:hidden dark:text-radar-muted dark:hover:bg-white/5"
       >
         <Menu className="size-5" />
       </button>
@@ -89,7 +90,7 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
         <button
           type="button"
           aria-label="Compare projects"
-          className="hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-radar-light-text outline-none transition-colors hover:bg-slate-900/5 focus-visible:ring-2 focus-visible:ring-radar-primary/50 lg:flex dark:text-radar-muted dark:hover:bg-white/5"
+          className="hidden items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-medium text-radar-light-text outline-none transition-colors hover:bg-radar-light-surface focus-visible:ring-2 focus-visible:ring-radar-primary/50 lg:flex dark:text-radar-muted dark:hover:bg-white/5"
         >
           <GitCompare className="size-4" />
           Compare
@@ -107,7 +108,7 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
         <button
           type="button"
           aria-label="View notifications"
-          className="relative flex size-9 items-center justify-center rounded-lg text-radar-light-muted outline-none transition-colors hover:bg-slate-900/5 focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:text-radar-muted dark:hover:bg-white/5"
+          className="relative flex size-9 items-center justify-center rounded-lg text-radar-light-muted outline-none transition-colors hover:bg-radar-light-surface focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:text-radar-muted dark:hover:bg-white/5"
         >
           <Bell className="size-[18px]" />
           <span className="absolute top-2 right-2 size-1.5 rounded-full bg-radar-accent" />
@@ -116,7 +117,7 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
         <button
           type="button"
           aria-label="Connect wallet"
-          className="hidden items-center gap-2 rounded-lg border border-radar-light-border px-3 py-1.5 text-sm font-medium text-radar-light-text outline-none transition-colors hover:bg-slate-900/5 focus-visible:ring-2 focus-visible:ring-radar-primary/50 sm:flex dark:border-white/10 dark:text-radar-white dark:hover:bg-white/5"
+          className="hidden items-center gap-2 rounded-lg border border-radar-light-border px-3 py-1.5 text-sm font-medium text-radar-light-text outline-none transition-colors hover:bg-radar-light-surface focus-visible:ring-2 focus-visible:ring-radar-primary/50 sm:flex dark:border-white/10 dark:text-radar-white dark:hover:bg-white/5"
         >
           <Wallet className="size-4" />
           Connect Wallet

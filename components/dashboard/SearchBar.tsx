@@ -72,7 +72,7 @@ export function SearchBar({ className }: SearchBarProps) {
       <Dialog.Portal>
         <Dialog.Backdrop
           className={cn(
-            "fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm dark:bg-black/60",
+            "fixed inset-0 z-40 bg-radar-bg/40 backdrop-blur-sm dark:bg-black/60",
             "transition-opacity duration-200 motion-reduce:transition-none",
             "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0"
           )}
@@ -115,7 +115,7 @@ export function SearchBar({ className }: SearchBarProps) {
                     key={item}
                     type="button"
                     onClick={() => setQuery(item)}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-radar-light-text outline-none transition-colors hover:bg-slate-900/5 focus-visible:bg-radar-light-surface dark:text-radar-muted dark:hover:bg-white/5 dark:focus-visible:bg-white/5"
+                    className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-radar-light-text outline-none transition-colors hover:bg-radar-light-surface focus-visible:bg-radar-light-surface dark:text-radar-muted dark:hover:bg-white/5 dark:focus-visible:bg-white/5"
                   >
                     <Clock className="size-4 shrink-0 opacity-60" aria-hidden="true" />
                     {item}
@@ -134,7 +134,7 @@ export function SearchBar({ className }: SearchBarProps) {
                     key={item}
                     type="button"
                     onClick={() => setQuery(item)}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-radar-light-text outline-none transition-colors hover:bg-slate-900/5 focus-visible:bg-radar-light-surface dark:text-radar-muted dark:hover:bg-white/5 dark:focus-visible:bg-white/5"
+                    className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-radar-light-text outline-none transition-colors hover:bg-radar-light-surface focus-visible:bg-radar-light-surface dark:text-radar-muted dark:hover:bg-white/5 dark:focus-visible:bg-white/5"
                   >
                     <TrendingUp className="size-4 shrink-0 text-radar-accent" aria-hidden="true" />
                     {item}
@@ -153,7 +153,7 @@ export function SearchBar({ className }: SearchBarProps) {
                     key={action.href}
                     href={action.href}
                     onClick={() => handleOpenChange(false)}
-                    className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm text-radar-light-text outline-none transition-colors hover:bg-slate-900/5 focus-visible:bg-radar-light-surface dark:text-radar-muted dark:hover:bg-white/5 dark:focus-visible:bg-white/5"
+                    className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm text-radar-light-text outline-none transition-colors hover:bg-radar-light-surface focus-visible:bg-radar-light-surface dark:text-radar-muted dark:hover:bg-white/5 dark:focus-visible:bg-white/5"
                   >
                     <action.icon className="size-4 shrink-0 text-radar-primary dark:text-radar-accent" aria-hidden="true" />
                     <span className="flex-1">{action.label}</span>

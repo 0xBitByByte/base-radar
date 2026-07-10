@@ -33,7 +33,7 @@ export function SidebarItem({
         "focus-visible:ring-2 focus-visible:ring-radar-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-radar-light-bg dark:focus-visible:ring-offset-radar-bg",
         active
           ? "bg-radar-primary/10 font-semibold text-radar-primary dark:bg-radar-primary/15 dark:text-radar-accent"
-          : "text-radar-light-muted hover:bg-slate-900/5 hover:text-radar-light-text dark:text-radar-muted dark:hover:bg-white/5 dark:hover:text-radar-white"
+          : "text-radar-light-muted hover:bg-radar-light-surface hover:text-radar-light-text dark:text-radar-muted dark:hover:bg-white/5 dark:hover:text-radar-white"
       )}
     >
       {active && (

@@ -32,7 +32,7 @@ export function ProgressBar({
       <Progress.Track className="relative h-1.5 w-full overflow-hidden rounded-full bg-radar-light-surface dark:bg-white/10">
         <Progress.Indicator
           className={cn(
-            "h-full rounded-full transition-[width] duration-700 ease-out motion-reduce:transition-none",
+            "h-full rounded-full transition-[width] duration-300 ease-out motion-reduce:transition-none",
             colorClassName
           )}
         />

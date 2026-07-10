@@ -63,7 +63,7 @@ export function QuickViewDrawer({ project, onClose }: QuickViewDrawerProps) {
       <Dialog.Portal>
         <Dialog.Backdrop
           className={cn(
-            "fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm dark:bg-black/60",
+            "fixed inset-0 z-40 bg-radar-bg/40 backdrop-blur-sm dark:bg-black/60",
             "transition-opacity duration-300 motion-reduce:transition-none",
             "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0"
           )}

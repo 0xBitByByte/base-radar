@@ -4,7 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowDown, ArrowUp, Minus } from "lucide-react";
 
-import { cn } from "@/lib/utils";
+import { cn, TREND_COLOR_VAR } from "@/lib/utils";
 import {
   formatCompactCurrencyParts,
   formatCompactNumberParts,
@@ -21,12 +21,6 @@ const TREND_COLOR: Record<Trend, string> = {
   up: "text-radar-success",
   down: "text-radar-danger",
   flat: "text-radar-light-muted dark:text-radar-muted",
-};
-
-const TREND_HEX: Record<Trend, string> = {
-  up: "#00e676",
-  down: "#ff5a6f",
-  flat: "#93a4c5",
 };
 
 const TREND_ICON: Record<Trend, typeof ArrowUp> = {
@@ -81,7 +75,7 @@ export function KPIRow({ items, lastUpdated }: KPIRowProps) {
                   </span>
                   <Sparkline
                     data={kpi.sparkline}
-                    color={TREND_HEX[trend]}
+                    color={TREND_COLOR_VAR[trend]}
                     height={20}
                     opacity={0.8}
                     className="w-12 shrink-0"

@@ -5,7 +5,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Eye, Sparkles, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { formatCompactCurrency, formatPercent } from "@/lib/data/format";
+import { formatCompactCurrency, formatNumber, formatPercent } from "@/lib/data/format";
 import type { ProjectSpotlight as ProjectSpotlightData, WithSource } from "@/lib/data/types";
 import { ProjectLogo } from "@/components/branding/ProjectLogo";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
@@ -41,7 +41,7 @@ export function ProjectSpotlight({ data, lastUpdated }: ProjectSpotlightProps) {
     },
     {
       label: "GitHub Stars",
-      value: data.githubStars !== null ? data.githubStars.toLocaleString() : "—",
+      value: data.githubStars !== null ? formatNumber(data.githubStars) : "—",
     },
   ];
 
@@ -119,7 +119,7 @@ export function ProjectSpotlight({ data, lastUpdated }: ProjectSpotlightProps) {
         <Dialog.Portal>
           <Dialog.Backdrop
             className={cn(
-              "fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm dark:bg-black/60",
+              "fixed inset-0 z-40 bg-radar-bg/40 backdrop-blur-sm dark:bg-black/60",
               "transition-opacity duration-200 motion-reduce:transition-none",
               "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0"
             )}

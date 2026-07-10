@@ -38,7 +38,7 @@ export function ThemeToggle({ variant = "switch", className }: ThemeToggleProps)
         onClick={() => setTheme(isDark ? "light" : "dark")}
         aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
         className={cn(
-          "flex size-9 items-center justify-center rounded-lg text-radar-light-muted outline-none transition-colors hover:bg-slate-900/5 focus-visible:ring-2 focus-visible:ring-radar-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-radar-light-bg dark:text-radar-muted dark:hover:bg-white/5 dark:focus-visible:ring-offset-radar-bg",
+          "flex size-9 items-center justify-center rounded-lg text-radar-light-muted outline-none transition-colors hover:bg-radar-light-surface focus-visible:ring-2 focus-visible:ring-radar-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-radar-light-bg dark:text-radar-muted dark:hover:bg-white/5 dark:focus-visible:ring-offset-radar-bg",
           className
         )}
       >
