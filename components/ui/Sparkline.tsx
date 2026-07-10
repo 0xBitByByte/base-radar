@@ -8,10 +8,12 @@ type SparklineProps = {
   data: SparklinePoint[];
   color?: string;
   height?: number;
+  /** Stroke opacity — defaults to fully opaque so every existing consumer's appearance is unchanged unless it explicitly opts into a softer line (the Dashboard KPI Row passes `0.8` so the sparkline reads as supporting context next to the hero value, not competing with it). */
+  opacity?: number;
   className?: string;
 };
 
-export function Sparkline({ data, color = "#0052ff", height = 40, className }: SparklineProps) {
+export function Sparkline({ data, color = "#0052ff", height = 40, opacity = 1, className }: SparklineProps) {
   const gradientId = `sparkline-${color.replace("#", "")}`;
 
   return (
@@ -28,6 +30,7 @@ export function Sparkline({ data, color = "#0052ff", height = 40, className }: S
             type="monotone"
             dataKey="v"
             stroke={color}
+            strokeOpacity={opacity}
             strokeWidth={1.75}
             fill={`url(#${gradientId})`}
             isAnimationActive={false}

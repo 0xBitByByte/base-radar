@@ -3,8 +3,9 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Radar, Send, ArrowLeft } from "lucide-react";
+import { Send, ArrowLeft } from "lucide-react";
 
+import { BaseRadarLogo } from "@/components/branding/BaseRadarLogo";
 import { cn } from "@/lib/utils";
 import { DASHBOARD_NAV_GROUPS, DASHBOARD_SETTINGS_ITEM, APP_VERSION } from "@/constants/dashboard";
 import { SITE } from "@/constants/site";
@@ -12,6 +13,7 @@ import { SidebarItem } from "@/components/dashboard/SidebarItem";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { GithubMark, DiscordMark, XMark, LinktreeMark } from "@/components/ui/BrandIcons";
+import { SOCIAL_BRANDING } from "@/lib/branding/socials";
 
 type SocialLink = {
   label: string;
@@ -21,43 +23,45 @@ type SocialLink = {
   hoverClassName: string;
 };
 
+/** GitHub/X's neutral hover class is defined locally, not in the shared registry — Sidebar supports both themes while `Footer` is dark-only, so the two legitimately differ; only the brand-color hovers below (Discord/Telegram/Linktree) are genuinely identical across both consumers and worth centralizing. */
+const NEUTRAL_HOVER_CLASS =
+  "hover:bg-radar-light-text/5 hover:text-radar-light-text dark:hover:bg-white/10 dark:hover:text-white";
+
 const SOCIAL_LINKS: SocialLink[] = [
   {
     label: "GitHub",
     ariaLabel: "Visit Base Radar GitHub",
     href: SITE.social.github,
     icon: <GithubMark className="size-4" />,
-    hoverClassName:
-      "hover:bg-radar-light-text/5 hover:text-radar-light-text dark:hover:bg-white/10 dark:hover:text-white",
+    hoverClassName: NEUTRAL_HOVER_CLASS,
   },
   {
     label: "X (Twitter)",
     ariaLabel: "Follow Base Radar on X",
     href: SITE.social.x,
     icon: <XMark className="size-4" />,
-    hoverClassName:
-      "hover:bg-radar-light-text/5 hover:text-radar-light-text dark:hover:bg-white/10 dark:hover:text-white",
+    hoverClassName: NEUTRAL_HOVER_CLASS,
   },
   {
     label: "Discord",
     ariaLabel: "Join Base Radar on Discord",
     href: SITE.social.discord,
     icon: <DiscordMark className="size-4" />,
-    hoverClassName: "hover:bg-[#5865F2]/10 hover:text-[#5865F2]",
+    hoverClassName: SOCIAL_BRANDING.discord.hoverClassName ?? "",
   },
   {
     label: "Telegram",
     ariaLabel: "Join Base Radar Telegram",
     href: SITE.social.telegram,
     icon: <Send className="size-4" />,
-    hoverClassName: "hover:bg-[#26A5E4]/10 hover:text-[#26A5E4]",
+    hoverClassName: SOCIAL_BRANDING.telegram.hoverClassName ?? "",
   },
   {
     label: "Linktree",
     ariaLabel: "Visit Base Radar Linktree",
     href: SITE.social.linktree,
     icon: <LinktreeMark className="size-4" />,
-    hoverClassName: "hover:bg-[#43E660]/10 hover:text-[#43E660]",
+    hoverClassName: SOCIAL_BRANDING.linktree.hoverClassName ?? "",
   },
 ];
 
@@ -88,8 +92,8 @@ export function SidebarNav({ onNavigate, className }: SidebarNavProps) {
         aria-label="Base Radar dashboard home"
         className="group flex items-center gap-3 rounded-xl px-2 pb-6 outline-none focus-visible:ring-2 focus-visible:ring-radar-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-radar-light-bg dark:focus-visible:ring-offset-radar-bg"
       >
-        <span className="flex size-10 items-center justify-center rounded-xl border border-radar-light-border bg-radar-primary/10 text-radar-primary transition-colors group-hover:bg-radar-primary/20 dark:border-white/10 dark:text-radar-accent">
-          <Radar className="size-5" />
+        <span className="flex size-10 items-center justify-center rounded-xl border border-radar-light-border bg-radar-primary/10 transition-colors group-hover:bg-radar-primary/20 dark:border-white/10">
+          <BaseRadarLogo size={22} />
         </span>
         <span className="flex flex-col leading-none">
           <span className="text-sm font-bold tracking-wide text-radar-light-text dark:text-radar-white">

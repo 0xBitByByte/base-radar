@@ -1,4 +1,6 @@
 import { PROJECT_CATEGORIES, VERIFICATION_STATUSES } from "@/data/projects/enums";
+import { formatLabel } from "@/components/explorer/format";
+import { sortAlphabetically } from "@/lib/utils";
 import type { ProjectCategory, VerificationStatus } from "@/data/projects/enums";
 import type { ConfidenceLevel, HealthLabel, ProjectIntelligence } from "@/lib/intelligence/types";
 
@@ -29,10 +31,10 @@ function availableValues<T>(canonicalOrder: readonly T[], present: Set<T>): T[] 
   return canonicalOrder.filter((value) => present.has(value));
 }
 
-/** Every category actually present in `projects`, in the registry's canonical order — never every possible category, so the picker never offers a facet value with zero real matches. */
+/** Every category actually present in `projects`, alphabetically by display label (never the registry's declared/backend order, never every possible category) — so the picker never offers a facet value with zero real matches, and always reads A→Z. */
 export function availableCategories(projects: ProjectIntelligence[]): ProjectCategory[] {
   const present = new Set(projects.flatMap((project) => project.identity.categories));
-  return availableValues(PROJECT_CATEGORIES, present);
+  return sortAlphabetically(availableValues(PROJECT_CATEGORIES, present), formatLabel);
 }
 
 export function availableVerificationStatuses(projects: ProjectIntelligence[]): VerificationStatus[] {

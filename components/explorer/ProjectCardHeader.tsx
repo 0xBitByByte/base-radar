@@ -1,5 +1,4 @@
-import Image from "next/image";
-
+import { ProjectLogo } from "@/components/branding/ProjectLogo";
 import { VerificationBadge } from "@/components/explorer/VerificationBadge";
 import type { Community, Identity } from "@/lib/intelligence/types";
 
@@ -8,33 +7,28 @@ type ProjectCardHeaderProps = {
   community: Community;
 };
 
-/** Logo, name, and verification — docs/explorer/04-component-specification.md §9. */
+/**
+ * Logo, name, and verification — docs/explorer/04-component-specification.md §9.
+ * Verification sits on its own row below the name (rather than beside it)
+ * so the name row gets the card's full width to itself — a long name
+ * (e.g. "Across Protocol", "Aerodrome Finance") no longer competes with
+ * the badge for space and truncates later than it otherwise would.
+ */
 export function ProjectCardHeader({ identity, community }: ProjectCardHeaderProps) {
   return (
-    <div className="flex items-center gap-3">
-      {identity.logoUrl ? (
-        <Image
-          src={identity.logoUrl}
-          alt=""
-          width={40}
-          height={40}
-          unoptimized
-          className="size-10 shrink-0 rounded-full object-cover"
-        />
-      ) : (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-3">
+        <ProjectLogo logoUrl={identity.logoUrl} name={identity.name} size={40} />
+
         <span
-          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-radar-light-surface text-sm font-semibold text-radar-light-muted dark:bg-white/5 dark:text-radar-muted"
-          aria-hidden="true"
+          title={identity.name}
+          className="min-w-0 flex-1 truncate text-sm font-semibold text-radar-light-text dark:text-radar-white"
         >
-          {identity.name.slice(0, 2).toUpperCase()}
+          {identity.name}
         </span>
-      )}
+      </div>
 
-      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-radar-light-text dark:text-radar-white">
-        {identity.name}
-      </span>
-
-      <VerificationBadge status={community.verificationStatus} className="shrink-0" />
+      <VerificationBadge status={community.verificationStatus} />
     </div>
   );
 }

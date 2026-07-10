@@ -3,19 +3,17 @@
 import { useLayoutEffect, useState } from "react";
 import { animate, useReducedMotion } from "framer-motion";
 
+import { KpiValueDisplay } from "@/components/ui/KpiValueDisplay";
+import type { KpiValueParts } from "@/lib/data/format";
+
 type AnimatedNumberProps = {
   value: number;
-  format?: (value: number) => string;
+  format: (value: number) => KpiValueParts;
   duration?: number;
   className?: string;
 };
 
-export function AnimatedNumber({
-  value,
-  format = (v) => Math.round(v).toLocaleString(),
-  duration = 1,
-  className,
-}: AnimatedNumberProps) {
+export function AnimatedNumber({ value, format, duration = 1, className }: AnimatedNumberProps) {
   const prefersReducedMotion = useReducedMotion();
   // Seeded with the real target value so the server-rendered text and the
   // first client render always match — the count-up-from-zero only kicks in
@@ -45,8 +43,6 @@ export function AnimatedNumber({
     // formatting (e.g. "$486M" vs "$486.00M") for the exact same input —
     // a harmless hydration-text mismatch since `shown` is always
     // recomputed from React state immediately after mount.
-    <span className={className} suppressHydrationWarning>
-      {format(shown)}
-    </span>
+    <KpiValueDisplay parts={format(shown)} className={className} suppressHydrationWarning />
   );
 }

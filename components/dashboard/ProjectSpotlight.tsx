@@ -7,6 +7,7 @@ import { Eye, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCompactCurrency, formatPercent } from "@/lib/data/format";
 import type { ProjectSpotlight as ProjectSpotlightData, WithSource } from "@/lib/data/types";
+import { ProjectLogo } from "@/components/branding/ProjectLogo";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
 import { GlowBadge } from "@/components/ui/GlowBadge";
 import { ProgressBar } from "@/components/ui/ProgressBar";
@@ -62,9 +63,13 @@ export function ProjectSpotlight({ data, lastUpdated }: ProjectSpotlightProps) {
       className="sm:col-span-2 xl:col-span-1"
     >
       <div className="flex items-center gap-3">
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-radar-primary/10 text-sm font-bold text-radar-primary dark:text-radar-accent">
-          {data.symbol.slice(0, 2) || data.name.slice(0, 2)}
-        </span>
+        {/* No `logoUrl` field exists on this legacy dashboard data type yet
+            (unlike `lib/intelligence/types.ts`'s `Identity`) — `ProjectLogo`
+            still gives this widget the same shared fallback-initials
+            treatment Explorer uses, instead of a locally reimplemented one,
+            and will start rendering a real image for free whenever this
+            widget's data source gains a logo field. */}
+        <ProjectLogo logoUrl={null} name={data.name} size={44} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <p className="truncate text-sm font-semibold text-radar-light-text dark:text-radar-white">

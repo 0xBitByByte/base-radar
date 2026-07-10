@@ -1,9 +1,9 @@
-import { Coins } from "lucide-react";
-
+import { ChainBadge } from "@/components/branding/ChainBadge";
+import { ChainBadgeGroup } from "@/components/branding/ChainBadgeGroup";
+import { TokenLogo } from "@/components/branding/TokenLogo";
 import { MetricItem } from "@/components/explorer/MetricItem";
 import { QuickViewSectionLabel } from "@/components/explorer/QuickViewSectionLabel";
 import { formatLabel } from "@/components/explorer/format";
-import { GlowBadge } from "@/components/ui/GlowBadge";
 import { cn } from "@/lib/utils";
 import { formatCompactCurrency, formatGwei, formatNumber, formatPercent } from "@/lib/data/format";
 import type { ChainInfo, Contracts, Market, Trading, Tvl } from "@/lib/intelligence/types";
@@ -28,11 +28,11 @@ const METRIC_GROUP_CLASS =
  * a group share one card (`MetricItem`'s `bare` variant) rather than each
  * getting its own border — same information, fewer boxes.
  *
- * The dashed placeholder icon beside "Market" is deliberate: a Token Logo
- * is a different asset from the Project Logo already shown in
- * `QuickViewHeader`, and this codebase's data model has no token-logo field
- * yet. This reserves the visual slot for a real one later rather than
- * substituting the project logo or inventing a fake image.
+ * The `TokenLogo` beside "Market" is deliberate: a Token Logo is a
+ * different asset from the Project Logo already shown in `QuickViewHeader`,
+ * and this codebase's data model has no token-logo field yet, so it always
+ * renders its reserved-slot empty state here. Never substitutes the
+ * project logo or invents a fake image.
  */
 export function QuickViewMetrics({ market, trading, tvl, chain, contracts }: QuickViewMetricsProps) {
   const marketCapAvailable = market.available && market.marketCapUsd !== null;
@@ -48,13 +48,7 @@ export function QuickViewMetrics({ market, trading, tvl, chain, contracts }: Qui
     <div className="flex flex-col gap-6 px-5 py-6">
       <section className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
-          <span
-            className="flex size-5 shrink-0 items-center justify-center rounded-full border border-dashed border-radar-light-border text-radar-light-muted/50 dark:border-white/10 dark:text-radar-muted/40"
-            aria-hidden="true"
-            title="Token logo not yet available"
-          >
-            <Coins className="size-3" />
-          </span>
+          <TokenLogo size={20} />
           <QuickViewSectionLabel>Market</QuickViewSectionLabel>
         </div>
         <div className={METRIC_GROUP_CLASS}>
@@ -105,13 +99,7 @@ export function QuickViewMetrics({ market, trading, tvl, chain, contracts }: Qui
 
       <section className="flex flex-col gap-2">
         <QuickViewSectionLabel>Chain</QuickViewSectionLabel>
-        <div className="flex flex-wrap gap-1.5">
-          {chain.chains.map((oneChain) => (
-            <GlowBadge key={oneChain} color="muted" className="px-2 py-0.5 text-[10.5px]">
-              {formatLabel(oneChain)}
-            </GlowBadge>
-          ))}
-        </div>
+        <ChainBadgeGroup chains={chain.chains} size="sm" />
         <div className={METRIC_GROUP_CLASS}>
           <MetricItem
             bare
@@ -138,8 +126,11 @@ export function QuickViewMetrics({ market, trading, tvl, chain, contracts }: Qui
                 className="flex items-center justify-between gap-3 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 dark:border-white/10 dark:bg-white/[0.02]"
               >
                 <div className="min-w-0">
-                  <div className="truncate text-xs font-medium text-radar-light-text dark:text-radar-white">
-                    {contract.label ?? formatLabel(contract.type)}
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-xs font-medium text-radar-light-text dark:text-radar-white">
+                      {contract.label ?? formatLabel(contract.type)}
+                    </span>
+                    <ChainBadge chain={contract.chain} size="sm" className="shrink-0" />
                   </div>
                   <div className="truncate text-[11px] text-radar-light-muted dark:text-radar-muted">
                     {contract.address}

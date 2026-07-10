@@ -45,6 +45,78 @@ export function formatGwei(value: number): string {
   return `${value.toFixed(3)} gwei`;
 }
 
+/**
+ * A formatted value split into the pieces `KpiValueDisplay` renders with
+ * independent emphasis — the numeral (`integer`/`decimal`) as the hero,
+ * everything else (`prefix`/`suffix`/`unit`) demoted to secondary color.
+ * `decimal` includes its leading `.` (e.g. `".00"`); `integer` includes any
+ * thousands grouping (e.g. `"1,234"`).
+ */
+export type KpiValueParts = {
+  prefix?: string;
+  integer: string;
+  decimal?: string;
+  suffix?: string;
+  unit?: string;
+};
+
+/** Buckets `Intl.NumberFormat#formatToParts` output into `KpiValueParts` — shared by every compact-notation parts formatter below so a new one is a one-line wrapper, not a re-implementation. */
+function partsFromFormatter(value: number, formatter: Intl.NumberFormat): KpiValueParts {
+  let prefix = "";
+  let integer = "";
+  let decimal = "";
+  let suffix = "";
+  // Multi-letter currency identifiers (e.g. "BTC", "ETH") emit a `literal`
+  // separator (a space) between the code and the numeral — which side of
+  // the number it belongs to depends on whether we've seen the integer yet.
+  let sawInteger = false;
+
+  for (const part of formatter.formatToParts(value)) {
+    switch (part.type) {
+      case "currency":
+        prefix += part.value;
+        break;
+      case "minusSign":
+        integer = part.value + integer;
+        sawInteger = true;
+        break;
+      case "integer":
+      case "group":
+        integer += part.value;
+        sawInteger = true;
+        break;
+      case "decimal":
+      case "fraction":
+        decimal += part.value;
+        break;
+      case "compact":
+        suffix += part.value;
+        break;
+      case "literal":
+        if (sawInteger) suffix += part.value;
+        else prefix += part.value;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return { prefix: prefix || undefined, integer, decimal: decimal || undefined, suffix: suffix || undefined };
+}
+
+export function formatCompactCurrencyParts(value: number): KpiValueParts {
+  return partsFromFormatter(value, compactCurrency);
+}
+
+export function formatCompactNumberParts(value: number): KpiValueParts {
+  return partsFromFormatter(value, compactNumber);
+}
+
+export function formatGweiParts(value: number): KpiValueParts {
+  const [integer, fraction] = value.toFixed(3).split(".");
+  return { integer, decimal: `.${fraction}`, unit: "gwei" };
+}
+
 export function formatPercent(value: number, opts?: { showSign?: boolean }): string {
   const sign = opts?.showSign !== false && value > 0 ? "+" : "";
   return `${sign}${value.toFixed(1)}%`;

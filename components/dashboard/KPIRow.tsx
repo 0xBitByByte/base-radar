@@ -6,9 +6,9 @@ import { ArrowDown, ArrowUp, Minus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import {
-  formatCompactCurrency,
-  formatCompactNumber,
-  formatGwei,
+  formatCompactCurrencyParts,
+  formatCompactNumberParts,
+  formatGweiParts,
   formatPercent,
   formatRelativeTime,
 } from "@/lib/data/format";
@@ -36,9 +36,9 @@ const TREND_ICON: Record<Trend, typeof ArrowUp> = {
 };
 
 function formatterFor(kpi: Kpi) {
-  if (kpi.format === "currency") return formatCompactCurrency;
-  if (kpi.format === "gwei") return formatGwei;
-  return formatCompactNumber;
+  if (kpi.format === "currency") return formatCompactCurrencyParts;
+  if (kpi.format === "gwei") return formatGweiParts;
+  return formatCompactNumberParts;
 }
 
 type KPIRowProps = {
@@ -73,19 +73,21 @@ export function KPIRow({ items, lastUpdated }: KPIRowProps) {
                 viewport={{ once: true, margin: "-40px" }}
                 whileHover={{ y: -3 }}
                 transition={{ duration: 0.25, ease: "easeOut", delay: index * 0.03 }}
-                className="flex flex-col gap-1.5 rounded-2xl border border-radar-light-border bg-radar-light-card/80 p-4 backdrop-blur-xl transition-[border-color,box-shadow] duration-200 hover:border-radar-primary/30 hover:shadow-lg dark:hover:shadow-[0_12px_40px_-12px_rgba(0,82,255,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:border-white/10 dark:bg-radar-card/60 dark:hover:border-radar-primary/40"
+                className="flex h-[112px] w-full flex-col gap-1.5 overflow-hidden rounded-2xl border border-radar-light-border bg-radar-light-card/80 p-4 backdrop-blur-xl transition-[border-color,box-shadow] duration-200 hover:border-radar-primary/30 hover:shadow-lg dark:hover:shadow-[0_12px_40px_-12px_rgba(0,82,255,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:border-white/10 dark:bg-radar-card/60 dark:hover:border-radar-primary/40"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <span className="truncate text-[11px] font-medium text-radar-light-muted dark:text-radar-muted">
+                  <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-radar-light-muted dark:text-radar-muted">
                     {kpi.label}
                   </span>
-                  <Sparkline data={kpi.sparkline} color={TREND_HEX[trend]} height={20} className="w-12" />
+                  <Sparkline
+                    data={kpi.sparkline}
+                    color={TREND_HEX[trend]}
+                    height={20}
+                    opacity={0.8}
+                    className="w-12 shrink-0"
+                  />
                 </div>
-                <AnimatedNumber
-                  value={kpi.value}
-                  format={format}
-                  className="text-lg font-semibold text-radar-light-text tabular-nums dark:text-radar-white"
-                />
+                <AnimatedNumber value={kpi.value} format={format} className="whitespace-nowrap" />
                 {kpi.deltaPct !== undefined && (
                   <span className={cn("flex items-center gap-1 text-xs font-medium", TREND_COLOR[trend])}>
                     <TrendIcon className="size-3" aria-hidden="true" />

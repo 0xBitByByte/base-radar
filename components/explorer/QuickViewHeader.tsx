@@ -1,7 +1,7 @@
-import Image from "next/image";
 import { Dialog } from "@base-ui/react/dialog";
 import { X } from "lucide-react";
 
+import { ProjectLogo } from "@/components/branding/ProjectLogo";
 import { VerificationBadge } from "@/components/explorer/VerificationBadge";
 import { ProjectCategoryChips } from "@/components/explorer/ProjectCategoryChips";
 import type { Community, Identity } from "@/lib/intelligence/types";
@@ -28,26 +28,13 @@ export function QuickViewHeader({ identity, community }: QuickViewHeaderProps) {
   return (
     <div className="flex flex-col gap-4 p-5">
       <div className="flex items-center gap-3">
-        {identity.logoUrl ? (
-          <Image
-            src={identity.logoUrl}
-            alt=""
-            width={56}
-            height={56}
-            unoptimized
-            className="size-14 shrink-0 rounded-full object-cover"
-          />
-        ) : (
-          <span
-            className="flex size-14 shrink-0 items-center justify-center rounded-full bg-radar-light-surface text-lg font-semibold text-radar-light-muted dark:bg-white/5 dark:text-radar-muted"
-            aria-hidden="true"
-          >
-            {identity.name.slice(0, 2).toUpperCase()}
-          </span>
-        )}
+        <ProjectLogo logoUrl={identity.logoUrl} name={identity.name} size={56} />
 
         <div className="min-w-0 flex-1">
-          <Dialog.Title className="truncate text-lg font-semibold text-radar-light-text dark:text-radar-white">
+          <Dialog.Title
+            title={identity.name}
+            className="truncate text-lg font-semibold text-radar-light-text dark:text-radar-white"
+          >
             {identity.name}
           </Dialog.Title>
           <VerificationBadge status={community.verificationStatus} className="mt-1.5" />

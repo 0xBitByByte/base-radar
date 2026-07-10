@@ -5,6 +5,7 @@ import { ChevronRight, Menu, Sparkles, Bell, GitCompare, Wallet } from "lucide-r
 
 import { cn } from "@/lib/utils";
 import { useLiveNetworkStatus } from "@/lib/hooks/useLiveNetworkStatus";
+import { ChainBadge } from "@/components/branding/ChainBadge";
 import { SearchBar } from "@/components/dashboard/SearchBar";
 import { UserMenu } from "@/components/dashboard/UserMenu";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
@@ -34,7 +35,7 @@ function NetworkBadge() {
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-radar-success opacity-75" />
         <span className="relative inline-flex size-1.5 rounded-full bg-radar-success" />
       </span>
-      Base
+      <ChainBadge chain="base" size="sm" bare />
       {status && (
         <span className="text-radar-light-muted dark:text-radar-muted/70">
           · {status.gasGwei.toFixed(3)} gwei

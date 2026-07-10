@@ -1,4 +1,4 @@
-import { ColumnHeader } from "@/components/explorer/ColumnHeader";
+import { ACTION_COLUMN_CLASS, ColumnHeader } from "@/components/explorer/ColumnHeader";
 import { SortableHeader } from "@/components/explorer/SortableHeader";
 import type { SortState } from "@/components/explorer/sort";
 import { cn } from "@/lib/utils";
@@ -31,6 +31,7 @@ export function ExplorerTableHeader({ sort, onSortChange, isStuck }: ExplorerTab
       {/* border-b lives on the row, not `<thead>` — `border-collapse` tables don't render borders on row-groups. */}
       <tr className={cn(isStuck && "border-b border-radar-light-border dark:border-white/10")}>
         <SortableHeader field="name" label="Name" sort={sort} onSortChange={onSortChange} className={PINNED_HEADER_CLASS} />
+        <ColumnHeader label="Chain" />
         <ColumnHeader label="Category" />
         <ColumnHeader label="Verification" />
         <SortableHeader field="price" label="Price" align="right" sort={sort} onSortChange={onSortChange} />
@@ -39,7 +40,7 @@ export function ExplorerTableHeader({ sort, onSortChange, isStuck }: ExplorerTab
         <SortableHeader field="health" label="Health" sort={sort} onSortChange={onSortChange} />
         <SortableHeader field="confidence" label="Confidence" sort={sort} onSortChange={onSortChange} />
         <SortableHeader field="githubStars" label="GitHub Stars" align="right" sort={sort} onSortChange={onSortChange} />
-        <ColumnHeader label="Actions" srOnly />
+        <ColumnHeader label="Actions" srOnly className={ACTION_COLUMN_CLASS} />
       </tr>
     </thead>
   );

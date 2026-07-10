@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { Radar, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { NAV_LINKS } from "@/constants/site";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { GithubMark } from "@/components/ui/BrandIcons";
+import { BaseRadarLogo } from "@/components/branding/BaseRadarLogo";
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -35,8 +36,8 @@ export function Navbar() {
         aria-label="Primary"
       >
         <Link href="/" className="group flex items-center gap-3" aria-label="Base Radar home">
-          <span className="flex size-[2.6rem] items-center justify-center rounded-xl border border-white/10 bg-radar-primary/10 text-radar-accent transition-colors group-hover:bg-radar-primary/20">
-            <Radar className="size-6" />
+          <span className="flex size-[2.6rem] items-center justify-center rounded-xl border border-white/10 bg-radar-primary/10 transition-colors group-hover:bg-radar-primary/20">
+            <BaseRadarLogo size={26} />
           </span>
           <span className="flex flex-col leading-none">
             <span className="text-base font-bold tracking-wide text-radar-white">BASE</span>

@@ -1,6 +1,8 @@
 import { memo, type ReactNode } from "react";
-import Image from "next/image";
 
+import { ChainBadgeGroup } from "@/components/branding/ChainBadgeGroup";
+import { ProjectLogo } from "@/components/branding/ProjectLogo";
+import { ACTION_COLUMN_CLASS } from "@/components/explorer/ColumnHeader";
 import { VerificationBadge } from "@/components/explorer/VerificationBadge";
 import { ScoreBadge } from "@/components/explorer/ScoreBadge";
 import { RowActions } from "@/components/explorer/RowActions";
@@ -21,9 +23,26 @@ const UNAVAILABLE_CLASS = "text-radar-light-muted dark:text-radar-muted";
 const PINNED_CELL_CLASS =
   "sticky left-0 z-[1] border-r border-radar-light-border bg-radar-light-card group-hover:bg-radar-light-surface dark:border-white/10 dark:bg-radar-card dark:group-hover:bg-white/[0.03]";
 
-function Cell({ children, align = "left", className }: { children: ReactNode; align?: "left" | "right"; className?: string }) {
+function Cell({
+  children,
+  align = "left",
+  className,
+}: {
+  children: ReactNode;
+  align?: "left" | "right" | "center";
+  className?: string;
+}) {
   return (
-    <td className={cn(CELL_CLASS, align === "right" && "min-w-20 text-right tabular-nums", className)}>{children}</td>
+    <td
+      className={cn(
+        CELL_CLASS,
+        align === "right" && "min-w-20 text-right tabular-nums",
+        align === "center" && "text-center",
+        className
+      )}
+    >
+      {children}
+    </td>
   );
 }
 
@@ -35,7 +54,7 @@ function Cell({ children, align = "left", className }: { children: ReactNode; al
  * `VerificationBadge` directly — no duplicate rendering implementation.
  */
 function ProjectRowComponent({ project, onActivate }: ProjectRowProps) {
-  const { identity, community, market, tvl, health, confidence, github } = project;
+  const { identity, community, market, tvl, health, confidence, github, chain } = project;
   const primaryCategory = identity.categories[0];
 
   const priceAvailable = market.available && market.priceUsd !== null;
@@ -63,31 +82,38 @@ function ProjectRowComponent({ project, onActivate }: ProjectRowProps) {
     >
       <Cell className={PINNED_CELL_CLASS}>
         <div className="flex min-w-0 items-center gap-2.5">
-          {identity.logoUrl ? (
-            <Image
-              src={identity.logoUrl}
-              alt=""
-              width={24}
-              height={24}
-              unoptimized
-              className="size-6 shrink-0 rounded-full object-cover"
-            />
-          ) : (
-            <span
-              className="flex size-6 shrink-0 items-center justify-center rounded-full bg-radar-light-surface text-[10px] font-semibold text-radar-light-muted dark:bg-white/5 dark:text-radar-muted"
-              aria-hidden="true"
-            >
-              {identity.name.slice(0, 2).toUpperCase()}
-            </span>
-          )}
-          <span className="min-w-0 truncate font-medium">{identity.name}</span>
+          <ProjectLogo logoUrl={identity.logoUrl} name={identity.name} size={24} />
+          <span title={identity.name} className="min-w-0 truncate font-medium">
+            {identity.name}
+          </span>
         </div>
       </Cell>
 
-      <Cell>{primaryCategory ? formatLabel(primaryCategory) : <span className={UNAVAILABLE_CLASS}>—</span>}</Cell>
+      <Cell>
+        {/* max=1: always the single leading (Base-first) chain badge, plus
+            "+N" for the rest — denser than showing multiple full badges,
+            and `flex-nowrap` keeps every row the same single-line height
+            regardless of chain count. */}
+        <ChainBadgeGroup chains={chain.chains} size="sm" max={1} className="flex-nowrap" />
+      </Cell>
 
       <Cell>
-        <VerificationBadge status={community.verificationStatus} />
+        {/* Plain text, not a badge — Chain/Verification/Health/Confidence
+            already carry the row's badge visual weight; a fifth pill here
+            would read as noise. Matches `ChainBadge`'s "sm" 10px text size
+            so the column stays as compact as the badge version was, without
+            the pill chrome. */}
+        {primaryCategory ? (
+          <span className="text-[10px] font-medium text-radar-light-muted dark:text-radar-muted">
+            {formatLabel(primaryCategory)}
+          </span>
+        ) : (
+          <span className={UNAVAILABLE_CLASS}>—</span>
+        )}
+      </Cell>
+
+      <Cell>
+        <VerificationBadge status={community.verificationStatus} compact />
       </Cell>
 
       <Cell align="right">
@@ -103,18 +129,18 @@ function ProjectRowComponent({ project, onActivate }: ProjectRowProps) {
       </Cell>
 
       <Cell>
-        <ScoreBadge type="health" score={health.score} label={health.label} showLabel={false} />
+        <ScoreBadge type="health" score={health.score} label={health.label} showLabel={false} bare />
       </Cell>
 
       <Cell>
-        <ScoreBadge type="confidence" score={confidence.score} label={confidence.level} showLabel={false} />
+        <ScoreBadge type="confidence" score={confidence.score} label={confidence.level} showLabel={false} bare />
       </Cell>
 
       <Cell align="right">
         {githubAvailable ? formatCompactNumber(github.stars as number) : <span className={UNAVAILABLE_CLASS}>—</span>}
       </Cell>
 
-      <Cell>
+      <Cell align="center" className={ACTION_COLUMN_CLASS}>
         <RowActions onActivate={onActivate} />
       </Cell>
     </tr>
