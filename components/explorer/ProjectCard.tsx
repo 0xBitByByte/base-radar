@@ -1,6 +1,7 @@
 import { memo, type KeyboardEvent } from "react";
 import { motion } from "framer-motion";
 
+import { ChainBadgeGroup } from "@/components/branding/ChainBadgeGroup";
 import { ProjectCardHeader } from "@/components/explorer/ProjectCardHeader";
 import { ProjectCardDescription } from "@/components/explorer/ProjectCardDescription";
 import { ProjectCategoryChips } from "@/components/explorer/ProjectCategoryChips";
@@ -26,7 +27,7 @@ type ProjectCardProps = {
  * docs/explorer/03 §13) — never a reflow, never an omitted slot.
  */
 function ProjectCardComponent({ project, onActivate }: ProjectCardProps) {
-  const { identity, community, health, confidence, tvl, github, freshness } = project;
+  const { identity, community, health, confidence, tvl, github, freshness, chain } = project;
   const primaryCategory = identity.categories[0];
 
   const tvlAvailable = tvl.available && tvl.tvlUsd !== null;
@@ -70,7 +71,21 @@ function ProjectCardComponent({ project, onActivate }: ProjectCardProps) {
     >
       <ProjectCardHeader identity={identity} community={community} />
       <ProjectCardDescription shortDescription={identity.shortDescription} />
-      <ProjectCategoryChips categories={identity.categories} tags={identity.tags} />
+      {/* Chain (network identity, colored + logo-bearing) always leads,
+          on its own row — deliberately distinct from Category (a neutral
+          taxonomy chip) below, so the two are never mistaken for one
+          merged concept. `flex-nowrap` keeps this row's height identical
+          across every card regardless of chain count — overflow becomes
+          "+N" instead of a second line or a clipped/overflowing badge.
+          max=1: exactly one real chain badge ("Base") always leads, with
+          every other chain collapsing into "+N" — never two full badges
+          side by side ("Base Optimism"), even for a 2-chain project. This
+          is also the narrowest possible value, so it's automatically safe
+          against the Grid's tightest real width (2-column layout at the
+          `lg`/1024px breakpoint, where the Sidebar narrows each card to
+          ~213px). */}
+      <ChainBadgeGroup chains={chain.chains} size="sm" max={1} className="flex-nowrap self-start" />
+      <ProjectCategoryChips categories={identity.categories} tags={identity.tags} reserveHeight />
 
       <ProjectMetricsGrid>
         <ScoreBadge

@@ -1,3 +1,4 @@
+import { ProviderBadge } from "@/components/branding/ProviderBadge";
 import { Timestamp } from "@/components/explorer/Timestamp";
 import { cn } from "@/lib/utils";
 import type { SourceAttribution, SourceStatus } from "@/lib/intelligence/types";
@@ -6,15 +7,6 @@ import type { ProviderName } from "@/lib/providers/common/types";
 type ProviderIndicatorProps = {
   provider: ProviderName;
   attribution: SourceAttribution;
-};
-
-const PROVIDER_LABEL: Record<ProviderName, string> = {
-  coingecko: "CoinGecko",
-  dexscreener: "DexScreener",
-  defillama: "DefiLlama",
-  blockscout: "Blockscout",
-  github: "GitHub",
-  base: "Base Network",
 };
 
 const STATUS_DOT_CLASS: Record<SourceStatus, string> = {
@@ -45,9 +37,10 @@ export function ProviderIndicator({ provider, attribution }: ProviderIndicatorPr
           className={cn("size-1.5 shrink-0 rounded-full", STATUS_DOT_CLASS[attribution.status])}
           aria-hidden="true"
         />
-        <span className="truncate text-xs font-medium text-radar-light-text dark:text-radar-white">
-          {PROVIDER_LABEL[provider]}
-        </span>
+        <ProviderBadge
+          provider={provider}
+          className="text-xs font-medium text-radar-light-text dark:text-radar-white"
+        />
       </div>
       <div className="shrink-0 text-[11px] text-radar-light-muted dark:text-radar-muted">
         {attribution.status === "live" && attribution.fetchedAt ? (

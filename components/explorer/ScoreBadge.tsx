@@ -13,11 +13,50 @@ type ScoreBadgeProps = {
   className?: string;
   /** Grid shows the "Health"/"Confidence" label; Table hides it since the column header already identifies it. */
   showLabel?: boolean;
-  /** One-sentence explanation shown via an info icon — Grid only; omit to render no icon. */
+  /** Fallback one-sentence explanation shown when `factors` isn't passed — Grid/Table never pass `factors`, so this is what their info icon shows. */
   infoTooltip?: string;
-  /** The Engine's own plain-English reasoning behind the score — Quick View only; omit to render none (Grid/Table never pass this). */
+  /** The Engine's own plain-English reasoning behind the score — Quick View only (Grid/Table never pass this). When present, the info tooltip shows this real breakdown instead of `infoTooltip`'s generic sentence — always the Engine's actual computed factors, never invented. */
   factors?: string[];
+  /** Renders as a plain label+value stack with no border/background/padding of its own — Table's dense cells. Grid/Quick View never pass this. */
+  bare?: boolean;
 };
+
+const TOOLTIP_LIST_CLASS = "mt-1 flex flex-col gap-0.5";
+
+function ScoreTooltipContent({
+  typeTitle,
+  label,
+  score,
+  factors,
+  fallback,
+}: {
+  typeTitle: string;
+  label: string;
+  score: number;
+  factors?: string[];
+  fallback?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="font-semibold">{typeTitle} Score</p>
+      <p>
+        Overall score: {formatLabel(label)} ({score})
+      </p>
+      {factors && factors.length > 0 ? (
+        <>
+          <p className="text-radar-light-muted dark:text-radar-muted">Calculated from:</p>
+          <ul className={TOOLTIP_LIST_CLASS}>
+            {factors.map((factor) => (
+              <li key={factor}>✓ {factor}</li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        fallback && <p className="text-radar-light-muted dark:text-radar-muted">{fallback}</p>
+      )}
+    </div>
+  );
+}
 
 const TYPE_TITLE: Record<ScoreBadgeType, string> = {
   health: "Health",
@@ -48,23 +87,45 @@ const CONFIDENCE_COLOR: Record<string, string> = {
  * by the Intelligence Engine (`scoring.ts`/`confidence.ts`) — never
  * derived or recomputed here.
  */
-export function ScoreBadge({ type, score, label, className, showLabel = true, infoTooltip, factors }: ScoreBadgeProps) {
+export function ScoreBadge({
+  type,
+  score,
+  label,
+  className,
+  showLabel = true,
+  infoTooltip,
+  factors,
+  bare,
+}: ScoreBadgeProps) {
   const color =
     (type === "health" ? HEALTH_COLOR[label] : CONFIDENCE_COLOR[label]) ??
     "text-radar-light-muted dark:text-radar-muted";
+  const hasFactors = Boolean(factors && factors.length > 0);
+  const hasTooltip = hasFactors || Boolean(infoTooltip);
 
   return (
     <div
       className={cn(
-        "flex flex-col gap-0.5 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 dark:border-white/10 dark:bg-white/[0.02]",
+        "flex flex-col gap-0.5",
+        !bare && "rounded-xl border border-radar-light-border bg-radar-light-surface p-3 dark:border-white/10 dark:bg-white/[0.02]",
         className
       )}
     >
       {showLabel && (
         <span className="flex items-center gap-1 text-[10.5px] text-radar-light-muted dark:text-radar-muted">
           {TYPE_TITLE[type]}
-          {infoTooltip && (
-            <Tooltip content={infoTooltip}>
+          {hasTooltip && (
+            <Tooltip
+              content={
+                <ScoreTooltipContent
+                  typeTitle={TYPE_TITLE[type]}
+                  label={label}
+                  score={score}
+                  factors={factors}
+                  fallback={infoTooltip}
+                />
+              }
+            >
               <button
                 type="button"
                 onClick={(event) => event.stopPropagation()}
@@ -77,7 +138,7 @@ export function ScoreBadge({ type, score, label, className, showLabel = true, in
           )}
         </span>
       )}
-      <span className={cn("text-sm font-semibold tabular-nums", color)}>
+      <span className={cn("text-sm tabular-nums", bare ? "whitespace-nowrap font-normal" : "font-semibold", color)}>
         {formatLabel(label)} <span className="text-radar-light-muted dark:text-radar-muted">· {score}</span>
       </span>
       {factors && factors.length > 0 && (

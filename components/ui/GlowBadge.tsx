@@ -15,7 +15,8 @@ const colorStyles = {
   success: "border-radar-success/30 bg-radar-success/10 text-radar-success",
   warning: "border-radar-warning/30 bg-radar-warning/10 text-radar-warning",
   danger: "border-radar-danger/30 bg-radar-danger/10 text-radar-danger",
-  muted: "border-white/10 bg-white/5 text-radar-muted",
+  muted:
+    "border-radar-light-border bg-radar-light-surface text-radar-light-muted dark:border-white/10 dark:bg-white/5 dark:text-radar-muted",
 } as const;
 
 export function GlowBadge({
