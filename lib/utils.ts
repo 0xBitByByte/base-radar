@@ -33,3 +33,20 @@ export function splitOverflow<T>(items: T[], max: number): { visible: T[]; hidde
 export function sortAlphabetically<T>(items: T[], key: (item: T) => string = (item) => String(item)): T[] {
   return [...items].sort((a, b) => key(a).localeCompare(key(b)));
 }
+
+/**
+ * The literal (non-Tailwind-class) colour for each trend direction — for
+ * anything that needs a real CSS color string rather than a class, e.g. a
+ * `Sparkline`'s `stroke`/`fill` props or any other inline SVG color. Each
+ * value is the CSS custom property every `text-radar-success`/
+ * `text-radar-danger`/`text-radar-muted` utility already resolves to, so
+ * there is exactly one place (`app/globals.css`) each brand colour is ever
+ * defined — this just points at it instead of re-hardcoding the hex.
+ * Shared by `KPIRow` and `PortfolioWidget`, the two surfaces that pass a
+ * literal trend color into `Sparkline`.
+ */
+export const TREND_COLOR_VAR: Record<"up" | "down" | "flat", string> = {
+  up: "var(--color-radar-success)",
+  down: "var(--color-radar-danger)",
+  flat: "var(--color-radar-muted)",
+};

@@ -1,8 +1,12 @@
+"use client";
+
 import { Wallet } from "lucide-react";
 
-import { formatCompactCurrency, formatPercent } from "@/lib/data/format";
+import { formatCompactCurrency, formatCompactCurrencyParts, formatPercent } from "@/lib/data/format";
 import type { PortfolioSummary, WithSource } from "@/lib/data/types";
+import { TREND_COLOR_VAR } from "@/lib/utils";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
+import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { Sparkline } from "@/components/ui/Sparkline";
 
 type PortfolioWidgetProps = {
@@ -24,9 +28,11 @@ export function PortfolioWidget({ data, lastUpdated }: PortfolioWidgetProps) {
     >
       <div className="flex items-end justify-between gap-3">
         <div>
-          <p className="text-2xl font-semibold tabular-nums text-radar-light-text dark:text-radar-white">
-            {formatCompactCurrency(data.totalValue)}
-          </p>
+          <AnimatedNumber
+            value={data.totalValue}
+            format={formatCompactCurrencyParts}
+            className="whitespace-nowrap"
+          />
           <p
             className={
               isUp
@@ -39,7 +45,7 @@ export function PortfolioWidget({ data, lastUpdated }: PortfolioWidgetProps) {
         </div>
         <Sparkline
           data={data.sparkline}
-          color={isUp ? "#00e676" : "#ff5a6f"}
+          color={isUp ? TREND_COLOR_VAR.up : TREND_COLOR_VAR.down}
           height={44}
           className="w-24"
         />

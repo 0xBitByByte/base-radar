@@ -1,7 +1,8 @@
 import { BookOpen, FileText, Globe, MessageCircle, PenLine, Send } from "lucide-react";
 
 import { DiscordMark, GithubMark, LinktreeMark, XMark } from "@/components/ui/BrandIcons";
-import type { SocialBrand, SocialPlatform } from "@/lib/branding/types";
+import { SITE } from "@/constants/site";
+import type { BrandIconComponent, SocialBrand, SocialPlatform } from "@/lib/branding/types";
 
 /**
  * Display metadata for every external link platform `SocialLink` supports.
@@ -37,3 +38,59 @@ export const SOCIAL_BRANDING: Record<SocialPlatform, SocialBrand> = {
   farcaster: { label: "Farcaster", Icon: MessageCircle },
   linktree: { label: "Linktree", Icon: LinktreeMark, hoverClassName: "hover:bg-[#43E660]/10 hover:text-[#43E660]" },
 };
+
+export type SocialNavLink = {
+  label: string;
+  ariaLabel: string;
+  href: string;
+  Icon: BrandIconComponent;
+  hoverClassName: string;
+};
+
+/**
+ * The Base Radar-wide social row (`Sidebar`, `Footer`) — every field but
+ * the neutral GitHub/X hover was already duplicated identically between
+ * the two consumers, so it's built once here. `neutralHoverClassName` stays
+ * a parameter rather than living in the registry: Sidebar is theme-aware
+ * and Footer is dark-only, a real, intentional difference the two callers
+ * still control themselves.
+ */
+export function buildSocialNavLinks(neutralHoverClassName: string): SocialNavLink[] {
+  return [
+    {
+      label: "GitHub",
+      ariaLabel: "Visit Base Radar GitHub",
+      href: SITE.social.github,
+      Icon: GithubMark,
+      hoverClassName: neutralHoverClassName,
+    },
+    {
+      label: "X (Twitter)",
+      ariaLabel: "Follow Base Radar on X",
+      href: SITE.social.x,
+      Icon: XMark,
+      hoverClassName: neutralHoverClassName,
+    },
+    {
+      label: "Discord",
+      ariaLabel: "Join Base Radar on Discord",
+      href: SITE.social.discord,
+      Icon: DiscordMark,
+      hoverClassName: SOCIAL_BRANDING.discord.hoverClassName ?? "",
+    },
+    {
+      label: "Telegram",
+      ariaLabel: "Join Base Radar Telegram",
+      href: SITE.social.telegram,
+      Icon: Send,
+      hoverClassName: SOCIAL_BRANDING.telegram.hoverClassName ?? "",
+    },
+    {
+      label: "Linktree",
+      ariaLabel: "Visit Base Radar Linktree",
+      href: SITE.social.linktree,
+      Icon: LinktreeMark,
+      hoverClassName: SOCIAL_BRANDING.linktree.hoverClassName ?? "",
+    },
+  ];
+}

@@ -17,7 +17,7 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
       <Dialog.Portal>
         <Dialog.Backdrop
           className={cn(
-            "fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-sm lg:hidden dark:bg-black/60",
+            "fixed inset-0 z-40 bg-radar-bg/40 backdrop-blur-sm lg:hidden dark:bg-black/60",
             "transition-opacity duration-300 motion-reduce:transition-none",
             "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0"
           )}
@@ -36,7 +36,7 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
             </Dialog.Title>
             <Dialog.Close
               aria-label="Close navigation"
-              className="flex size-8 items-center justify-center rounded-lg text-radar-light-muted outline-none transition-colors hover:bg-slate-900/5 focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:text-radar-muted dark:hover:bg-white/5"
+              className="flex size-8 items-center justify-center rounded-lg text-radar-light-muted outline-none transition-colors hover:bg-radar-light-surface focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:text-radar-muted dark:hover:bg-white/5"
             >
               <X className="size-4" />
             </Dialog.Close>

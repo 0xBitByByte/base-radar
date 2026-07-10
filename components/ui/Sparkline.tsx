@@ -13,8 +13,18 @@ type SparklineProps = {
   className?: string;
 };
 
-export function Sparkline({ data, color = "#0052ff", height = 40, opacity = 1, className }: SparklineProps) {
-  const gradientId = `sparkline-${color.replace("#", "")}`;
+export function Sparkline({
+  data,
+  color = "var(--color-radar-primary)",
+  height = 40,
+  opacity = 1,
+  className,
+}: SparklineProps) {
+  // Strips every non-alphanumeric character rather than just "#" — the
+  // default color is now a CSS custom-property reference
+  // (`var(--color-radar-primary)`), and its parentheses/dashes would
+  // otherwise produce an invalid `url(#...)` gradient reference.
+  const gradientId = `sparkline-${color.replace(/[^a-zA-Z0-9]/g, "")}`;
 
   return (
     <div className={className} style={{ height }}>
