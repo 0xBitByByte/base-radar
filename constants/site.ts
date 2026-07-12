@@ -94,18 +94,20 @@ export const FOOTER_LINK_GROUPS: FooterLinkGroup[] = [
 
 export const TRUST_INDICATORS: string[] = ["Free", "Open Source", "Built for Base"];
 
+/** `format` selects which of `lib/data/format.ts`'s shared `*Parts` formatters (the same ones `KPIRow` uses) renders `value` — the Hero preview's stat grid is a real `AnimatedNumber`/`KpiValueDisplay` consumer, not a lookalike with pre-formatted strings. */
 export type DashboardStat = {
   label: string;
-  value: string;
+  value: number;
+  format: "gwei" | "compactCurrency" | "compactNumber";
   delta?: string;
   trend?: "up" | "down";
 };
 
 export const DASHBOARD_STATS: DashboardStat[] = [
-  { label: "Gas", value: "0.014 gwei", delta: "+6%", trend: "up" },
-  { label: "Active Projects", value: "2,314", delta: "+42", trend: "up" },
-  { label: "TVL", value: "$3.68B", delta: "+3.4%", trend: "up" },
-  { label: "24H Volume", value: "$486M", delta: "+9.2%", trend: "up" },
+  { label: "Gas", value: 0.014, format: "gwei", delta: "+6%", trend: "up" },
+  { label: "Active Projects", value: 2314, format: "compactNumber", delta: "+42", trend: "up" },
+  { label: "TVL", value: 3_680_000_000, format: "compactCurrency", delta: "+3.4%", trend: "up" },
+  { label: "24H Volume", value: 486_000_000, format: "compactCurrency", delta: "+9.2%", trend: "up" },
 ];
 
 export type DashboardHighlight = {

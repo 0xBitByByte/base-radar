@@ -37,7 +37,7 @@ export function GlowBadge({
     >
       {dot && (
         <span className="relative flex size-1.5">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-75" />
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-75 motion-reduce:animate-none" />
           <span className="relative inline-flex size-1.5 rounded-full bg-current" />
         </span>
       )}

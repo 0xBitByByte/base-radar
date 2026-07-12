@@ -1,9 +1,17 @@
 import { BadgeCheck, CircleAlert, Flag, Users, type LucideIcon } from "lucide-react";
 
 import { GlowBadge, type GlowBadgeColor } from "@/components/ui/GlowBadge";
+import { RichTooltip } from "@/components/ui/RichTooltip";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";
 import type { VerificationStatus } from "@/data/projects/enums";
+
+const STATUS_ACCENT: Record<VerificationStatus, "success" | "primary" | "muted" | "danger"> = {
+  verified: "success",
+  community: "primary",
+  unverified: "muted",
+  flagged: "danger",
+};
 
 const STATUS_STYLE: Record<VerificationStatus, { label: string; color: GlowBadgeColor; icon: LucideIcon }> = {
   verified: { label: "Verified", color: "success", icon: BadgeCheck },
@@ -60,9 +68,13 @@ export function VerificationBadge({ status, compact, className }: VerificationBa
         const { label, color, icon: Icon } = STATUS_STYLE[candidate];
         const isActive = candidate === status;
 
+        const tooltipContent = (
+          <RichTooltip icon={Icon} title={label} accent={STATUS_ACCENT[candidate]} description={STATUS_DESCRIPTION[candidate]} />
+        );
+
         if (!isActive) {
           return (
-            <Tooltip key={candidate} content={STATUS_DESCRIPTION[candidate]}>
+            <Tooltip key={candidate} content={tooltipContent}>
               <span
                 role="img"
                 aria-label={label}
@@ -79,7 +91,7 @@ export function VerificationBadge({ status, compact, className }: VerificationBa
         }
 
         return (
-          <Tooltip key={candidate} content={STATUS_DESCRIPTION[candidate]}>
+          <Tooltip key={candidate} content={tooltipContent}>
             <GlowBadge
               color={color}
               tabIndex={0}

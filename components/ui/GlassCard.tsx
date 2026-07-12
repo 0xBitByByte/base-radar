@@ -10,8 +10,9 @@ export function GlassCard({ className, glow = false, children, ...props }: Glass
   return (
     <div
       className={cn(
-        "relative rounded-3xl border border-white/10 bg-radar-card/60 backdrop-blur-xl",
-        glow && "shadow-[0_0_60px_-15px_var(--color-radar-primary)]",
+        "relative rounded-3xl border border-radar-light-border bg-gradient-to-b from-radar-light-card/80 to-radar-light-surface/60 shadow-[0_1px_2px_rgba(16,34,58,0.04)] backdrop-blur-xl",
+        "dark:border-radar-border dark:bg-gradient-to-b dark:from-radar-elevated/70 dark:to-radar-card/70 dark:shadow-[0_1px_2px_rgba(0,0,0,0.2)]",
+        glow && "shadow-[0_0_50px_-10px_rgba(var(--color-radar-primary-rgb),0.12)] dark:shadow-[0_0_50px_-10px_rgba(var(--color-radar-primary-rgb),0.15)]",
         className
       )}
       {...props}

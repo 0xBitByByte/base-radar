@@ -8,6 +8,7 @@ import { Sidebar } from "@/components/dashboard/Sidebar";
 import { MobileSidebar } from "@/components/dashboard/MobileSidebar";
 import { Topbar } from "@/components/dashboard/Topbar";
 import { LiveStatusBar } from "@/components/dashboard/LiveStatusBar";
+import { NavigationOverlayProvider, NavigationOverlay } from "@/components/dashboard/NavigationOverlay";
 
 type DashboardLayoutProps = {
   children: ReactNode;
@@ -44,23 +45,26 @@ export function DashboardLayout({ children, ticker, intelligenceRail }: Dashboar
           <div className="absolute top-0 left-1/2 size-[50rem] -translate-x-1/2 -translate-y-1/3 rounded-full bg-radar-primary/10 blur-3xl dark:bg-radar-primary/20" />
         </div>
 
-        <div className="mx-auto flex max-w-[1600px]">
-          <Sidebar />
+        <NavigationOverlayProvider>
+          <div className="mx-auto flex max-w-[1600px]">
+            <Sidebar />
 
-          <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
-            <Topbar onOpenMobileNav={() => setMobileNavOpen(true)} />
-            <LiveStatusBar data={ticker} />
-            <main className="min-w-0 flex-1 px-4 py-8 sm:px-6 lg:px-10">{children}</main>
+            <div className="relative flex min-h-dvh min-w-0 flex-1 flex-col">
+              <Topbar onOpenMobileNav={() => setMobileNavOpen(true)} />
+              <LiveStatusBar data={ticker} />
+              <main className="min-w-0 flex-1 px-4 py-8 sm:px-6 lg:px-10">{children}</main>
+              <NavigationOverlay />
+            </div>
+
+            {intelligenceRail && (
+              <aside className="hidden w-80 shrink-0 border-l border-radar-light-border px-4 py-8 xl:block dark:border-white/10">
+                {intelligenceRail}
+              </aside>
+            )}
           </div>
 
-          {intelligenceRail && (
-            <aside className="hidden w-80 shrink-0 border-l border-radar-light-border px-4 py-8 xl:block dark:border-white/10">
-              {intelligenceRail}
-            </aside>
-          )}
-        </div>
-
-        <MobileSidebar open={mobileNavOpen} onOpenChange={setMobileNavOpen} />
+          <MobileSidebar open={mobileNavOpen} onOpenChange={setMobileNavOpen} />
+        </NavigationOverlayProvider>
       </div>
     </MotionConfig>
   );

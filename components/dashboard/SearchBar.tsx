@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Dialog } from "@base-ui/react/dialog";
-import { ArrowUpRight, Clock, Search, TrendingUp, Zap } from "lucide-react";
+import { ArrowUpRight, Clock, Search, SearchX, TrendingUp } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { QUICK_ACTIONS, RECENT_SEARCHES, TRENDING_SEARCHES } from "@/constants/dashboard";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 type SearchBarProps = {
   className?: string;
@@ -54,9 +55,9 @@ export function SearchBar({ className }: SearchBarProps) {
           <button
             type="button"
             className={cn(
-              "relative flex items-center gap-2 rounded-xl border border-radar-light-border bg-radar-light-surface px-3 py-2 text-left text-sm text-radar-light-muted outline-none transition-colors",
-              "hover:border-radar-primary/30 focus-visible:border-radar-primary/50 focus-visible:ring-2 focus-visible:ring-radar-primary/30",
-              "dark:border-white/10 dark:bg-white/5 dark:text-radar-muted",
+              "relative flex items-center gap-2 rounded-xl border border-radar-light-border bg-radar-light-surface px-3 py-2 text-left text-sm text-radar-light-muted outline-none transition-[border-color,box-shadow] duration-200",
+              "hover:border-radar-primary/30 focus-visible:border-radar-primary/50 focus-visible:shadow-[0_0_0_4px_rgba(var(--color-radar-primary-rgb),0.1)]",
+              "dark:border-radar-border dark:bg-white/5 dark:text-radar-muted dark:focus-visible:shadow-[0_0_0_4px_rgba(var(--color-radar-primary-rgb),0.15)]",
               className
             )}
           />
@@ -164,10 +165,12 @@ export function SearchBar({ className }: SearchBarProps) {
             )}
 
             {filteredRecent.length === 0 && filteredTrending.length === 0 && filteredActions.length === 0 && (
-              <p className="flex items-center gap-2 px-2.5 py-6 text-sm text-radar-light-muted dark:text-radar-muted">
-                <Zap className="size-4" aria-hidden="true" />
-                No matches for &ldquo;{query}&rdquo;
-              </p>
+              <EmptyState
+                icon={SearchX}
+                title={`No matches for "${query}"`}
+                description="Try a different name, category, or keyword."
+                className="border-none py-6"
+              />
             )}
           </div>
         </Dialog.Popup>

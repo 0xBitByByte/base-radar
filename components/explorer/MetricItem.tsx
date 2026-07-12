@@ -1,6 +1,7 @@
 import { Info } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { RichTooltip } from "@/components/ui/RichTooltip";
 import { Tooltip } from "@/components/ui/Tooltip";
 
 type MetricItemProps = {
@@ -36,7 +37,7 @@ export function MetricItem({ label, value, unavailable, className, infoTooltip, 
       <span className="flex items-center gap-1 text-[10.5px] text-radar-light-muted dark:text-radar-muted">
         {label}
         {infoTooltip && (
-          <Tooltip content={infoTooltip}>
+          <Tooltip content={<RichTooltip description={infoTooltip} />}>
             <button
               type="button"
               onClick={(event) => event.stopPropagation()}

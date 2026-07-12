@@ -22,41 +22,88 @@
 }
 
 @theme {
-  --color-radar-bg: #061224;
-  --color-radar-surface: #0b1731;
-  --color-radar-card: #101c38;
-  --color-radar-primary: #0052ff;
-  --color-radar-accent: #00d4ff;
-  --color-radar-success: #00e676;
-  --color-radar-warning: #ffc857;
-  --color-radar-danger: #ff5a6f;
-  --color-radar-white: #f7fafc;
-  --color-radar-muted: #93a4c5;
-  --color-radar-purple: #a78bfa;
+  /* Midnight Sapphire — dark theme surfaces. */
+  --color-radar-bg: #071321;
+  --color-radar-bg-secondary: #0f1b2e;
+  --color-radar-surface: #0f1b2e;
+  --color-radar-card: #131f3c;
+  --color-radar-elevated: #182847;
+  --color-radar-border: rgba(255, 255, 255, 0.08);
+  --color-radar-border-hover: rgba(61, 118, 255, 0.35);
+
+  /* Theme-responsive semantic accents — the values registered here are the
+     *light*-mode defaults (this block feeds `:root`); the `.dark` rule below
+     * overrides the same custom properties for dark mode. Every consumer
+     * (`bg-radar-primary`, `var(--color-radar-accent)`, etc.) automatically
+     * repaints per theme with zero component changes, the same cascade
+     * pattern this file already uses for `--background`/`--foreground`. */
+  --color-radar-primary: #1565ff;
+  /* Same value as `--color-radar-primary`, as bare comma-separated RGB
+     channels — the `rgba(var(--color-radar-primary-rgb), <alpha>)` idiom
+     used by GlassCard/WidgetCard/ProjectCard/SearchBar/KPIRow's glow-shadow
+     utilities, which each need a different alpha (0.1–0.25) that a plain
+     `var()` inside a single non-rgba color can't parameterize. One token
+     to retune instead of the six hand-copied rgba literals this replaced. */
+  --color-radar-primary-rgb: 21, 101, 255;
+  --color-radar-accent: #06b8d4;
+  --color-radar-purple: #7c3aed;
+  --color-radar-success: #18c78b;
+  --color-radar-warning: #f6c453;
+  --color-radar-danger: #ff5c72;
   --color-radar-orange: #ff8a3d;
 
-  /* Premium light-theme surfaces — warm neutrals, never stark white. */
-  --color-radar-light-bg: #f7f8fa;
-  --color-radar-light-card: #ffffff;
-  --color-radar-light-surface: #f2f4f7;
-  --color-radar-light-border: #e4e7ec;
-  --color-radar-light-text: #1e293b;
-  --color-radar-light-muted: #64748b;
+  --color-radar-white: #ffffff;
+  --color-radar-secondary-text: #b4c2d9;
+  --color-radar-muted: #7f8da7;
+
+  /* Light theme — bright, premium, Apple/Notion/Arc/Linear inspired. */
+  --color-radar-light-bg: #f4f8fc;
+  --color-radar-light-card: #f8fbff;
+  --color-radar-light-surface: #ffffff;
+  --color-radar-light-elevated: #ffffff;
+  --color-radar-light-border: #dce5f3;
+  --color-radar-light-hover: #eef5ff;
+  --color-radar-light-text: #10223a;
+  --color-radar-light-secondary-text: #53657d;
+  /* Darkened from #8090a7 (~3.0:1 on light-bg/-card, failing WCAG AA's 4.5:1
+     for normal text) to restore AA compliance at the small sizes this token
+     is actually used at (10.5px labels, metrics, timestamps) — 5.15:1 /
+     5.29:1 against light-bg/light-card respectively, while staying visibly
+     lighter than `-light-secondary-text` (5.58:1/5.74:1) so the muted/
+     secondary-text/text hierarchy is unchanged, just shifted a few points
+     darker. */
+  --color-radar-light-muted: #5a6a83;
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --border: oklch(0.922 0 0);
+  /* Mirrors `--color-radar-light-bg`/`-text`/`-border` — kept as its own
+     token (rather than referencing the radar-* vars) because this is what
+     `<body>` itself paints with (`@layer base` below), so it must resolve
+     even before the radar-* custom properties are registered. Any gap not
+     covered by an explicit `bg-radar-*` container (overscroll, min-height
+     shortfalls) shows this color, so it has to match the palette exactly. */
+  --background: #f4f8fc;
+  --foreground: #10223a;
+  --border: #dce5f3;
   --ring: oklch(0.708 0 0);
   --radius: 0.625rem;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
+  /* Mirrors `--color-radar-bg`/`-white`/`-border` for the same reason. */
+  --background: #071321;
+  --foreground: #ffffff;
+  --border: rgba(255, 255, 255, 0.08);
   --ring: oklch(0.556 0 0);
+
+  /* Dark-mode values for the theme-responsive accents declared above. */
+  --color-radar-primary: #3d76ff;
+  --color-radar-primary-rgb: 61, 118, 255;
+  --color-radar-accent: #22d0ee;
+  --color-radar-purple: #8b5cf6;
+  --color-radar-success: #18c78b;
+  --color-radar-warning: #f6c453;
+  --color-radar-danger: #ff5c72;
 }
 
 @layer base {
@@ -68,5 +115,72 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* Theme switching animates background/text/border color over ~250ms
+   instead of snapping instantly, applied globally so Landing and Dashboard
+   both get the same feel from the one shared `next-themes` provider.
+   Scoped to color properties only (never `transform`/`layout`) so it can't
+   introduce jank into anything else already animating on the page. */
+@media (prefers-reduced-motion: no-preference) {
+  * {
+    transition:
+      background-color 250ms ease,
+      border-color 250ms ease,
+      color 250ms ease,
+      fill 250ms ease,
+      stroke 250ms ease;
+  }
+}
+
+/* BrandSpinner (components/ui/BrandSpinner.tsx) — the two keyframes behind
+   its "breathe" pulse and rotating glow ring. Kept here alongside the rest
+   of the token/animation layer rather than inline, matching how every other
+   shared visual primitive in this app sources its styling from globals.css. */
+@keyframes br-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.88;
+  }
+  50% {
+    transform: scale(1.07);
+    opacity: 1;
+  }
+}
+
+@keyframes br-spin-glow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* The splash screen's bottom loading bar — an indeterminate gradient chunk
+   sliding across its track, looping. `transform`-only. */
+@keyframes br-loading-bar {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(220%);
+  }
+}
+
+/* Route-transition `loading.tsx` files wrap `BrandSpinner` in this — held at
+   opacity 0 for the animation's first half, then fades in. A navigation that
+   resolves before the hold ends never renders a visible spinner at all
+   (avoids a flash-of-loading-state on fast transitions); a slower one gets a
+   smooth fade-in instead of popping in abruptly. */
+@keyframes br-loader-reveal {
+  0%,
+  50% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
   }
 }

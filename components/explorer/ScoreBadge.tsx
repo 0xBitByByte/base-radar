@@ -2,6 +2,7 @@ import { Info } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { formatLabel } from "@/components/explorer/format";
+import { RichTooltip } from "@/components/ui/RichTooltip";
 import { Tooltip } from "@/components/ui/Tooltip";
 
 type ScoreBadgeType = "health" | "confidence";
@@ -37,11 +38,7 @@ function ScoreTooltipContent({
   fallback?: string;
 }) {
   return (
-    <div className="flex flex-col gap-1">
-      <p className="font-semibold">{typeTitle} Score</p>
-      <p>
-        Overall score: {formatLabel(label)} ({score})
-      </p>
+    <RichTooltip title={`${typeTitle} Score`} description={`Overall score: ${formatLabel(label)} (${score})`}>
       {factors && factors.length > 0 ? (
         <>
           <p className="text-radar-light-muted dark:text-radar-muted">Calculated from:</p>
@@ -54,7 +51,7 @@ function ScoreTooltipContent({
       ) : (
         fallback && <p className="text-radar-light-muted dark:text-radar-muted">{fallback}</p>
       )}
-    </div>
+    </RichTooltip>
   );
 }
 
@@ -102,6 +99,32 @@ export function ScoreBadge({
     "text-radar-light-muted dark:text-radar-muted";
   const hasFactors = Boolean(factors && factors.length > 0);
   const hasTooltip = hasFactors || Boolean(infoTooltip);
+  const tooltipContent = hasTooltip && (
+    <ScoreTooltipContent
+      typeTitle={TYPE_TITLE[type]}
+      label={label}
+      score={score}
+      factors={factors}
+      fallback={infoTooltip}
+    />
+  );
+
+  const valueSpan = (
+    <span
+      // Only ever keyboard-focusable when it's also the tooltip trigger
+      // (`!showLabel && hasTooltip`, below) — otherwise this plain `<span>`
+      // has nothing to focus for.
+      tabIndex={!showLabel && hasTooltip ? 0 : undefined}
+      className={cn(
+        "text-sm tabular-nums outline-none",
+        !showLabel && hasTooltip && "rounded focus-visible:ring-2 focus-visible:ring-radar-primary/50",
+        bare ? "whitespace-nowrap font-normal" : "font-semibold",
+        color
+      )}
+    >
+      {formatLabel(label)} <span className="text-radar-light-muted dark:text-radar-muted">· {score}</span>
+    </span>
+  );
 
   return (
     <div
@@ -115,17 +138,7 @@ export function ScoreBadge({
         <span className="flex items-center gap-1 text-[10.5px] text-radar-light-muted dark:text-radar-muted">
           {TYPE_TITLE[type]}
           {hasTooltip && (
-            <Tooltip
-              content={
-                <ScoreTooltipContent
-                  typeTitle={TYPE_TITLE[type]}
-                  label={label}
-                  score={score}
-                  factors={factors}
-                  fallback={infoTooltip}
-                />
-              }
-            >
+            <Tooltip content={tooltipContent}>
               <button
                 type="button"
                 onClick={(event) => event.stopPropagation()}
@@ -138,9 +151,15 @@ export function ScoreBadge({
           )}
         </span>
       )}
-      <span className={cn("text-sm tabular-nums", bare ? "whitespace-nowrap font-normal" : "font-semibold", color)}>
-        {formatLabel(label)} <span className="text-radar-light-muted dark:text-radar-muted">· {score}</span>
-      </span>
+      {/* `!showLabel` (Table's dense `bare` cells) hides the label+icon row
+          entirely for space — the value itself becomes the tooltip trigger
+          instead, so Health/Confidence stay hoverable there too rather than
+          silently losing their info tooltip. */}
+      {!showLabel && hasTooltip ? (
+        <Tooltip content={tooltipContent}>{valueSpan}</Tooltip>
+      ) : (
+        valueSpan
+      )}
       {factors && factors.length > 0 && (
         <ul className="mt-1 flex flex-col gap-1 text-xs text-radar-light-muted dark:text-radar-muted">
           {factors.map((factor) => (

@@ -31,6 +31,8 @@ export type ChainBrand = {
 export type ProviderBrand = {
   label: string;
   Icon: BrandIconComponent | null;
+  /** One sentence describing what this provider actually supplies — rendered by `ProviderBadge`'s info tooltip. */
+  description: string;
 };
 
 export type SocialPlatform =

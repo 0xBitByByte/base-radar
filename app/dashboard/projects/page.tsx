@@ -7,7 +7,7 @@ import { ExplorerErrorState } from "@/components/explorer/ExplorerErrorState";
 import type { ProjectIntelligence } from "@/lib/intelligence/types";
 
 export const metadata: Metadata = {
-  title: "Projects — Base Radar",
+  title: "Projects",
   description: "Browse every project in the Base Radar Project Registry.",
 };
 
