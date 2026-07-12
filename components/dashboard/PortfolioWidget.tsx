@@ -7,6 +7,8 @@ import type { PortfolioSummary, WithSource } from "@/lib/data/types";
 import { TREND_COLOR_VAR } from "@/lib/utils";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Sparkline } from "@/components/ui/Sparkline";
 
 type PortfolioWidgetProps = {
@@ -26,49 +28,59 @@ export function PortfolioWidget({ data, lastUpdated }: PortfolioWidgetProps) {
       source={data.source}
       lastUpdated={lastUpdated}
     >
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <AnimatedNumber
-            value={data.totalValue}
-            format={formatCompactCurrencyParts}
-            className="whitespace-nowrap"
-          />
-          <p
-            className={
-              isUp
-                ? "text-xs font-medium text-radar-success"
-                : "text-xs font-medium text-radar-danger"
-            }
-          >
-            {formatPercent(data.pnlPct24h)} · {formatCompactCurrency(data.pnlValue24h)} today
-          </p>
-        </div>
-        <Sparkline
-          data={data.sparkline}
-          color={isUp ? TREND_COLOR_VAR.up : TREND_COLOR_VAR.down}
-          height={44}
-          className="w-24"
+      {data.holdings.length === 0 ? (
+        <EmptyState
+          icon={Wallet}
+          title="No holdings yet"
+          description="Connect a wallet to see your portfolio here."
         />
-      </div>
-
-      <div className="flex flex-col gap-2.5">
-        {data.holdings.map((asset) => (
-          <div key={asset.symbol} className="flex items-center gap-3">
-            <span className="w-14 shrink-0 text-xs font-semibold text-radar-light-text dark:text-radar-white">
-              {asset.symbol}
-            </span>
-            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-radar-light-surface dark:bg-white/10">
-              <div
-                className="h-full rounded-full bg-radar-primary"
-                style={{ width: `${asset.allocationPct}%` }}
+      ) : (
+        <>
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <AnimatedNumber
+                value={data.totalValue}
+                format={formatCompactCurrencyParts}
+                className="whitespace-nowrap"
               />
+              <p
+                className={
+                  isUp
+                    ? "text-xs font-medium text-radar-success"
+                    : "text-xs font-medium text-radar-danger"
+                }
+              >
+                {formatPercent(data.pnlPct24h)} · {formatCompactCurrency(data.pnlValue24h)} today
+              </p>
             </div>
-            <span className="w-12 shrink-0 text-right text-xs text-radar-light-muted dark:text-radar-muted">
-              {asset.allocationPct.toFixed(0)}%
-            </span>
+            <Sparkline
+              data={data.sparkline}
+              color={isUp ? TREND_COLOR_VAR.up : TREND_COLOR_VAR.down}
+              height={44}
+              className="w-24"
+            />
           </div>
-        ))}
-      </div>
+
+          <div className="flex flex-col gap-2.5">
+            {data.holdings.map((asset) => (
+              <div key={asset.symbol} className="flex items-center gap-3">
+                <span className="w-14 shrink-0 text-xs font-semibold text-radar-light-text dark:text-radar-white">
+                  {asset.symbol}
+                </span>
+                <ProgressBar
+                  value={asset.allocationPct}
+                  showValue={false}
+                  colorClassName="bg-radar-primary"
+                  className="flex-1"
+                />
+                <span className="w-12 shrink-0 text-right text-xs text-radar-light-muted dark:text-radar-muted">
+                  {asset.allocationPct.toFixed(0)}%
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </WidgetCard>
   );
 }

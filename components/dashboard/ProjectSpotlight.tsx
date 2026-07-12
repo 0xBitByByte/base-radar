@@ -9,6 +9,7 @@ import { formatCompactCurrency, formatNumber, formatPercent } from "@/lib/data/f
 import type { ProjectSpotlight as ProjectSpotlightData, WithSource } from "@/lib/data/types";
 import { ProjectLogo } from "@/components/branding/ProjectLogo";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
+import { MetricItem } from "@/components/explorer/MetricItem";
 import { GlowBadge } from "@/components/ui/GlowBadge";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 
@@ -16,17 +17,6 @@ type ProjectSpotlightProps = {
   data: WithSource<ProjectSpotlightData>;
   lastUpdated: string;
 };
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-0.5 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 dark:border-white/10 dark:bg-white/[0.02]">
-      <span className="text-[10.5px] text-radar-light-muted dark:text-radar-muted">{label}</span>
-      <span className="text-sm font-semibold tabular-nums text-radar-light-text dark:text-radar-white">
-        {value}
-      </span>
-    </div>
-  );
-}
 
 export function ProjectSpotlight({ data, lastUpdated }: ProjectSpotlightProps) {
   const [open, setOpen] = useState(false);
@@ -93,7 +83,7 @@ export function ProjectSpotlight({ data, lastUpdated }: ProjectSpotlightProps) {
 
       <div className="grid grid-cols-2 gap-2">
         {metrics.map((m) => (
-          <Metric key={m.label} label={m.label} value={m.value} />
+          <MetricItem key={m.label} label={m.label} value={m.value} />
         ))}
       </div>
 
@@ -147,10 +137,10 @@ export function ProjectSpotlight({ data, lastUpdated }: ProjectSpotlightProps) {
             </Dialog.Description>
             <div className="grid grid-cols-2 gap-2">
               {metrics.map((m) => (
-                <Metric key={m.label} label={m.label} value={m.value} />
+                <MetricItem key={m.label} label={m.label} value={m.value} />
               ))}
-              <Metric label="Price" value={data.priceUsd > 0 ? `$${data.priceUsd.toFixed(4)}` : "—"} />
-              <Metric label="24h Change" value={formatPercent(data.change24hPct)} />
+              <MetricItem label="Price" value={data.priceUsd > 0 ? `$${data.priceUsd.toFixed(4)}` : "—"} />
+              <MetricItem label="24h Change" value={formatPercent(data.change24hPct)} />
             </div>
             <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-3">
               {scores.map((s) => (

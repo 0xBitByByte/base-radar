@@ -1,5 +1,6 @@
 import { SocialLink } from "@/components/branding/SocialLink";
 import { MetricItem } from "@/components/explorer/MetricItem";
+import { GITHUB_STARS_INFO_TOOLTIP } from "@/components/explorer/metricTooltips";
 import { QuickViewSectionLabel } from "@/components/explorer/QuickViewSectionLabel";
 import { VerificationBadge } from "@/components/explorer/VerificationBadge";
 import { formatCompactNumber, formatNumber } from "@/lib/data/format";
@@ -56,7 +57,7 @@ export function QuickViewCommunity({ community, github }: QuickViewCommunityProp
             label="GitHub Stars"
             value={starsAvailable ? formatCompactNumber(github.stars as number) : undefined}
             unavailable={!starsAvailable}
-            infoTooltip="The project's GitHub star count, sourced live from the GitHub API."
+            infoTooltip={GITHUB_STARS_INFO_TOOLTIP}
           />
           <MetricItem
             bare

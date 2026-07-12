@@ -7,6 +7,13 @@ import { VerificationBadge } from "@/components/explorer/VerificationBadge";
 import { ScoreBadge } from "@/components/explorer/ScoreBadge";
 import { RowActions } from "@/components/explorer/RowActions";
 import { formatLabel } from "@/components/explorer/format";
+import {
+  CONFIDENCE_SCORE_INFO_TOOLTIP,
+  GITHUB_STARS_INFO_TOOLTIP,
+  HEALTH_SCORE_INFO_TOOLTIP,
+} from "@/components/explorer/metricTooltips";
+import { RichTooltip } from "@/components/ui/RichTooltip";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { formatCompactCurrency, formatCompactNumber, formatPercent, formatPrice } from "@/lib/data/format";
 import { cn } from "@/lib/utils";
 import type { ProjectIntelligence } from "@/lib/intelligence/types";
@@ -129,15 +136,37 @@ function ProjectRowComponent({ project, onActivate }: ProjectRowProps) {
       </Cell>
 
       <Cell>
-        <ScoreBadge type="health" score={health.score} label={health.label} showLabel={false} bare />
+        <ScoreBadge
+          type="health"
+          score={health.score}
+          label={health.label}
+          showLabel={false}
+          bare
+          infoTooltip={HEALTH_SCORE_INFO_TOOLTIP}
+        />
       </Cell>
 
       <Cell>
-        <ScoreBadge type="confidence" score={confidence.score} label={confidence.level} showLabel={false} bare />
+        <ScoreBadge
+          type="confidence"
+          score={confidence.score}
+          label={confidence.level}
+          showLabel={false}
+          bare
+          infoTooltip={CONFIDENCE_SCORE_INFO_TOOLTIP}
+        />
       </Cell>
 
       <Cell align="right">
-        {githubAvailable ? formatCompactNumber(github.stars as number) : <span className={UNAVAILABLE_CLASS}>—</span>}
+        {githubAvailable ? (
+          <Tooltip content={<RichTooltip title="GitHub Stars" description={GITHUB_STARS_INFO_TOOLTIP} />}>
+            <span tabIndex={0} className="rounded outline-none focus-visible:ring-2 focus-visible:ring-radar-primary/50">
+              {formatCompactNumber(github.stars as number)}
+            </span>
+          </Tooltip>
+        ) : (
+          <span className={UNAVAILABLE_CLASS}>—</span>
+        )}
       </Cell>
 
       <Cell align="center" className={ACTION_COLUMN_CLASS}>

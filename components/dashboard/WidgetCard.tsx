@@ -67,7 +67,8 @@ export function WidgetCard({
       whileHover={{ y: -3 }}
       transition={{ duration: 0.25, ease: "easeOut" }}
       className={cn(
-        "flex flex-col gap-4 rounded-2xl border border-radar-light-border bg-radar-light-card/80 p-5 backdrop-blur-xl transition-[border-color,box-shadow] duration-200 hover:border-radar-primary/30 hover:shadow-lg dark:hover:shadow-[0_12px_40px_-12px_rgba(0,82,255,0.25)] sm:p-6 dark:border-white/10 dark:bg-radar-card/60 dark:hover:border-radar-primary/40",
+        "flex flex-col gap-4 rounded-2xl border border-radar-light-border bg-gradient-to-b from-radar-light-card/90 to-radar-light-surface/70 p-5 shadow-[0_1px_2px_rgba(16,34,58,0.04)] backdrop-blur-xl transition-[border-color,box-shadow] duration-200 hover:border-radar-primary/30 hover:shadow-[0_0_50px_-15px_rgba(var(--color-radar-primary-rgb),0.12)] sm:p-6",
+        "dark:border-radar-border dark:bg-gradient-to-b dark:from-radar-elevated/60 dark:to-radar-card/70 dark:shadow-[0_1px_2px_rgba(0,0,0,0.2)] dark:hover:border-radar-border-hover dark:hover:shadow-[0_0_50px_-15px_rgba(var(--color-radar-primary-rgb),0.15)]",
         className
       )}
     >

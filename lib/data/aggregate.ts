@@ -16,6 +16,7 @@ import * as coingecko from "@/lib/data/providers/coingecko";
 import * as defillama from "@/lib/data/providers/defillama";
 import * as dexscreener from "@/lib/data/providers/dexscreener";
 import * as github from "@/lib/data/providers/github";
+import { formatNumber, formatPrice } from "@/lib/data/format";
 import {
   MOCK_ACTIVITY_FEED,
   MOCK_AI_PROJECTS,
@@ -325,7 +326,7 @@ export async function getActivityFeed(): Promise<WithSource<ActivityEvent[]>> {
       id: `gh-${repo.latestReleaseTag}`,
       kind: "github-release",
       title: `${repo.fullName} released ${repo.latestReleaseTag}`,
-      detail: `${repo.stars.toLocaleString()} stars · ${repo.forks.toLocaleString()} forks`,
+      detail: `${formatNumber(repo.stars)} stars · ${formatNumber(repo.forks)} forks`,
       timestamp: repo.latestReleasePublishedAt,
     });
     liveHits++;
@@ -338,7 +339,7 @@ export async function getActivityFeed(): Promise<WithSource<ActivityEvent[]>> {
       id: `swap-${p.baseToken.address}`,
       kind: "large-swap",
       title: `High volume on ${p.baseToken.symbol}`,
-      detail: `$${Math.round((p.volume?.h24 ?? 0)).toLocaleString()} 24h volume on ${p.dexId}`,
+      detail: `${formatPrice(Math.round(p.volume?.h24 ?? 0))} 24h volume on ${p.dexId}`,
       timestamp: new Date().toISOString(),
     });
     liveHits++;

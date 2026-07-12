@@ -10,6 +10,11 @@ import { ScoreBadge } from "@/components/explorer/ScoreBadge";
 import { MetricItem } from "@/components/explorer/MetricItem";
 import { ProjectCardFooter } from "@/components/explorer/ProjectCardFooter";
 import { formatLabel } from "@/components/explorer/format";
+import {
+  CONFIDENCE_SCORE_INFO_TOOLTIP,
+  GITHUB_STARS_INFO_TOOLTIP,
+  HEALTH_SCORE_INFO_TOOLTIP,
+} from "@/components/explorer/metricTooltips";
 import { formatCompactCurrency, formatCompactNumber } from "@/lib/data/format";
 import { cn } from "@/lib/utils";
 import type { ProjectIntelligence } from "@/lib/intelligence/types";
@@ -63,10 +68,10 @@ function ProjectCardComponent({ project, onActivate }: ProjectCardProps) {
       whileHover={{ y: -3 }}
       transition={{ duration: 0.2, ease: "easeOut" }}
       className={cn(
-        "flex cursor-pointer flex-col gap-4 rounded-2xl border border-radar-light-border bg-radar-light-card/80 p-5 outline-none backdrop-blur-xl transition-[border-color,box-shadow] duration-200",
-        "hover:border-radar-primary/30 hover:shadow-lg dark:hover:shadow-[0_12px_40px_-12px_rgba(0,82,255,0.25)]",
+        "flex cursor-pointer flex-col gap-4 rounded-2xl border border-radar-light-border bg-gradient-to-b from-radar-light-card/90 to-radar-light-surface/70 p-5 shadow-[0_1px_2px_rgba(16,34,58,0.04)] outline-none backdrop-blur-xl transition-[border-color,box-shadow] duration-200",
+        "hover:border-radar-primary/30 hover:shadow-[0_0_50px_-15px_rgba(var(--color-radar-primary-rgb),0.12)]",
         "focus-visible:ring-2 focus-visible:ring-radar-primary/50",
-        "dark:border-white/10 dark:bg-radar-card/60 dark:hover:border-radar-primary/40"
+        "dark:border-radar-border dark:bg-gradient-to-b dark:from-radar-elevated/60 dark:to-radar-card/70 dark:shadow-[0_1px_2px_rgba(0,0,0,0.2)] dark:hover:border-radar-border-hover dark:hover:shadow-[0_0_50px_-15px_rgba(var(--color-radar-primary-rgb),0.15)]"
       )}
     >
       <ProjectCardHeader identity={identity} community={community} />
@@ -92,13 +97,13 @@ function ProjectCardComponent({ project, onActivate }: ProjectCardProps) {
           type="health"
           score={health.score}
           label={health.label}
-          infoTooltip="A 0–100 score blending live market, TVL, and GitHub activity signals into one health read."
+          infoTooltip={HEALTH_SCORE_INFO_TOOLTIP}
         />
         <ScoreBadge
           type="confidence"
           score={confidence.score}
           label={confidence.level}
-          infoTooltip="A 0–100 score reflecting how much live data and registry verification back this record."
+          infoTooltip={CONFIDENCE_SCORE_INFO_TOOLTIP}
         />
         <MetricItem
           label="TVL"
@@ -109,7 +114,7 @@ function ProjectCardComponent({ project, onActivate }: ProjectCardProps) {
           label="GitHub Stars"
           value={githubAvailable ? formatCompactNumber(github.stars as number) : undefined}
           unavailable={!githubAvailable}
-          infoTooltip="The project's GitHub star count, sourced live from the GitHub API."
+          infoTooltip={GITHUB_STARS_INFO_TOOLTIP}
         />
       </ProjectMetricsGrid>
 

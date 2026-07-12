@@ -5,7 +5,7 @@ import { getLiveTicker } from "@/lib/data/aggregate";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 
 export const metadata: Metadata = {
-  title: "Dashboard — Base Radar",
+  title: "Dashboard",
   description: "Your intelligence hub for the Base ecosystem.",
 };
 

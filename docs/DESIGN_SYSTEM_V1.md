@@ -112,6 +112,23 @@ lift) inline since they're a denser grid cell, not a `WidgetCard` consumer. `Gla
 marketing-only. Don't create a new card shell — extend `WidgetCard` with an optional prop
 if a new widget needs different chrome.
 
+## Buttons
+
+`components/ui/GradientButton.tsx` is the one CTA button component (`variant="primary"` /
+`"secondary"`, plus a `whileHover`/`whileTap` lift wrapped in `MotionConfig reducedMotion="user"`
+at every call site — Navbar, Hero, ProjectSpotlight — so the motion respects
+`prefers-reduced-motion` automatically).
+
+**`primary`'s gradient (`from-[#1565ff] to-[#22c8ff]`) is a deliberate, static brand treatment —
+it does not re-tint between light and dark theme, unlike every other primary-accent surface
+in the app.** This is intentional, not an oversight: the CTA gradient is the one fixed piece
+of brand identity a user should recognize as "the same button" regardless of which theme
+they're in, the same way a product's primary logo mark doesn't invert per theme. `secondary`
+(bordered, surface-tinted) *is* fully theme-aware, since it's chrome, not brand identity. If a
+future revision wants the primary gradient to re-tint per theme instead, replace the two
+hardcoded hex stops with `from-radar-primary to-radar-accent` (already used elsewhere, e.g.
+`Hero.tsx`'s headline gradient) — but that is a deliberate design change, not a bug fix.
+
 ## Tables
 
 There is exactly one `<table>` element in the app: `components/explorer/ExplorerTable.tsx`.

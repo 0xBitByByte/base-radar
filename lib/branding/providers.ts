@@ -15,10 +15,34 @@ import type { ProviderBrand } from "@/lib/branding/types";
  * not a promotional lockup).
  */
 export const PROVIDER_BRANDING: Record<ProviderName, ProviderBrand> = {
-  coingecko: { label: "CoinGecko", Icon: LineChart },
-  dexscreener: { label: "DexScreener", Icon: Activity },
-  defillama: { label: "DefiLlama", Icon: Landmark },
-  blockscout: { label: "Blockscout", Icon: Blocks },
-  github: { label: "GitHub", Icon: GithubMark },
-  base: { label: "Base Network", Icon: Zap },
+  coingecko: {
+    label: "CoinGecko",
+    Icon: LineChart,
+    description: "Price, market cap, and 24h volume, pulled live from CoinGecko's public API.",
+  },
+  dexscreener: {
+    label: "DexScreener",
+    Icon: Activity,
+    description: "On-chain DEX pair price, volume, and liquidity data from DexScreener.",
+  },
+  defillama: {
+    label: "DefiLlama",
+    Icon: Landmark,
+    description: "Total value locked (TVL), sourced live from DefiLlama's protocol data.",
+  },
+  blockscout: {
+    label: "Blockscout",
+    Icon: Blocks,
+    description: "On-chain contract and network activity, read directly from Base's Blockscout explorer.",
+  },
+  github: {
+    label: "GitHub",
+    Icon: GithubMark,
+    description: "Stars, forks, open issues, and release activity, sourced live from the GitHub API.",
+  },
+  base: {
+    label: "Base Network",
+    Icon: Zap,
+    description: "Live gas price and network status, read directly from the Base RPC.",
+  },
 };

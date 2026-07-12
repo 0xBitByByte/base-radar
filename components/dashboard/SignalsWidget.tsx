@@ -2,6 +2,7 @@ import { Radio } from "lucide-react";
 
 import type { Signal, SignalKind, WithSource } from "@/lib/data/types";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { GlowBadge, type GlowBadgeColor } from "@/components/ui/GlowBadge";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 
@@ -41,26 +42,34 @@ export function SignalsWidget({ data, lastUpdated }: SignalsWidgetProps) {
       source={data.source}
       lastUpdated={lastUpdated}
     >
-      <div className="flex flex-col gap-3.5">
-        {data.map((signal) => (
-          <div key={signal.id} className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between gap-2 text-xs">
-              <span className="font-semibold text-radar-light-text dark:text-radar-white">
-                {signal.project}
-              </span>
-              <GlowBadge color={KIND_BADGE_COLOR[signal.kind]} className="px-1.5 py-0 text-[10px]">
-                {KIND_LABEL[signal.kind]}
-              </GlowBadge>
+      {data.length === 0 ? (
+        <EmptyState
+          icon={Radio}
+          title="No active signals"
+          description="Buy, watch and momentum alerts will appear here as they fire."
+        />
+      ) : (
+        <div className="flex flex-col gap-3.5">
+          {data.map((signal) => (
+            <div key={signal.id} className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span className="font-semibold text-radar-light-text dark:text-radar-white">
+                  {signal.project}
+                </span>
+                <GlowBadge color={KIND_BADGE_COLOR[signal.kind]} className="px-1.5 py-0 text-[10px]">
+                  {KIND_LABEL[signal.kind]}
+                </GlowBadge>
+              </div>
+              <ProgressBar
+                value={signal.strength}
+                showValue={false}
+                colorClassName={KIND_BAR_COLOR[signal.kind]}
+              />
+              <p className="text-[11px] text-radar-light-muted dark:text-radar-muted">{signal.note}</p>
             </div>
-            <ProgressBar
-              value={signal.strength}
-              showValue={false}
-              colorClassName={KIND_BAR_COLOR[signal.kind]}
-            />
-            <p className="text-[11px] text-radar-light-muted dark:text-radar-muted">{signal.note}</p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </WidgetCard>
   );
 }

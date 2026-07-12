@@ -1,6 +1,7 @@
 import { ChainBadge } from "@/components/branding/ChainBadge";
 import { ChainListTooltip } from "@/components/branding/ChainListTooltip";
 import { GlowBadge } from "@/components/ui/GlowBadge";
+import { RichTooltip } from "@/components/ui/RichTooltip";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { getDisplayChains } from "@/lib/branding/chains";
 import { cn } from "@/lib/utils";
@@ -35,7 +36,13 @@ export function ChainBadgeGroup({ chains, size = "default", max, className }: Ch
         <ChainBadge key={chain} chain={chain} size={size} />
       ))}
       {hidden.length > 0 && (
-        <Tooltip content={<ChainListTooltip chains={all} />}>
+        <Tooltip
+          content={
+            <RichTooltip variant="list" title="Supported Chains">
+              <ChainListTooltip chains={all} />
+            </RichTooltip>
+          }
+        >
           <GlowBadge
             color="muted"
             tabIndex={0}

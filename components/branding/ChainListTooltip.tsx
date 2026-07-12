@@ -12,33 +12,23 @@ const FALLBACK_LABEL_CLASS = "text-radar-light-muted dark:text-radar-muted";
 const FALLBACK_LABEL = "Unknown Network";
 
 /**
- * The rich content rendered inside the shared `Tooltip` for every chain
- * overflow ("+N") indicator — Grid, Table, and Quick View all hover the
- * same `ChainBadgeGroup` trigger, so building this once here means all
- * three automatically get one consistent chain list, not three
- * hand-rolled ones. Never adds its own popup chrome (border/shadow/
- * radius/blur/animation) — that's `Tooltip`'s job; this only fills its
- * `content`, escaping the popup's own small inline padding via negative
- * margin so full-width divider rows can bleed edge-to-edge.
+ * The rich content rendered inside `RichTooltip`'s `variant="list"` slot for
+ * every chain overflow ("+N") indicator — Grid, Table, and Quick View all
+ * hover the same `ChainBadgeGroup` trigger, so building this once here means
+ * all three automatically get one consistent chain list, not three
+ * hand-rolled ones. Only ever the scrollable rows — the "Supported Chains"
+ * header and the bleed-past-padding wrapper are `RichTooltip`'s job now, not
+ * this component's (see `ChainBadgeGroup`'s call site).
  */
 export function ChainListTooltip({ chains }: ChainListTooltipProps) {
   // No trigger in this codebase opens this with an empty list today (the
   // one call site guards with `hidden.length > 0`), but a reusable
-  // component shouldn't render a header floating over nothing if some
-  // future caller ever does.
+  // component shouldn't render an empty scroll region if some future
+  // caller ever does.
   if (chains.length === 0) return null;
 
   return (
-    // `w-max` + `min-w`/`max-w` — sized to content (a 2-chain list isn't
-    // artificially stretched to the same width as a 6-chain list) but
-    // bounded to the ~220–260px range on the low end and the Popup's own
-    // `max-w-64` on the high end, so one unusually long future chain name
-    // wraps onto a second line inside that cap instead of overflowing or
-    // forcing the whole tooltip wider.
-    <div className="-mx-3 w-max min-w-[220px] max-w-64 overflow-hidden rounded-lg">
-      <div className="px-4 pb-3 text-xs font-medium tracking-wide text-radar-light-muted uppercase dark:text-radar-muted">
-        Supported Chains
-      </div>
+    <>
       {/* Scrolls independently of the header once the list is long enough
           to risk pushing the tooltip off-screen (a hypothetical future
           project on 10+ chains) — every row stays a uniform 40px whether
@@ -94,6 +84,6 @@ export function ChainListTooltip({ chains }: ChainListTooltipProps) {
           );
         })}
       </div>
-    </div>
+    </>
   );
 }

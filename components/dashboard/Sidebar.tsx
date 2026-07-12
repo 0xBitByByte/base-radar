@@ -4,13 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
-import { BaseRadarLogo } from "@/components/branding/BaseRadarLogo";
+import { HeaderLogo } from "@/components/branding/HeaderLogo";
 import { cn } from "@/lib/utils";
 import { DASHBOARD_NAV_GROUPS, DASHBOARD_SETTINGS_ITEM, APP_VERSION } from "@/constants/dashboard";
 import { SidebarItem } from "@/components/dashboard/SidebarItem";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { buildSocialNavLinks } from "@/lib/branding/socials";
+import { useStartNavigation } from "@/components/dashboard/NavigationOverlay";
 
 /** GitHub/X's neutral hover class is defined locally, not in the shared registry — Sidebar supports both themes while `Footer` is dark-only, so the two legitimately differ; only the brand-color hovers (Discord/Telegram/Linktree) are shared, via `buildSocialNavLinks`. */
 const NEUTRAL_HOVER_CLASS =
@@ -33,29 +34,25 @@ type SidebarNavProps = {
 
 export function SidebarNav({ onNavigate, className }: SidebarNavProps) {
   const pathname = usePathname();
+  const startNavigation = useStartNavigation();
 
   const isActive = (href: string) =>
     href === "/dashboard" ? pathname === href : pathname.startsWith(href);
+
+  const navigateTo = (href: string) => {
+    startNavigation(href);
+    onNavigate?.();
+  };
 
   return (
     <div className={cn("flex h-full flex-col", className)}>
       <Link
         href="/dashboard"
-        onClick={onNavigate}
+        onClick={() => navigateTo("/dashboard")}
         aria-label="Base Radar dashboard home"
-        className="group flex items-center gap-3 rounded-xl px-2 pb-6 outline-none focus-visible:ring-2 focus-visible:ring-radar-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-radar-light-bg dark:focus-visible:ring-offset-radar-bg"
+        className="group rounded-xl px-2 pb-6 outline-none focus-visible:ring-2 focus-visible:ring-radar-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-radar-light-bg dark:focus-visible:ring-offset-radar-bg"
       >
-        <span className="flex size-10 items-center justify-center rounded-xl border border-radar-light-border bg-radar-primary/10 transition-colors group-hover:bg-radar-primary/20 dark:border-white/10">
-          <BaseRadarLogo size={22} />
-        </span>
-        <span className="flex flex-col leading-none">
-          <span className="text-sm font-bold tracking-wide text-radar-light-text dark:text-radar-white">
-            BASE
-          </span>
-          <span className="text-sm font-bold tracking-wide text-radar-primary dark:text-radar-accent">
-            RADAR
-          </span>
-        </span>
+        <HeaderLogo height={32} className="transition-transform duration-200 ease-out group-hover:scale-105" />
       </Link>
 
       <nav className="flex flex-1 flex-col overflow-y-auto" aria-label="Main">
@@ -70,7 +67,7 @@ export function SidebarNav({ onNavigate, className }: SidebarNavProps) {
                   label={item.label}
                   icon={<item.icon className="size-[18px]" />}
                   active={isActive(item.href)}
-                  onClick={onNavigate}
+                  onClick={() => navigateTo(item.href)}
                 />
               ))}
             </div>
@@ -83,7 +80,7 @@ export function SidebarNav({ onNavigate, className }: SidebarNavProps) {
           label={DASHBOARD_SETTINGS_ITEM.label}
           icon={<DASHBOARD_SETTINGS_ITEM.icon className="size-[18px]" />}
           active={isActive(DASHBOARD_SETTINGS_ITEM.href)}
-          onClick={onNavigate}
+          onClick={() => navigateTo(DASHBOARD_SETTINGS_ITEM.href)}
         />
       </nav>
 
