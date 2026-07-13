@@ -37,12 +37,18 @@ export function GradientButton({
 }: GradientButtonProps) {
   const classes = cn(baseStyles, variantStyles[variant], className);
 
+  // A tween (never a spring) — at any stiffness/damping pairing a spring
+  // still overshoots its target by definition, which read as "bouncy" for
+  // a button this small. `easeOut` reaches the target and stops, matching
+  // the calm, no-bounce feel PR9.3 asks for across every micro-interaction.
+  const hoverTransition = { duration: 0.18, ease: "easeOut" as const };
+
   if (href) {
     return (
       <motion.div
-        whileHover={{ y: -2, scale: 1.02 }}
+        whileHover={{ y: -1, scale: 1.015 }}
         whileTap={{ scale: 0.98 }}
-        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+        transition={hoverTransition}
         className="inline-block"
       >
         <Link href={href} target={target} rel={rel} className={classes} {...ariaProps}>
@@ -54,9 +60,9 @@ export function GradientButton({
 
   return (
     <motion.button
-      whileHover={{ y: -2, scale: 1.02 }}
+      whileHover={{ y: -1, scale: 1.015 }}
       whileTap={{ scale: 0.98 }}
-      transition={{ type: "spring", stiffness: 400, damping: 25 }}
+      transition={hoverTransition}
       className={classes}
       {...ariaProps}
     >

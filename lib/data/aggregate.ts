@@ -8,7 +8,17 @@
  * crashing the page. Swapping a provider (or adding a paid one later) only
  * means editing the corresponding function body here; every widget keeps
  * consuming the same shape.
+ *
+ * Every exported function is wrapped in React's `cache()` (PR9.3.4 §8) —
+ * since each dashboard widget now fetches its own data independently
+ * (`app/dashboard/page.tsx`), some of these are called from more than one
+ * place within the same request (e.g. `getKpis()` is called directly by the
+ * KPI row and again inside `getIntelligenceBrief()`); `cache()` collapses
+ * those into a single call per request instead of firing the underlying
+ * provider requests twice.
  */
+
+import { cache } from "react";
 
 import * as baseRpc from "@/lib/data/providers/baseRpc";
 import * as blockscout from "@/lib/data/providers/blockscout";
@@ -97,7 +107,7 @@ function patchKpi(items: Kpi[], id: KpiId, value: number, deltaPct?: number) {
   };
 }
 
-export async function getKpis(): Promise<WithSource<{ items: Kpi[] }>> {
+async function getKpisImpl(): Promise<WithSource<{ items: Kpi[] }>> {
   const items = MOCK_KPIS.map((k) => ({ ...k }));
   let liveHits = 0;
 
@@ -147,8 +157,9 @@ export async function getKpis(): Promise<WithSource<{ items: Kpi[] }>> {
 
   return { items, source: liveHits > 0 ? "live" : "mock" };
 }
+export const getKpis = cache(getKpisImpl);
 
-export async function getMarketOverview(): Promise<WithSource<MarketOverview>> {
+async function getMarketOverviewImpl(): Promise<WithSource<MarketOverview>> {
   const net = await baseRpc.getBaseNetworkStatus();
   if (!net) return { ...MOCK_MARKET_OVERVIEW, source: "mock" };
   return {
@@ -163,15 +174,17 @@ export async function getMarketOverview(): Promise<WithSource<MarketOverview>> {
     source: "live",
   };
 }
+export const getMarketOverview = cache(getMarketOverviewImpl);
 
-export async function getPortfolioSummary(): Promise<WithSource<PortfolioSummary>> {
+async function getPortfolioSummaryImpl(): Promise<WithSource<PortfolioSummary>> {
   // No wallet is connected in this shell, so this stays mock by design —
   // ready to be replaced by a real balances read the moment wallet connect
   // ships, without any change to `PortfolioWidget`.
   return { ...MOCK_PORTFOLIO, source: "mock" };
 }
+export const getPortfolioSummary = cache(getPortfolioSummaryImpl);
 
-export async function getTrendingNarratives(): Promise<WithSource<Narrative[]>> {
+async function getTrendingNarrativesImpl(): Promise<WithSource<Narrative[]>> {
   // Narrative classification isn't exposed by a free API — curated for now,
   // shaped so a categorization service can populate it later.
   return Object.assign(
@@ -179,8 +192,9 @@ export async function getTrendingNarratives(): Promise<WithSource<Narrative[]>> 
     { source: "mock" as const }
   );
 }
+export const getTrendingNarratives = cache(getTrendingNarrativesImpl);
 
-export async function getAIProjects(): Promise<WithSource<AIProject[]>> {
+async function getAIProjectsImpl(): Promise<WithSource<AIProject[]>> {
   const mockResult = () =>
     Object.assign(
       MOCK_AI_PROJECTS.map((p) => ({ ...p })),
@@ -210,8 +224,9 @@ export async function getAIProjects(): Promise<WithSource<AIProject[]>> {
     return mockResult();
   }
 }
+export const getAIProjects = cache(getAIProjectsImpl);
 
-export async function getWhaleEvents(): Promise<WithSource<WhaleEvent[]>> {
+async function getWhaleEventsImpl(): Promise<WithSource<WhaleEvent[]>> {
   // Whale-transfer indexing requires a paid API (e.g. Whale Alert) — mocked
   // for now, typed identically to what that integration would return.
   return Object.assign(
@@ -219,8 +234,9 @@ export async function getWhaleEvents(): Promise<WithSource<WhaleEvent[]>> {
     { source: "mock" as const }
   );
 }
+export const getWhaleEvents = cache(getWhaleEventsImpl);
 
-export async function getSignals(): Promise<WithSource<Signal[]>> {
+async function getSignalsImpl(): Promise<WithSource<Signal[]>> {
   try {
     const pairs = await dexscreener.getBaseTrendingPairs();
     if (!pairs || !pairs.length) {
@@ -262,8 +278,9 @@ export async function getSignals(): Promise<WithSource<Signal[]>> {
     return Object.assign(MOCK_SIGNALS.map((s) => ({ ...s })), { source: "mock" as const });
   }
 }
+export const getSignals = cache(getSignalsImpl);
 
-export async function getProjectSpotlight(): Promise<WithSource<ProjectSpotlight>> {
+async function getProjectSpotlightImpl(): Promise<WithSource<ProjectSpotlight>> {
   try {
     const top = await defillama.getTopBaseProtocol();
     if (!top) return { ...MOCK_PROJECT_SPOTLIGHT, source: "mock" };
@@ -315,8 +332,9 @@ export async function getProjectSpotlight(): Promise<WithSource<ProjectSpotlight
     return { ...MOCK_PROJECT_SPOTLIGHT, source: "mock" };
   }
 }
+export const getProjectSpotlight = cache(getProjectSpotlightImpl);
 
-export async function getActivityFeed(): Promise<WithSource<ActivityEvent[]>> {
+async function getActivityFeedImpl(): Promise<WithSource<ActivityEvent[]>> {
   let events: ActivityEvent[] = MOCK_ACTIVITY_FEED.map((e) => ({ ...e }));
   let liveHits = 0;
 
@@ -366,13 +384,18 @@ export async function getActivityFeed(): Promise<WithSource<ActivityEvent[]>> {
 
   return Object.assign(sorted, { source });
 }
+export const getActivityFeed = cache(getActivityFeedImpl);
 
-export async function getWelcomeStats(): Promise<WithSource<WelcomeStats>> {
-  const [tvl, net, repo] = await Promise.all([
+async function getWelcomeStatsImpl(): Promise<WithSource<WelcomeStats>> {
+  const [tvlRes, netRes, repoRes] = await Promise.allSettled([
     defillama.getBaseChainTvl(),
     baseRpc.getBaseNetworkStatus(),
     github.getRepoStats(PRIMARY_REPO),
   ]);
+
+  const tvl = tvlRes.status === "fulfilled" ? tvlRes.value : null;
+  const net = netRes.status === "fulfilled" ? netRes.value : null;
+  const repo = repoRes.status === "fulfilled" ? repoRes.value : null;
 
   let liveHits = 0;
   const stats: WelcomeStats = { ...MOCK_WELCOME_STATS };
@@ -392,32 +415,39 @@ export async function getWelcomeStats(): Promise<WithSource<WelcomeStats>> {
 
   return { ...stats, source: liveHits > 0 ? "live" : "mock" };
 }
+export const getWelcomeStats = cache(getWelcomeStatsImpl);
 
-export async function getIntelligenceBrief(): Promise<WithSource<IntelligenceBrief>> {
+async function getIntelligenceBriefImpl(): Promise<WithSource<IntelligenceBrief>> {
   try {
     return await buildIntelligenceBrief();
   } catch {
     return { ...MOCK_INTELLIGENCE_BRIEF, source: "mock" };
   }
 }
+export const getIntelligenceBrief = cache(getIntelligenceBriefImpl);
 
 async function buildIntelligenceBrief(): Promise<WithSource<IntelligenceBrief>> {
-  const [kpisRes, marketRes, welcomeRes, signalsRes] = await Promise.all([
+  const [kpisRes, marketRes, welcomeRes, signalsRes] = await Promise.allSettled([
     getKpis(),
     getMarketOverview(),
     getWelcomeStats(),
     getSignals(),
   ]);
 
+  const kpis = kpisRes.status === "fulfilled" ? kpisRes.value : { items: MOCK_KPIS, source: "mock" as const };
+  const market = marketRes.status === "fulfilled" ? marketRes.value : { ...MOCK_MARKET_OVERVIEW, source: "mock" as const };
+  const welcome = welcomeRes.status === "fulfilled" ? welcomeRes.value : { ...MOCK_WELCOME_STATS, source: "mock" as const };
+  const signals = signalsRes.status === "fulfilled" ? signalsRes.value : Object.assign(MOCK_SIGNALS.map((s) => ({ ...s })), { source: "mock" as const });
+
   const points: IntelligenceBriefPoint[] = [];
 
   points.push({
     id: "narrative",
-    text: `${welcomeRes.trendingNarrative} dominate narratives`,
+    text: `${welcome.trendingNarrative} dominate narratives`,
     tone: "positive",
   });
 
-  const tvlKpi = kpisRes.items.find((k) => k.id === "tvl");
+  const tvlKpi = kpis.items.find((k) => k.id === "tvl");
   if (tvlKpi?.deltaPct !== undefined) {
     const up = tvlKpi.deltaPct >= 0;
     points.push({
@@ -429,19 +459,19 @@ async function buildIntelligenceBrief(): Promise<WithSource<IntelligenceBrief>> 
 
   points.push({
     id: "gas",
-    text: marketRes.gasGwei < 0.02 ? "Gas remains low" : `Gas at ${marketRes.gasGwei.toFixed(3)} gwei`,
-    tone: marketRes.gasGwei < 0.02 ? "positive" : "neutral",
+    text: market.gasGwei < 0.02 ? "Gas remains low" : `Gas at ${market.gasGwei.toFixed(3)} gwei`,
+    tone: market.gasGwei < 0.02 ? "positive" : "neutral",
   });
 
-  points.push({ id: "whale", text: `Whale transferred ${welcomeRes.whaleAlert}`, tone: "neutral" });
+  points.push({ id: "whale", text: `Whale transferred ${welcome.whaleAlert}`, tone: "neutral" });
 
   points.push({
     id: "launches",
-    text: `${welcomeRes.projectsLaunchedToday} projects launched today`,
+    text: `${welcome.projectsLaunchedToday} projects launched today`,
     tone: "positive",
   });
 
-  const momentumSignal = signalsRes.find((s) => s.kind === "momentum") ?? signalsRes[0];
+  const momentumSignal = signals.find((s) => s.kind === "momentum") ?? signals[0];
   if (momentumSignal) {
     points.push({
       id: "momentum",
@@ -450,9 +480,7 @@ async function buildIntelligenceBrief(): Promise<WithSource<IntelligenceBrief>> 
     });
   }
 
-  const anyLive = [kpisRes.source, marketRes.source, welcomeRes.source, signalsRes.source].includes(
-    "live"
-  );
+  const anyLive = [kpis.source, market.source, welcome.source, signals.source].includes("live");
 
   return {
     points: points.slice(0, 6),
@@ -461,7 +489,7 @@ async function buildIntelligenceBrief(): Promise<WithSource<IntelligenceBrief>> 
   };
 }
 
-export async function getNarrativeHeatmap(): Promise<WithSource<NarrativeHeatRow[]>> {
+async function getNarrativeHeatmapImpl(): Promise<WithSource<NarrativeHeatRow[]>> {
   // Narrative-to-category heat classification isn't exposed by a free API —
   // curated for now, shaped identically to what a categorization service
   // would return.
@@ -470,8 +498,9 @@ export async function getNarrativeHeatmap(): Promise<WithSource<NarrativeHeatRow
     { source: "mock" as const }
   );
 }
+export const getNarrativeHeatmap = cache(getNarrativeHeatmapImpl);
 
-export async function getWatchlist(): Promise<WithSource<WatchlistItem[]>> {
+async function getWatchlistImpl(): Promise<WithSource<WatchlistItem[]>> {
   // Pinned items are inherently user-specific and require accounts/wallet
   // connect, neither of which exist in this shell yet.
   return Object.assign(
@@ -479,106 +508,40 @@ export async function getWatchlist(): Promise<WithSource<WatchlistItem[]>> {
     { source: "mock" as const }
   );
 }
+export const getWatchlist = cache(getWatchlistImpl);
 
-export async function getLiveTicker(): Promise<WithSource<LiveTicker>> {
+async function getLiveTickerImpl(): Promise<WithSource<LiveTicker>> {
   const ticker: LiveTicker = { ...MOCK_LIVE_TICKER };
   let liveHits = 0;
 
-  const [net, prices, tvl, chainStats] = await Promise.all([
+  const [netRes, pricesRes, tvlRes, chainStatsRes] = await Promise.allSettled([
     baseRpc.getBaseNetworkStatus(),
     coingecko.getMajorPrices(),
     defillama.getBaseChainTvl(),
     blockscout.getChainStats(),
   ]);
 
-  if (net) {
-    ticker.blockHeight = net.blockHeight;
-    ticker.gasGwei = net.gasGwei;
+  if (netRes.status === "fulfilled" && netRes.value) {
+    ticker.blockHeight = netRes.value.blockHeight;
+    ticker.gasGwei = netRes.value.gasGwei;
     liveHits++;
   }
-  if (prices) {
-    ticker.ethPriceUsd = prices.eth.usd;
-    ticker.ethChangePct24h = prices.eth.changePct24h;
-    ticker.btcPriceUsd = prices.btc.usd;
-    ticker.btcChangePct24h = prices.btc.changePct24h;
+  if (pricesRes.status === "fulfilled" && pricesRes.value) {
+    ticker.ethPriceUsd = pricesRes.value.eth.usd;
+    ticker.ethChangePct24h = pricesRes.value.eth.changePct24h;
+    ticker.btcPriceUsd = pricesRes.value.btc.usd;
+    ticker.btcChangePct24h = pricesRes.value.btc.changePct24h;
     liveHits++;
   }
-  if (tvl) {
-    ticker.tvlUsd = tvl.tvlUsd;
+  if (tvlRes.status === "fulfilled" && tvlRes.value) {
+    ticker.tvlUsd = tvlRes.value.tvlUsd;
     liveHits++;
   }
-  if (chainStats) {
-    ticker.transactionsToday = chainStats.transactionsToday;
+  if (chainStatsRes.status === "fulfilled" && chainStatsRes.value) {
+    ticker.transactionsToday = chainStatsRes.value.transactionsToday;
     liveHits++;
   }
 
   return { ...ticker, source: liveHits > 0 ? "live" : "mock" };
 }
-
-export type DashboardData = {
-  kpis: WithSource<{ items: Kpi[] }>;
-  market: WithSource<MarketOverview>;
-  portfolio: WithSource<PortfolioSummary>;
-  narratives: WithSource<Narrative[]>;
-  aiProjects: WithSource<AIProject[]>;
-  whaleEvents: WithSource<WhaleEvent[]>;
-  signals: WithSource<Signal[]>;
-  spotlight: WithSource<ProjectSpotlight>;
-  activity: WithSource<ActivityEvent[]>;
-  welcome: WithSource<WelcomeStats>;
-  brief: WithSource<IntelligenceBrief>;
-  heatmap: WithSource<NarrativeHeatRow[]>;
-  watchlist: WithSource<WatchlistItem[]>;
-  ticker: WithSource<LiveTicker>;
-};
-
-export async function getDashboardData(): Promise<DashboardData> {
-  const [
-    kpis,
-    market,
-    portfolio,
-    narratives,
-    aiProjects,
-    whaleEvents,
-    signals,
-    spotlight,
-    activity,
-    welcome,
-    brief,
-    heatmap,
-    watchlist,
-    ticker,
-  ] = await Promise.all([
-    getKpis(),
-    getMarketOverview(),
-    getPortfolioSummary(),
-    getTrendingNarratives(),
-    getAIProjects(),
-    getWhaleEvents(),
-    getSignals(),
-    getProjectSpotlight(),
-    getActivityFeed(),
-    getWelcomeStats(),
-    getIntelligenceBrief(),
-    getNarrativeHeatmap(),
-    getWatchlist(),
-    getLiveTicker(),
-  ]);
-
-  return {
-    kpis,
-    market,
-    portfolio,
-    narratives,
-    aiProjects,
-    whaleEvents,
-    signals,
-    spotlight,
-    activity,
-    welcome,
-    brief,
-    heatmap,
-    watchlist,
-    ticker,
-  };
-}
+export const getLiveTicker = cache(getLiveTickerImpl);

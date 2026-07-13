@@ -56,14 +56,19 @@ export const SITE: SiteConfig = {
 export type NavLink = {
   label: string;
   href: string;
+  /** Opens in a new tab (`target="_blank" rel="noopener noreferrer"`) — real external destinations only (GitHub repo, its `docs/` folder), never in-page anchors or internal routes. */
+  external?: boolean;
 };
+
+/** The real Base Radar GitHub repo's `docs/` folder — the actual documentation (API/Architecture/Design System/etc. markdown) already lives there; there's no separate hosted docs site yet, so "Docs" points at the real source rather than a fabricated URL. */
+const DOCS_URL = `${SITE.social.github}/tree/main/docs`;
 
 export const NAV_LINKS: NavLink[] = [
   { label: "Features", href: "#features" },
   { label: "Dashboard", href: "/dashboard" },
-  { label: "Roadmap", href: "#" },
-  { label: "Docs", href: "#" },
-  { label: "GitHub", href: "#" },
+  { label: "Roadmap", href: "#roadmap" },
+  { label: "Docs", href: DOCS_URL, external: true },
+  { label: "GitHub", href: SITE.social.github, external: true },
 ];
 
 export type FooterLinkGroup = {
@@ -71,23 +76,33 @@ export type FooterLinkGroup = {
   links: NavLink[];
 };
 
+/** PR9.3 — split the previous single "Navigation" group into Product/Company/Legal, matching the footer hierarchy of Stripe/Linear/Vercel. */
 export const FOOTER_LINK_GROUPS: FooterLinkGroup[] = [
   {
     title: "Product",
     links: [
-      { label: "Documentation", href: "#" },
-      { label: "API", href: "#" },
+      { label: "Dashboard", href: "/dashboard" },
+      { label: "Projects", href: "/dashboard/projects" },
+      { label: "AI Research", href: "/dashboard/ai-research" },
+      { label: "Signals", href: "/dashboard/signals" },
+      { label: "Watchlist", href: "/dashboard/watchlist" },
+      { label: "Roadmap", href: "#roadmap" },
     ],
   },
   {
     title: "Company",
-    links: [{ label: "Contact", href: "#" }],
+    links: [
+      { label: "About", href: "/about" },
+      { label: "Contact", href: "/contact" },
+      { label: "Docs", href: DOCS_URL, external: true },
+      { label: "GitHub", href: SITE.social.github, external: true },
+    ],
   },
   {
     title: "Legal",
     links: [
-      { label: "Privacy", href: "#" },
-      { label: "Terms", href: "#" },
+      { label: "Privacy", href: "/legal/privacy" },
+      { label: "Terms", href: "/legal/terms" },
     ],
   },
 ];
@@ -127,4 +142,24 @@ export const DASHBOARD_HIGHLIGHTS: DashboardHighlight[] = [
     icon: "signal",
     tone: "success",
   },
+];
+
+/** Landing page "Live Intelligence Ticker" (PR9.3, replaces the old static Key Metrics grid) — same `*Parts` formatter pipeline as `DashboardStat` above, routed through the identical `AnimatedNumber`/KPI rendering `KPIRow` uses on the real dashboard. */
+export type KeyMetric = {
+  label: string;
+  value: number;
+  format: "gwei" | "compactCurrency" | "compactNumber";
+};
+
+export const TICKER_METRICS: KeyMetric[] = [
+  { label: "Verified Projects", value: 2_348, format: "compactNumber" },
+  { label: "Protocols", value: 412, format: "compactNumber" },
+  { label: "TVL", value: 4_600_000_000, format: "compactCurrency" },
+  { label: "24H Volume", value: 1_300_000_000, format: "compactCurrency" },
+  { label: "Signals Today", value: 86, format: "compactNumber" },
+  { label: "AI Alerts", value: 29, format: "compactNumber" },
+  { label: "Narratives Tracked", value: 12, format: "compactNumber" },
+  { label: "Builders Added", value: 9, format: "compactNumber" },
+  { label: "Governance Votes", value: 11, format: "compactNumber" },
+  { label: "Security Updates", value: 6, format: "compactNumber" },
 ];

@@ -11,7 +11,6 @@ import { SidebarItem } from "@/components/dashboard/SidebarItem";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { buildSocialNavLinks } from "@/lib/branding/socials";
-import { useStartNavigation } from "@/components/dashboard/NavigationOverlay";
 
 /** GitHub/X's neutral hover class is defined locally, not in the shared registry — Sidebar supports both themes while `Footer` is dark-only, so the two legitimately differ; only the brand-color hovers (Discord/Telegram/Linktree) are shared, via `buildSocialNavLinks`. */
 const NEUTRAL_HOVER_CLASS =
@@ -34,21 +33,15 @@ type SidebarNavProps = {
 
 export function SidebarNav({ onNavigate, className }: SidebarNavProps) {
   const pathname = usePathname();
-  const startNavigation = useStartNavigation();
 
   const isActive = (href: string) =>
     href === "/dashboard" ? pathname === href : pathname.startsWith(href);
-
-  const navigateTo = (href: string) => {
-    startNavigation(href);
-    onNavigate?.();
-  };
 
   return (
     <div className={cn("flex h-full flex-col", className)}>
       <Link
         href="/dashboard"
-        onClick={() => navigateTo("/dashboard")}
+        onClick={onNavigate}
         aria-label="Base Radar dashboard home"
         className="group rounded-xl px-2 pb-6 outline-none focus-visible:ring-2 focus-visible:ring-radar-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-radar-light-bg dark:focus-visible:ring-offset-radar-bg"
       >
@@ -67,7 +60,7 @@ export function SidebarNav({ onNavigate, className }: SidebarNavProps) {
                   label={item.label}
                   icon={<item.icon className="size-[18px]" />}
                   active={isActive(item.href)}
-                  onClick={() => navigateTo(item.href)}
+                  onClick={onNavigate}
                 />
               ))}
             </div>
@@ -80,7 +73,7 @@ export function SidebarNav({ onNavigate, className }: SidebarNavProps) {
           label={DASHBOARD_SETTINGS_ITEM.label}
           icon={<DASHBOARD_SETTINGS_ITEM.icon className="size-[18px]" />}
           active={isActive(DASHBOARD_SETTINGS_ITEM.href)}
-          onClick={() => navigateTo(DASHBOARD_SETTINGS_ITEM.href)}
+          onClick={onNavigate}
         />
       </nav>
 

@@ -56,6 +56,17 @@ export function SplashScreen() {
   const alreadySeenRef = useRef<boolean | null>(null);
 
   useLayoutEffect(() => {
+    // PR9.2 — a manual browser reload (F5/Cmd+R) must always replay the full
+    // splash, even within an already-"seen" session: the Navigation Timing
+    // API's `type` is the one reliable signal that distinguishes an actual
+    // reload from every other kind of navigation (first visit, an internal
+    // `<Link>` transition, a fresh tab) — `sessionStorage`'s "seen" flag
+    // alone can't tell those apart, since it persists across all of them.
+    const isReload =
+      typeof performance !== "undefined" &&
+      performance.getEntriesByType("navigation")[0] instanceof PerformanceNavigationTiming &&
+      (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming).type === "reload";
+
     // `visible` starts `true` unconditionally (see the class doc comment)
     // so server-rendered HTML always matches the first client render — that
     // means correcting for an already-seen session can only happen here,
@@ -63,10 +74,8 @@ export function SplashScreen() {
     // derivable app state), and must run in `useLayoutEffect` specifically
     // so it lands before the browser paints, leaving zero visible flash.
     if (alreadySeenRef.current === null) {
-      alreadySeenRef.current = Boolean(sessionStorage.getItem(SPLASH_SEEN_KEY));
-      if (!alreadySeenRef.current) {
-        sessionStorage.setItem(SPLASH_SEEN_KEY, "1");
-      }
+      alreadySeenRef.current = Boolean(sessionStorage.getItem(SPLASH_SEEN_KEY)) && !isReload;
+      sessionStorage.setItem(SPLASH_SEEN_KEY, "1");
     }
 
     if (alreadySeenRef.current) {
@@ -115,10 +124,15 @@ export function SplashScreen() {
             </span>
           </div>
 
+          {/* A real determinate 0% → 100% fill, timed to `MIN_VISIBLE_MS` —
+              one full cycle, never looping or resetting, so it reads as
+              actual load progress rather than an indeterminate spinner. */}
           <div className="absolute bottom-[12%] h-1 w-40 overflow-hidden rounded-full bg-radar-light-border dark:bg-radar-border">
-            <div
-              className="h-full w-1/3 rounded-full bg-gradient-to-r from-radar-primary to-radar-accent motion-reduce:animate-none"
-              style={{ animation: prefersReducedMotion ? undefined : "br-loading-bar 1.4s ease-in-out infinite" }}
+            <motion.div
+              className="h-full rounded-full bg-gradient-to-r from-radar-primary to-radar-accent"
+              initial={{ width: "0%" }}
+              animate={{ width: "100%" }}
+              transition={{ duration: prefersReducedMotion ? 0 : MIN_VISIBLE_MS / 1000, ease: "easeOut" }}
             />
           </div>
         </motion.div>

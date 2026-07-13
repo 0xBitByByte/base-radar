@@ -1,9 +1,10 @@
 "use client";
 
-import { MotionConfig, motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { MotionConfig, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
-  ExternalLink,
+  Compass,
   Fuel,
   Layers,
   Wallet,
@@ -16,8 +17,6 @@ import {
 } from "lucide-react";
 
 import { HeroBackground } from "@/components/landing/HeroBackground";
-import { ChainBadgeGroup } from "@/components/branding/ChainBadgeGroup";
-import { VerificationBadge } from "@/components/explorer/VerificationBadge";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { GradientButton } from "@/components/ui/GradientButton";
@@ -57,18 +56,57 @@ const fadeUp = {
   show: { opacity: 1, y: 0 },
 };
 
+/** Small, bounded random walk — keeps the Hero preview's stats visibly "alive" (PR9.3) without ever reading as noisy or fake-blinking; each tick nudges by a tiny fraction of the value itself. */
+function jitter(value: number, magnitude: number): number {
+  return value * (1 + (Math.random() - 0.5) * magnitude);
+}
+
+const LIVE_UPDATE_INTERVAL_MS = 4500;
+
+/**
+ * Drives the Hero preview's "continuously alive" feel (PR9.3 §2/§15): every
+ * few seconds, Gas/Active Projects/TVL/24H Volume each take one small,
+ * bounded step — `AnimatedNumber` already animates any value change
+ * smoothly, so this just needs to supply new numbers on an interval, not
+ * its own animation. Skipped entirely under `prefers-reduced-motion`.
+ */
+function useLivePreview(prefersReducedMotion: boolean | null) {
+  const [stats, setStats] = useState(() => DASHBOARD_STATS.map((stat) => stat.value));
+
+  useEffect(() => {
+    if (prefersReducedMotion) return;
+
+    const id = setInterval(() => {
+      // Jitters from `DASHBOARD_STATS`'s fixed values every tick, never
+      // from the previous tick's already-jittered result — jittering from
+      // the running value would be an unbounded random walk that keeps
+      // compounding for as long as the tab stays open; anchoring to the
+      // real value keeps every stat gently oscillating around it forever,
+      // which is what "subtle live update" actually means.
+      setStats(DASHBOARD_STATS.map((stat, index) => jitter(stat.value, index === 0 ? 0.08 : 0.015)));
+    }, LIVE_UPDATE_INTERVAL_MS);
+
+    return () => clearInterval(id);
+  }, [prefersReducedMotion]);
+
+  return { stats };
+}
+
 export function Hero() {
+  const prefersReducedMotion = useReducedMotion();
+  const live = useLivePreview(prefersReducedMotion);
+
   return (
     <MotionConfig reducedMotion="user">
-      <section className="relative overflow-hidden px-6 pt-20 pb-24 sm:pt-28 sm:pb-32 lg:pt-32 lg:pb-40">
+      <section id="hero" className="relative overflow-hidden px-6 pt-6 pb-16 sm:pt-10 sm:pb-24 lg:pt-12 lg:pb-28 lg:px-8">
         <HeroBackground />
 
-        <div className="mx-auto grid max-w-7xl items-center gap-y-20 lg:grid-cols-2 lg:gap-16">
+        <div className="mx-auto grid max-w-7xl items-center gap-y-20 lg:grid-cols-2 lg:gap-20">
           <motion.div
             initial="hidden"
             animate="show"
             transition={{ staggerChildren: 0.1 }}
-            className="flex flex-col items-start gap-7"
+            className="flex flex-col items-start gap-8"
           >
             <motion.div variants={fadeUp} transition={{ duration: 0.5 }}>
               <GlowBadge color="accent" dot>
@@ -79,7 +117,7 @@ export function Hero() {
             <motion.h1
               variants={fadeUp}
               transition={{ duration: 0.5 }}
-              className="text-4xl leading-[1.05] font-semibold tracking-tight text-radar-light-text sm:text-5xl lg:text-6xl xl:text-7xl dark:text-radar-white"
+              className="text-5xl leading-[1.05] font-semibold tracking-tight text-radar-light-text sm:text-6xl lg:text-7xl dark:text-radar-white"
             >
               Everything happening on Base.
               <br />
@@ -91,7 +129,7 @@ export function Hero() {
             <motion.p
               variants={fadeUp}
               transition={{ duration: 0.5 }}
-              className="max-w-xl text-base leading-relaxed text-radar-light-muted sm:text-lg lg:text-xl dark:text-radar-muted"
+              className="max-w-xl text-lg leading-relaxed text-radar-light-muted lg:text-xl dark:text-radar-muted"
             >
               Track projects, narratives, builders, whales, AI ecosystems and emerging
               opportunities across the Base blockchain from a single platform.
@@ -103,12 +141,12 @@ export function Hero() {
               className="flex flex-col gap-4 sm:flex-row"
             >
               <GradientButton href="/dashboard" variant="primary">
-                Explore Dashboard
+                Launch App
                 <ArrowRight className="size-4" />
               </GradientButton>
-              <GradientButton href="#" variant="secondary">
-                View GitHub
-                <ExternalLink className="size-4" />
+              <GradientButton href="/dashboard/projects" variant="secondary">
+                Explore Projects
+                <Compass className="size-4" />
               </GradientButton>
             </motion.div>
 
@@ -132,14 +170,7 @@ export function Hero() {
             transition={{ duration: 0.6, delay: 0.2 }}
           >
             <GlassCard glow className="p-6 sm:p-8">
-              <div className="flex items-center justify-between border-b border-radar-light-border pb-5 dark:border-white/10">
-                <span className="text-sm font-semibold text-radar-light-text dark:text-radar-white">Base Network</span>
-                <GlowBadge color="success" dot>
-                  Live
-                </GlowBadge>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 py-6">
+              <div className="grid grid-cols-2 gap-4 pb-6">
                 {DASHBOARD_STATS.map((stat, index) => {
                   const Icon = STAT_ICONS[stat.label];
                   return (
@@ -157,8 +188,9 @@ export function Hero() {
                       </div>
                       <div className="mt-2 flex items-baseline gap-2">
                         <AnimatedNumber
-                          value={stat.value}
+                          value={live.stats[index]}
                           format={formatterFor(stat.format)}
+                          duration={1.2}
                           className="whitespace-nowrap"
                         />
                         {stat.delta && (
@@ -178,7 +210,7 @@ export function Hero() {
                 })}
               </div>
 
-              <div className="flex flex-col gap-1 border-t border-radar-light-border pt-5 dark:border-white/10">
+              <div className="flex flex-col gap-1">
                 {DASHBOARD_HIGHLIGHTS.map((highlight, index) => {
                   const Icon = HIGHLIGHT_ICONS[highlight.icon];
                   return (
@@ -198,24 +230,6 @@ export function Hero() {
                     </motion.div>
                   );
                 })}
-
-                {/* One illustrative row using the real Explorer chain/verification
-                    components (not decorative lookalikes) — a passive proof that
-                    the design system is consistent, since their tooltips are the
-                    same `RichTooltip` instances Grid/Table/Quick View use. */}
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-40px" }}
-                  transition={{ duration: 0.4, delay: DASHBOARD_HIGHLIGHTS.length * 0.06 }}
-                  className="-mx-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-xl px-2 py-2 transition-colors duration-200 hover:bg-radar-light-text/[0.03] dark:hover:bg-white/[0.04]"
-                >
-                  <span className="flex items-center gap-2 text-sm text-radar-light-muted dark:text-radar-muted">
-                    Aerodrome Finance
-                    <ChainBadgeGroup chains={["base", "ethereum"]} size="sm" max={1} />
-                  </span>
-                  <VerificationBadge status="verified" compact />
-                </motion.div>
               </div>
             </GlassCard>
           </motion.div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { animate, useReducedMotion } from "framer-motion";
 
 import { KpiValueDisplay } from "@/components/ui/KpiValueDisplay";
@@ -20,16 +20,29 @@ export function AnimatedNumber({ value, format, duration = 1, className }: Anima
   // afterwards, in a layout effect, so nothing user-visible ever regresses
   // to zero before paint.
   const [display, setDisplay] = useState(value);
+  // Mirrors `display` without triggering a re-render on every animation
+  // frame — read inside the effect below to find the animation's true
+  // starting point (see comment there), and updated in the same
+  // `onUpdate` callback that drives `display` itself.
+  const displayRef = useRef(value);
+  const isFirstRun = useRef(true);
 
   useLayoutEffect(() => {
     if (prefersReducedMotion) return;
-    // `onUpdate` fires immediately with the starting value (0), so the
-    // counter still visibly resets before counting up without a separate
-    // synchronous `setDisplay(0)` call here.
-    const controls = animate(0, value, {
+    // First mount counts up from zero (a real "0 → real value" reveal);
+    // every later change (e.g. a periodic live-preview update) animates
+    // from whatever's currently on screen — starting that from 0 too would
+    // make the number visibly reset and recount on every update, reading
+    // as a jarring blink rather than a subtle live tick.
+    const from = isFirstRun.current ? 0 : displayRef.current;
+    isFirstRun.current = false;
+    const controls = animate(from, value, {
       duration,
       ease: "easeOut",
-      onUpdate: setDisplay,
+      onUpdate: (v) => {
+        displayRef.current = v;
+        setDisplay(v);
+      },
     });
     return () => controls.stop();
   }, [value, duration, prefersReducedMotion]);

@@ -4,6 +4,17 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Trusted Data Sources' AI-hub border sweep (PR9.5.1 §2) — registering this
+   as an `<angle>` custom property lets the browser interpolate it smoothly
+   across the keyframe below, the same way any other animatable property
+   would; without `@property`, animating a bare custom property snaps
+   instantly instead of easing. */
+@property --tds-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -118,19 +129,63 @@
   }
 }
 
-/* Theme switching animates background/text/border color over ~250ms
-   instead of snapping instantly, applied globally so Landing and Dashboard
-   both get the same feel from the one shared `next-themes` provider.
-   Scoped to color properties only (never `transform`/`layout`) so it can't
-   introduce jank into anything else already animating on the page. */
+/* Theme switching (PR9.3.4 §1, retuned PR9.4 §8.1) — a plain, single-
+   duration crossfade on design-token-bearing properties only, no stagger
+   and no JS orchestration. Switching `.dark`/`:root`'s CSS custom properties
+   is the entire theme change; every consumer inherits automatically, so
+   this rule just needs to let the resulting color values ease in instead
+   of snapping. Scoped to a concrete tag list rather than `*` — still broad
+   enough to cover every real theme-bearing surface, but not a universal
+   selector. `transform` and layout are never touched, so marquees/counters/
+   tile flips/ambient particles keep animating through a theme switch with
+   nothing to pause.
+
+   `background-image` was missing from the original property list — every
+   icon badge and gradient CTA on the page uses `bg-gradient-to-br` with
+   theme-responsive `--color-radar-primary`/`-accent` stops, and the Hero
+   headline's gradient text-clip is a `background-image` too. Without it
+   listed here, every one of those gradients snapped instantly on toggle
+   while their neighboring solid-color borders/backgrounds eased — the
+   "flashing"/"text flashing" the still-abrupt-feeling transition was
+   actually caused by. Duration nudged 200ms → 240ms with a standard
+   ease-in-out curve (matching the easing most design systems use for this
+   exact kind of ambient repaint) for a slightly less snappy, more settled
+   feel, still well under the 300ms ceiling from previous rounds. */
 @media (prefers-reduced-motion: no-preference) {
-  * {
-    transition:
-      background-color 250ms ease,
-      border-color 250ms ease,
-      color 250ms ease,
-      fill 250ms ease,
-      stroke 250ms ease;
+  body,
+  div,
+  section,
+  header,
+  footer,
+  nav,
+  aside,
+  main,
+  button,
+  a,
+  span,
+  input,
+  textarea,
+  svg,
+  path {
+    transition-property: background-color, background-image, border-color, color, box-shadow, fill, stroke;
+    transition-duration: 240ms;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* Dashboard's critical-widget block (PR9.5 §4) — once every critical
+   widget's data has resolved together (a single `Promise.all` behind one
+   `<Suspense>`, not per-widget streaming), the whole block fades/slides in
+   as one coordinated reveal instead of widgets popping in individually.
+   `transform`/`opacity` only. */
+@keyframes br-dashboard-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -170,17 +225,71 @@
   }
 }
 
-/* Route-transition `loading.tsx` files wrap `BrandSpinner` in this — held at
-   opacity 0 for the animation's first half, then fades in. A navigation that
-   resolves before the hold ends never renders a visible spinner at all
-   (avoids a flash-of-loading-state on fast transitions); a slower one gets a
-   smooth fade-in instead of popping in abruptly. */
-@keyframes br-loader-reveal {
+/* Landing page's "Featured Base Ecosystem" marquee (`FeaturedEcosystem.tsx`)
+   — the track renders its item list twice back-to-back, then loops this
+   exactly one half-width so the seam is invisible. `transform`-only. */
+@keyframes br-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Landing page's "Live Intelligence Ticker" (`KeyMetrics.tsx`, PR9.3) — same
+   duplicated-content-loop technique as `br-marquee`, just slower and used
+   for a single-row stat strip instead of project tiles. Kept as its own
+   keyframe (rather than reusing `br-marquee`) so the two speeds can be
+   tuned independently. */
+@keyframes br-ticker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Trusted Data Sources' "Base Radar AI" hub (PR9.5.1 §2) — a rounded-rect
+   gradient border that sweeps once every 4s, timed to the same period as
+   the six converging provider particles and the single verified-output
+   particle (see `ProviderConvergence`/`VerifiedOutputConnector` in
+   TrustedDataSources.tsx): particles travel during the first ~40% of the
+   cycle, this ring is visible for the middle ~50% ("processing"), then
+   fades out as the output particle travels during the final ~20%. Opacity
+   eases in/out at both ends so the ring never snaps on/off ("no
+   flashing"). */
+@keyframes tds-ai-sweep {
   0%,
-  50% {
+  34% {
     opacity: 0;
+    --tds-angle: 0deg;
+  }
+  35% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+    --tds-angle: 360deg;
   }
   100% {
-    opacity: 1;
+    opacity: 0;
+  }
+}
+
+/* Roadmap section's ambient backdrop (`Roadmap.tsx`, PR9.3) — a handful of
+   soft dots drifting very slowly, `transform`+`opacity` only. Kept far
+   below the timeline cards in z-order and at low opacity so it reads as
+   texture, never competes with the quarter cards' content. */
+@keyframes br-drift {
+  0%,
+  100% {
+    transform: translate(0, 0);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translate(14px, -10px);
+    opacity: 0.9;
   }
 }

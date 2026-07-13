@@ -3,7 +3,7 @@
  * https://www.coingecko.com/en/api/documentation
  */
 
-const REVALIDATE_SECONDS = 90;
+const REVALIDATE_SECONDS = 60;
 const BASE_URL = "https://api.coingecko.com/api/v3";
 
 export type CoinGeckoMarket = {
