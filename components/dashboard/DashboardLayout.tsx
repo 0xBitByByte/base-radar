@@ -1,18 +1,23 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { Suspense, useState, type ReactNode } from "react";
 import { MotionConfig } from "framer-motion";
 
 import type { LiveTicker, WithSource } from "@/lib/data/types";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { MobileSidebar } from "@/components/dashboard/MobileSidebar";
 import { Topbar } from "@/components/dashboard/Topbar";
-import { LiveStatusBar } from "@/components/dashboard/LiveStatusBar";
-import { NavigationOverlayProvider, NavigationOverlay } from "@/components/dashboard/NavigationOverlay";
+import { LiveStatusBarAsync } from "@/components/dashboard/LiveStatusBarAsync";
+import { WidgetSkeleton } from "@/components/dashboard/WidgetSkeleton";
 
 type DashboardLayoutProps = {
   children: ReactNode;
-  ticker: WithSource<LiveTicker>;
+  /**
+   * Passed unresolved (PR9.3.4 §3) — Sidebar/Topbar below render immediately
+   * regardless of how long the ticker's provider calls take; only the
+   * `LiveStatusBarAsync` strip suspends on it, behind its own boundary.
+   */
+  tickerPromise: Promise<WithSource<LiveTicker>>;
   /**
    * Reserved for the future Intelligence Rail (breaking news, whale alerts,
    * governance, GitHub releases, AI insights, new launches, watchlist
@@ -23,7 +28,7 @@ type DashboardLayoutProps = {
   intelligenceRail?: ReactNode;
 };
 
-export function DashboardLayout({ children, ticker, intelligenceRail }: DashboardLayoutProps) {
+export function DashboardLayout({ children, tickerPromise, intelligenceRail }: DashboardLayoutProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
@@ -45,26 +50,25 @@ export function DashboardLayout({ children, ticker, intelligenceRail }: Dashboar
           <div className="absolute top-0 left-1/2 size-[50rem] -translate-x-1/2 -translate-y-1/3 rounded-full bg-radar-primary/10 blur-3xl dark:bg-radar-primary/20" />
         </div>
 
-        <NavigationOverlayProvider>
-          <div className="mx-auto flex max-w-[1600px]">
-            <Sidebar />
+        <div className="mx-auto flex max-w-[1600px]">
+          <Sidebar />
 
-            <div className="relative flex min-h-dvh min-w-0 flex-1 flex-col">
-              <Topbar onOpenMobileNav={() => setMobileNavOpen(true)} />
-              <LiveStatusBar data={ticker} />
-              <main className="min-w-0 flex-1 px-4 py-8 sm:px-6 lg:px-10">{children}</main>
-              <NavigationOverlay />
-            </div>
-
-            {intelligenceRail && (
-              <aside className="hidden w-80 shrink-0 border-l border-radar-light-border px-4 py-8 xl:block dark:border-white/10">
-                {intelligenceRail}
-              </aside>
-            )}
+          <div className="relative flex min-h-dvh min-w-0 flex-1 flex-col">
+            <Topbar onOpenMobileNav={() => setMobileNavOpen(true)} />
+            <Suspense fallback={<WidgetSkeleton className="h-10 rounded-none border-x-0 border-t-0" />}>
+              <LiveStatusBarAsync tickerPromise={tickerPromise} />
+            </Suspense>
+            <main className="min-w-0 flex-1 px-4 py-8 sm:px-6 lg:px-10">{children}</main>
           </div>
 
-          <MobileSidebar open={mobileNavOpen} onOpenChange={setMobileNavOpen} />
-        </NavigationOverlayProvider>
+          {intelligenceRail && (
+            <aside className="hidden w-80 shrink-0 border-l border-radar-light-border px-4 py-8 xl:block dark:border-white/10">
+              {intelligenceRail}
+            </aside>
+          )}
+        </div>
+
+        <MobileSidebar open={mobileNavOpen} onOpenChange={setMobileNavOpen} />
       </div>
     </MotionConfig>
   );

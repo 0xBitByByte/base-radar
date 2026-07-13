@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AnimatePresence, MotionConfig, motion } from "framer-motion";
+import { AnimatePresence, MotionConfig, motion, useReducedMotion } from "framer-motion";
 import { Menu, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { NAV_LINKS } from "@/constants/site";
+import { NAV_LINKS, type NavLink } from "@/constants/site";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { GithubMark } from "@/components/ui/BrandIcons";
 import { HeaderLogo } from "@/components/branding/HeaderLogo";
@@ -15,6 +15,7 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -22,6 +23,41 @@ export function Navbar() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  function handleNavClick(event: React.MouseEvent<HTMLAnchorElement>, link: NavLink) {
+    if (!link.href.startsWith("#")) return;
+    const target = document.querySelector(link.href);
+    if (!target) return;
+    event.preventDefault();
+    target.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" });
+    setIsOpen(false);
+  }
+
+  function renderNavLink(link: NavLink, className: string) {
+    const content =
+      link.label === "GitHub" ? (
+        <span className="flex items-center gap-1.5">
+          <GithubMark className="size-4" />
+          {link.label}
+        </span>
+      ) : (
+        link.label
+      );
+
+    if (link.external) {
+      return (
+        <a key={link.label} href={link.href} target="_blank" rel="noopener noreferrer" className={className}>
+          {content}
+        </a>
+      );
+    }
+
+    return (
+      <Link key={link.label} href={link.href} onClick={(event) => handleNavClick(event, link)} className={className}>
+        {content}
+      </Link>
+    );
+  }
 
   return (
     <MotionConfig reducedMotion="user">
@@ -34,33 +70,23 @@ export function Navbar() {
         )}
       >
         <nav
-          className="mx-auto flex h-[4.5rem] max-w-7xl items-center justify-between px-6 lg:px-8"
+          className="mx-auto flex h-20 max-w-7xl items-center justify-between px-6 lg:px-10"
           aria-label="Primary"
         >
           <Link href="/" aria-label="Base Radar home" className="group rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-radar-primary/50">
-            <HeaderLogo height={40} className="transition-transform duration-200 ease-out group-hover:scale-105" />
+            <HeaderLogo height={41} className="transition-transform duration-200 ease-out group-hover:scale-105" />
           </Link>
 
-          <div className="hidden items-center gap-9 md:flex">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.label}
-                href={link.href}
-                className="text-sm font-medium text-radar-light-muted transition-colors hover:text-radar-light-text dark:text-radar-muted dark:hover:text-radar-white"
-              >
-                {link.label === "GitHub" ? (
-                  <span className="flex items-center gap-1.5">
-                    <GithubMark className="size-4" />
-                    {link.label}
-                  </span>
-                ) : (
-                  link.label
-                )}
-              </Link>
-            ))}
+          <div className="hidden items-center gap-11 md:flex">
+            {NAV_LINKS.map((link) =>
+              renderNavLink(
+                link,
+                "text-sm font-medium text-radar-light-muted transition-colors hover:text-radar-light-text dark:text-radar-muted dark:hover:text-radar-white"
+              )
+            )}
           </div>
 
-          <div className="hidden items-center gap-2 md:flex">
+          <div className="hidden items-center gap-3 md:flex">
             <ThemeToggle variant="icon" />
             <GradientButton href="/dashboard" className="px-5 py-2.5 text-sm">
               Launch App
@@ -91,16 +117,12 @@ export function Navbar() {
               className="overflow-hidden border-t border-radar-light-border md:hidden dark:border-white/5"
             >
               <div className="flex flex-col gap-1 px-6 py-4">
-                {NAV_LINKS.map((link) => (
-                  <Link
-                    key={link.label}
-                    href={link.href}
-                    onClick={() => setIsOpen(false)}
-                    className="rounded-lg px-2 py-2.5 text-sm font-medium text-radar-light-muted transition-colors hover:bg-radar-light-surface hover:text-radar-light-text dark:text-radar-muted dark:hover:bg-white/5 dark:hover:text-radar-white"
-                  >
-                    {link.label}
-                  </Link>
-                ))}
+                {NAV_LINKS.map((link) =>
+                  renderNavLink(
+                    link,
+                    "rounded-lg px-2 py-2.5 text-sm font-medium text-radar-light-muted transition-colors hover:bg-radar-light-surface hover:text-radar-light-text dark:text-radar-muted dark:hover:bg-white/5 dark:hover:text-radar-white"
+                  )
+                )}
                 <div className="mt-2">
                   <GradientButton href="/dashboard" className="w-full">
                     Launch App

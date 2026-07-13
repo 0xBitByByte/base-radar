@@ -1,14 +1,12 @@
-import { BrandSpinner } from "@/components/ui/BrandSpinner";
+import { RouteLoading } from "@/components/dashboard/RouteLoading";
 
+/**
+ * PR9.5.2 — `app/dashboard/page.tsx` is `async` again and awaits its
+ * critical data at the top level (no inner Suspense split), so this
+ * fallback now genuinely fires for the duration of that fetch, exactly
+ * like `app/dashboard/projects/loading.tsx`. Both render the same
+ * `RouteLoading` component — one shared implementation, not a duplicate.
+ */
 export default function DashboardLoading() {
-  return (
-    <div className="flex min-h-[70vh] items-center justify-center">
-      {/* `br-loader-reveal`: invisible for the first ~300ms, then fades in —
-          so a navigation that resolves faster than that never flashes a
-          spinner at all. */}
-      <div className="animate-[br-loader-reveal_600ms_ease-out_forwards] motion-reduce:animate-none">
-        <BrandSpinner tier="xl" />
-      </div>
-    </div>
-  );
+  return <RouteLoading />;
 }

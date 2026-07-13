@@ -3,7 +3,7 @@
  * https://defillama.com/docs/api
  */
 
-const REVALIDATE_SECONDS = 120;
+const REVALIDATE_SECONDS = 60;
 
 type HistoricalTvlPoint = { date: number; tvl: number };
 
