@@ -30,4 +30,9 @@ export const uniswap: Project = {
     dexscreenerChainId: "base",
     defillamaSlug: "uniswap",
   },
+  governance: {
+    snapshotSpace: "uniswapgovernance.eth",
+    governanceType: "snapshot",
+    governanceUrl: "https://snapshot.org/#/uniswapgovernance.eth",
+  },
 };

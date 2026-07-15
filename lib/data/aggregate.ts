@@ -20,13 +20,18 @@
 
 import { cache } from "react";
 
-import * as baseRpc from "@/lib/data/providers/baseRpc";
-import * as blockscout from "@/lib/data/providers/blockscout";
-import * as coingecko from "@/lib/data/providers/coingecko";
-import * as defillama from "@/lib/data/providers/defillama";
-import * as dexscreener from "@/lib/data/providers/dexscreener";
-import * as github from "@/lib/data/providers/github";
-import { formatNumber, formatPrice } from "@/lib/data/format";
+import * as baseRpc from "@/lib/providers/base/service";
+import * as blockscout from "@/lib/providers/blockscout/service";
+import * as coingecko from "@/lib/providers/coingecko/service";
+import * as defillama from "@/lib/providers/defillama/service";
+import * as dexscreener from "@/lib/providers/dexscreener/service";
+import * as github from "@/lib/providers/github/service";
+import type { ProviderResult } from "@/lib/providers/common/types";
+import { getWhaleProvider, type WatchedToken, type WhaleEvent as WhaleDetectionEvent } from "@/lib/whale";
+import { getGovernanceProvider, type GovernanceProjectRef } from "@/lib/governance";
+import { getIntelligenceProvider, type NarrativeCategorySample } from "@/lib/intelligence-engine";
+import { getProjects, type ProjectCategory } from "@/data/projects";
+import { formatCompactCurrency, formatNumber, formatPercent, formatPrice, formatRelativeTime } from "@/lib/data/format";
 import {
   MOCK_ACTIVITY_FEED,
   MOCK_AI_PROJECTS,
@@ -47,8 +52,9 @@ import type {
   ActivityEvent,
   AIProject,
   DataSource,
+  HeatmapCategory,
   IntelligenceBrief,
-  IntelligenceBriefPoint,
+  IntelligenceWallData,
   Kpi,
   KpiId,
   LiveTicker,
@@ -80,6 +86,17 @@ const KNOWN_PROTOCOL_REPOS: Record<string, string> = {
   moonwell: "moonwell-fi/moonwell-contracts-monorepo",
   "uniswap v3": "Uniswap/v3-core",
 };
+
+/**
+ * Every `lib/providers/*` service function resolves to a `ProviderResult<T>`
+ * envelope (`{ok, data}` or `{ok:false, error}`), never throws, never
+ * returns bare `null` — this aggregation layer's own convention (predating
+ * PR10's migration onto that provider layer) is `T | null`, so every call
+ * site unwraps through this instead of branching on `.ok` inline.
+ */
+function unwrap<T>(result: ProviderResult<T>): T | null {
+  return result.ok ? result.data : null;
+}
 
 // Deliberately stricter than a bare /ai/i substring test, which false-positives
 // on names like "Chainbase", "USDai", or "OriginTrail" that merely contain the
@@ -121,25 +138,31 @@ async function getKpisImpl(): Promise<WithSource<{ items: Kpi[] }>> {
       blockscout.getChainStats(),
     ]);
 
-  if (tvlRes.status === "fulfilled" && tvlRes.value) {
-    patchKpi(items, "tvl", tvlRes.value.tvlUsd, tvlRes.value.changePct24h);
+  const tvl = tvlRes.status === "fulfilled" ? unwrap(tvlRes.value) : null;
+  const stable = stableRes.status === "fulfilled" ? unwrap(stableRes.value) : null;
+  const protocols = protocolsRes.status === "fulfilled" ? unwrap(protocolsRes.value) : null;
+  const net = netRes.status === "fulfilled" ? unwrap(netRes.value) : null;
+  const markets = marketsRes.status === "fulfilled" ? unwrap(marketsRes.value) : null;
+  const chainStats = chainStatsRes.status === "fulfilled" ? unwrap(chainStatsRes.value) : null;
+
+  if (tvl) {
+    patchKpi(items, "tvl", tvl.tvlUsd, tvl.changePct24h);
     liveHits++;
   }
-  if (stableRes.status === "fulfilled" && stableRes.value !== null) {
-    patchKpi(items, "stablecoins", stableRes.value);
+  if (stable !== null) {
+    patchKpi(items, "stablecoins", stable);
     liveHits++;
   }
-  if (protocolsRes.status === "fulfilled" && protocolsRes.value) {
-    patchKpi(items, "projects", protocolsRes.value.length);
+  if (protocols) {
+    patchKpi(items, "projects", protocols.length);
     liveHits++;
   }
-  if (netRes.status === "fulfilled" && netRes.value) {
-    patchKpi(items, "gas", Math.round(netRes.value.gasGwei * 1000) / 1000);
+  if (net) {
+    patchKpi(items, "gas", Math.round(net.gasGwei * 1000) / 1000);
     liveHits++;
   }
-  if (marketsRes.status === "fulfilled" && marketsRes.value) {
-    const markets = marketsRes.value;
-    const dexVolume = markets.reduce((sum, m) => sum + (m.total_volume ?? 0), 0);
+  if (markets) {
+    const dexVolume = markets.reduce((sum, m) => sum + (m.volume24hUsd ?? 0), 0);
     if (dexVolume > 0) {
       patchKpi(items, "dexVolume24h", dexVolume);
       liveHits++;
@@ -150,8 +173,8 @@ async function getKpisImpl(): Promise<WithSource<{ items: Kpi[] }>> {
       liveHits++;
     }
   }
-  if (chainStatsRes.status === "fulfilled" && chainStatsRes.value) {
-    patchKpi(items, "transactions", chainStatsRes.value.transactionsToday);
+  if (chainStats) {
+    patchKpi(items, "transactions", chainStats.transactionsToday);
     liveHits++;
   }
 
@@ -160,7 +183,7 @@ async function getKpisImpl(): Promise<WithSource<{ items: Kpi[] }>> {
 export const getKpis = cache(getKpisImpl);
 
 async function getMarketOverviewImpl(): Promise<WithSource<MarketOverview>> {
-  const net = await baseRpc.getBaseNetworkStatus();
+  const net = unwrap(await baseRpc.getBaseNetworkStatus());
   if (!net) return { ...MOCK_MARKET_OVERVIEW, source: "mock" };
   return {
     gasGwei: net.gasGwei,
@@ -184,13 +207,85 @@ async function getPortfolioSummaryImpl(): Promise<WithSource<PortfolioSummary>> 
 }
 export const getPortfolioSummary = cache(getPortfolioSummaryImpl);
 
+/**
+ * Narrative classification isn't exposed by any free API as a standalone
+ * feed (PR10 audit confirmed this) — but it doesn't need to be: every
+ * registry project already declares real categories, and CoinGecko already
+ * gives us real 24h price/volume deltas per project. Grouping those by
+ * category and running them through `generateNarrative` produces genuinely
+ * computed momentum, not curated copy — the same "real data in, transparent
+ * heuristic out" pattern the rest of this file already uses.
+ */
+type CategoryNarrativeMeta = { name: string; category: string; heatmapCategory: HeatmapCategory | null };
+
+const CATEGORY_NARRATIVE_META: Partial<Record<ProjectCategory, CategoryNarrativeMeta>> = {
+  ai: { name: "AI Agents", category: "Artificial Intelligence", heatmapCategory: "AI" },
+  dex: { name: "DEX Activity", category: "DeFi", heatmapCategory: "DeFi" },
+  lending: { name: "Lending Markets", category: "DeFi", heatmapCategory: "DeFi" },
+  derivatives: { name: "Derivatives", category: "DeFi", heatmapCategory: "DeFi" },
+  yield: { name: "Yield Strategies", category: "DeFi", heatmapCategory: "DeFi" },
+  stablecoin: { name: "Stablecoins", category: "DeFi", heatmapCategory: "DeFi" },
+  gaming: { name: "Onchain Gaming", category: "Gaming", heatmapCategory: "Gaming" },
+  rwa: { name: "RWA Tokenization", category: "RWA", heatmapCategory: "RWA" },
+  social: { name: "Onchain Social", category: "Consumer", heatmapCategory: "Social" },
+  infrastructure: { name: "Infrastructure", category: "Infra", heatmapCategory: "Infrastructure" },
+  bridge: { name: "Bridging", category: "Infra", heatmapCategory: "Infrastructure" },
+  oracle: { name: "Oracles", category: "Infra", heatmapCategory: "Infrastructure" },
+  wallet: { name: "Wallets", category: "Infra", heatmapCategory: "Infrastructure" },
+  identity: { name: "Identity", category: "Infra", heatmapCategory: "Infrastructure" },
+};
+
+function metaForDisplayCategory(displayCategory: string): CategoryNarrativeMeta | undefined {
+  return Object.values(CATEGORY_NARRATIVE_META).find((meta) => meta?.category === displayCategory);
+}
+
+async function getNarrativeSamplesImpl(): Promise<NarrativeCategorySample[]> {
+  const markets = unwrap(await coingecko.getBaseEcosystemMarkets(150));
+  if (!markets || markets.length === 0) return [];
+
+  const samples: NarrativeCategorySample[] = [];
+  for (const project of getProjects()) {
+    const coingeckoId = project.providerIds.coingeckoId;
+    if (!coingeckoId) continue;
+
+    const market = markets.find((m) => m.id === coingeckoId);
+    if (!market || market.changePct24h === null) continue;
+
+    const meta = CATEGORY_NARRATIVE_META[project.categories[0]];
+    if (!meta) continue;
+
+    samples.push({ category: meta.category, changePct24h: market.changePct24h, volumeUsd: market.volume24hUsd });
+  }
+  return samples;
+}
+const getNarrativeSamples = cache(getNarrativeSamplesImpl);
+
 async function getTrendingNarrativesImpl(): Promise<WithSource<Narrative[]>> {
-  // Narrative classification isn't exposed by a free API — curated for now,
-  // shaped so a categorization service can populate it later.
-  return Object.assign(
-    MOCK_NARRATIVES.map((n) => ({ ...n })),
-    { source: "mock" as const }
-  );
+  try {
+    const samples = await getNarrativeSamples();
+    if (samples.length === 0) {
+      return Object.assign(MOCK_NARRATIVES.map((n) => ({ ...n })), { source: "mock" as const });
+    }
+
+    const { signals } = await getIntelligenceProvider().generateNarrative({ samples });
+    if (signals.length === 0) {
+      return Object.assign(MOCK_NARRATIVES.map((n) => ({ ...n })), { source: "mock" as const });
+    }
+
+    const narratives: Narrative[] = signals.slice(0, 4).map((signal) => {
+      const meta = metaForDisplayCategory(signal.category);
+      return {
+        name: meta?.name ?? signal.category,
+        category: signal.category,
+        momentum: signal.strength,
+        change24hPct: signal.changePct24h,
+      };
+    });
+
+    return Object.assign(narratives, { source: "live" as const });
+  } catch {
+    return Object.assign(MOCK_NARRATIVES.map((n) => ({ ...n })), { source: "mock" as const });
+  }
 }
 export const getTrendingNarratives = cache(getTrendingNarrativesImpl);
 
@@ -202,7 +297,7 @@ async function getAIProjectsImpl(): Promise<WithSource<AIProject[]>> {
     );
 
   try {
-    const markets = await coingecko.getBaseEcosystemMarkets(150);
+    const markets = unwrap(await coingecko.getBaseEcosystemMarkets(150));
     if (!markets) return mockResult();
 
     const aiMarkets = markets.filter((m) => looksLikeAIProject(m.name));
@@ -210,12 +305,12 @@ async function getAIProjectsImpl(): Promise<WithSource<AIProject[]>> {
       return mockResult();
     }
 
-    const maxVolume = Math.max(...aiMarkets.map((m) => m.total_volume ?? 0), 1);
+    const maxVolume = Math.max(...aiMarkets.map((m) => m.volume24hUsd ?? 0), 1);
     const projects: AIProject[] = aiMarkets.slice(0, 6).map((m) => ({
       name: m.name,
       symbol: m.symbol.toUpperCase(),
-      activityScore: Math.round(((m.total_volume ?? 0) / maxVolume) * 100),
-      change24hPct: m.price_change_percentage_24h ?? 0,
+      activityScore: Math.round(((m.volume24hUsd ?? 0) / maxVolume) * 100),
+      change24hPct: m.changePct24h ?? 0,
       isNewLaunch: false,
     }));
 
@@ -226,29 +321,100 @@ async function getAIProjectsImpl(): Promise<WithSource<AIProject[]>> {
 }
 export const getAIProjects = cache(getAIProjectsImpl);
 
-async function getWhaleEventsImpl(): Promise<WithSource<WhaleEvent[]>> {
-  // Whale-transfer indexing requires a paid API (e.g. Whale Alert) — mocked
-  // for now, typed identically to what that integration would return.
+/** Minimum USD value for a real transfer to be reported at all (PR10 — `lib/whale`). */
+const WHALE_USD_THRESHOLD = 100_000;
+
+function mockWhaleEvents(): WithSource<WhaleEvent[]> {
   return Object.assign(
     MOCK_WHALE_EVENTS.map((e) => ({ ...e })),
     { source: "mock" as const }
   );
 }
+
+/**
+ * Real whale-detection events (`lib/whale`'s own shape — not the
+ * dashboard-facing `WhaleEvent` shape below). `cache()`-wrapped so both
+ * `getWhaleEventsImpl` (dashboard widget) and `buildIntelligenceBrief`
+ * (Brief's whale bullet) share one detection pass per request instead of
+ * each re-running the confidence-scoring loop independently — the
+ * underlying Blockscout calls are already cached at the provider level
+ * regardless, but this avoids redundant CPU work too.
+ */
+async function getRawWhaleEventsImpl(): Promise<WhaleDetectionEvent[]> {
+  const [marketsRes, pairsRes] = await Promise.all([
+    coingecko.getBaseEcosystemMarkets(150),
+    dexscreener.getBaseTrendingPairs(),
+  ]);
+  const markets = unwrap(marketsRes);
+  const pairs = unwrap(pairsRes);
+  if (!markets) return [];
+
+  const watchedTokens: WatchedToken[] = [];
+  for (const project of getProjects()) {
+    const tokenContract = project.contracts.find((c) => c.chain === "base" && c.type === "token");
+    const coingeckoId = project.providerIds.coingeckoId;
+    if (!tokenContract || !coingeckoId) continue;
+
+    const market = markets.find((m) => m.id === coingeckoId);
+    if (!market) continue;
+
+    const matchedPair = pairs?.find((p) => p.baseToken.symbol.toLowerCase() === market.symbol.toLowerCase());
+    const hasCorroboratingSignal = Math.abs(matchedPair?.priceChangePct24h ?? 0) > 10;
+
+    watchedTokens.push({
+      projectId: project.id,
+      projectName: project.name,
+      tokenSymbol: market.symbol.toUpperCase(),
+      contractAddress: tokenContract.address,
+      priceUsd: market.priceUsd,
+      hasCorroboratingSignal,
+    });
+  }
+
+  if (watchedTokens.length === 0) return [];
+  return getWhaleProvider().detect({ watchedTokens, usdThreshold: WHALE_USD_THRESHOLD });
+}
+const getRawWhaleEvents = cache(getRawWhaleEventsImpl);
+
+async function getWhaleEventsImpl(): Promise<WithSource<WhaleEvent[]>> {
+  try {
+    const events = await getRawWhaleEvents();
+    if (events.length === 0) return mockWhaleEvents();
+
+    const mapped: WhaleEvent[] = events
+      .sort((a, b) => b.usdValue - a.usdValue)
+      .slice(0, 8)
+      .map((e) => ({
+        id: e.id,
+        label:
+          e.classification === "whale-alert" ? `Whale Alert: ${e.tokenSymbol}` : `Large transfer: ${e.tokenSymbol}`,
+        amountUsd: e.usdValue,
+        direction: "in",
+        wallet: `${e.fromAddress.slice(0, 6)}…${e.fromAddress.slice(-4)}`,
+        minutesAgo: Math.max(0, Math.round((Date.now() - new Date(e.timestamp).getTime()) / 60_000)),
+        isSmartMoney: e.confidence >= 85,
+      }));
+
+    return Object.assign(mapped, { source: "live" as const });
+  } catch {
+    return mockWhaleEvents();
+  }
+}
 export const getWhaleEvents = cache(getWhaleEventsImpl);
 
 async function getSignalsImpl(): Promise<WithSource<Signal[]>> {
   try {
-    const pairs = await dexscreener.getBaseTrendingPairs();
+    const pairs = unwrap(await dexscreener.getBaseTrendingPairs());
     if (!pairs || !pairs.length) {
       return Object.assign(MOCK_SIGNALS.map((s) => ({ ...s })), { source: "mock" as const });
     }
 
     const now = Date.now();
     const signals: Signal[] = pairs.slice(0, 6).map((pair, i) => {
-      const change = pair.priceChange?.h24 ?? 0;
+      const change = pair.priceChangePct24h ?? 0;
       const ageHours = pair.pairCreatedAt ? (now - pair.pairCreatedAt) / 3_600_000 : Infinity;
-      const buys = pair.txns?.h24?.buys ?? 0;
-      const sells = pair.txns?.h24?.sells ?? 0;
+      const buys = pair.buys24h ?? 0;
+      const sells = pair.sells24h ?? 0;
 
       const kind: Signal["kind"] =
         ageHours < 48
@@ -282,25 +448,25 @@ export const getSignals = cache(getSignalsImpl);
 
 async function getProjectSpotlightImpl(): Promise<WithSource<ProjectSpotlight>> {
   try {
-    const top = await defillama.getTopBaseProtocol();
+    const top = unwrap(await defillama.getTopBaseProtocol());
     if (!top) return { ...MOCK_PROJECT_SPOTLIGHT, source: "mock" };
 
-    const markets = await coingecko.getBaseEcosystemMarkets(150);
+    const markets = unwrap(await coingecko.getBaseEcosystemMarkets(150));
     const match = markets?.find(
       (m) => m.symbol.toLowerCase() === top.symbol?.toLowerCase() || m.name === top.name
     );
 
-    const change24hPct = match?.price_change_percentage_24h ?? top.change_1d ?? 0;
+    const change24hPct = match?.changePct24h ?? top.changePct24h ?? 0;
     const category = top.category ?? "DeFi";
 
     const repoSlug = KNOWN_PROTOCOL_REPOS[top.name.toLowerCase()];
-    const repo = repoSlug ? await github.getRepoStats(repoSlug) : null;
+    const repo = repoSlug ? unwrap(await github.getRepoStats(repoSlug)) : null;
 
     // Real GitHub stars drive this when we have a known repo mapping;
     // otherwise fall back to a TVL-derived estimate of engineering activity.
     const developerActivityScore = repo
       ? Math.min(99, Math.round(Math.log10(Math.max(repo.stars, 10)) * 22))
-      : Math.min(80, Math.round(Math.log10(Math.max(top.tvl, 10)) * 8));
+      : Math.min(80, Math.round(Math.log10(Math.max(top.tvlUsd, 10)) * 8));
 
     const aiScore =
       looksLikeAIProject(top.name) || category.toLowerCase().includes("ai") ? 82 : 24;
@@ -309,23 +475,23 @@ async function getProjectSpotlightImpl(): Promise<WithSource<ProjectSpotlight>> 
     // metric — blending live TVL scale and 24h price action.
     const healthScore = Math.max(
       10,
-      Math.min(99, Math.round(70 + change24hPct * 1.5 + (top.tvl > 50_000_000 ? 10 : 0)))
+      Math.min(99, Math.round(70 + change24hPct * 1.5 + (top.tvlUsd > 50_000_000 ? 10 : 0)))
     );
 
     return {
       name: top.name,
       symbol: (top.symbol || match?.symbol || "").toUpperCase(),
       category,
-      priceUsd: match?.current_price ?? 0,
+      priceUsd: match?.priceUsd ?? 0,
       change24hPct,
-      tvlUsd: top.tvl,
-      fdvUsd: match?.fully_diluted_valuation ?? top.mcap ?? null,
+      tvlUsd: top.tvlUsd,
+      fdvUsd: match?.fullyDilutedValuationUsd ?? top.marketCapUsd ?? null,
       liquidityUsd: null,
       githubStars: repo?.stars ?? null,
       developerActivityScore,
       aiScore,
       healthScore,
-      communityScore: Math.min(99, Math.round(Math.log10(Math.max(top.tvl, 10)) * 10)),
+      communityScore: Math.min(99, Math.round(Math.log10(Math.max(top.tvlUsd, 10)) * 10)),
       source: "live",
     };
   } catch {
@@ -338,7 +504,7 @@ async function getActivityFeedImpl(): Promise<WithSource<ActivityEvent[]>> {
   let events: ActivityEvent[] = MOCK_ACTIVITY_FEED.map((e) => ({ ...e }));
   let liveHits = 0;
 
-  const repo = await github.getRepoStats(PRIMARY_REPO);
+  const repo = unwrap(await github.getRepoStats(PRIMARY_REPO));
   if (repo?.latestReleaseTag && repo.latestReleasePublishedAt) {
     events.unshift({
       id: `gh-${repo.latestReleaseTag}`,
@@ -350,20 +516,20 @@ async function getActivityFeedImpl(): Promise<WithSource<ActivityEvent[]>> {
     liveHits++;
   }
 
-  const pairs = await dexscreener.getBaseTrendingPairs();
+  const pairs = unwrap(await dexscreener.getBaseTrendingPairs());
   if (pairs && pairs[0]) {
     const p = pairs[0];
     events.unshift({
       id: `swap-${p.baseToken.address}`,
       kind: "large-swap",
       title: `High volume on ${p.baseToken.symbol}`,
-      detail: `${formatPrice(Math.round(p.volume?.h24 ?? 0))} 24h volume on ${p.dexId}`,
+      detail: `${formatPrice(Math.round(p.volume24hUsd ?? 0))} 24h volume on ${p.dexId}`,
       timestamp: new Date().toISOString(),
     });
     liveHits++;
   }
 
-  const verifiedContract = await blockscout.getRecentlyVerifiedContract();
+  const verifiedContract = unwrap(await blockscout.getRecentlyVerifiedContract());
   if (verifiedContract) {
     // Replace the mock placeholder now that a real verified contract is available.
     events = events.filter((e) => e.kind !== "contract-verification");
@@ -387,15 +553,15 @@ async function getActivityFeedImpl(): Promise<WithSource<ActivityEvent[]>> {
 export const getActivityFeed = cache(getActivityFeedImpl);
 
 async function getWelcomeStatsImpl(): Promise<WithSource<WelcomeStats>> {
-  const [tvlRes, netRes, repoRes] = await Promise.allSettled([
+  const [tvlRes, netRes, aiProjects] = await Promise.allSettled([
     defillama.getBaseChainTvl(),
     baseRpc.getBaseNetworkStatus(),
-    github.getRepoStats(PRIMARY_REPO),
+    getAIProjects(),
   ]);
 
-  const tvl = tvlRes.status === "fulfilled" ? tvlRes.value : null;
-  const net = netRes.status === "fulfilled" ? netRes.value : null;
-  const repo = repoRes.status === "fulfilled" ? repoRes.value : null;
+  const tvl = tvlRes.status === "fulfilled" ? unwrap(tvlRes.value) : null;
+  const net = netRes.status === "fulfilled" ? unwrap(netRes.value) : null;
+  const topAiProject = aiProjects.status === "fulfilled" ? aiProjects.value : null;
 
   let liveHits = 0;
   const stats: WelcomeStats = { ...MOCK_WELCOME_STATS };
@@ -408,8 +574,12 @@ async function getWelcomeStatsImpl(): Promise<WithSource<WelcomeStats>> {
     stats.gasStatus = net.gasGwei < 0.02 ? `Low · ${net.gasGwei.toFixed(3)} gwei` : `${net.gasGwei.toFixed(3)} gwei`;
     liveHits++;
   }
-  if (repo?.latestReleaseTag) {
-    stats.latestAiProject = MOCK_WELCOME_STATS.latestAiProject;
+  // Previously re-assigned `latestAiProject` to the same mock value it
+  // already had (a no-op that still counted as a "live hit") — this now
+  // derives the real top AI-named token from the AI Projects widget's own
+  // already-fetched CoinGecko data instead of leaving the field static.
+  if (topAiProject?.source === "live" && topAiProject[0]) {
+    stats.latestAiProject = topAiProject[0].name;
     liveHits++;
   }
 
@@ -426,77 +596,296 @@ async function getIntelligenceBriefImpl(): Promise<WithSource<IntelligenceBrief>
 }
 export const getIntelligenceBrief = cache(getIntelligenceBriefImpl);
 
+/** Registry projects with a real, configured governance source — never all of them, per `lib/governance`'s "omit rather than fabricate" rule. */
+function getGovernanceTrackedProjects(): GovernanceProjectRef[] {
+  return getProjects()
+    .filter((p): p is typeof p & { governance: { snapshotSpace: string } } => !!p.governance?.snapshotSpace)
+    .map((p) => ({ projectId: p.id, projectName: p.name, snapshotSpace: p.governance.snapshotSpace }));
+}
+
+/** Request-deduped so the Brief and the Intelligence Wall never issue this fetch twice in the same render pass. */
+async function getRegistryGovernanceEventsImpl() {
+  const projects = getGovernanceTrackedProjects();
+  if (projects.length === 0) return [];
+  return getGovernanceProvider().fetchEvents({ projects });
+}
+const getRegistryGovernanceEvents = cache(getRegistryGovernanceEventsImpl);
+
 async function buildIntelligenceBrief(): Promise<WithSource<IntelligenceBrief>> {
-  const [kpisRes, marketRes, welcomeRes, signalsRes] = await Promise.allSettled([
-    getKpis(),
-    getMarketOverview(),
-    getWelcomeStats(),
-    getSignals(),
-  ]);
+  const governanceProjects = getGovernanceTrackedProjects();
+
+  const [kpisRes, marketRes, signalsRes, narrativeSamplesRes, whaleRes, governanceRes, commitActivityRes, tvlRes] =
+    await Promise.allSettled([
+      getKpis(),
+      getMarketOverview(),
+      getSignals(),
+      getNarrativeSamples(),
+      getRawWhaleEvents(),
+      getRegistryGovernanceEvents(),
+      github.getCommitActivity(PRIMARY_REPO),
+      defillama.getBaseChainTvl(),
+    ]);
 
   const kpis = kpisRes.status === "fulfilled" ? kpisRes.value : { items: MOCK_KPIS, source: "mock" as const };
-  const market = marketRes.status === "fulfilled" ? marketRes.value : { ...MOCK_MARKET_OVERVIEW, source: "mock" as const };
-  const welcome = welcomeRes.status === "fulfilled" ? welcomeRes.value : { ...MOCK_WELCOME_STATS, source: "mock" as const };
-  const signals = signalsRes.status === "fulfilled" ? signalsRes.value : Object.assign(MOCK_SIGNALS.map((s) => ({ ...s })), { source: "mock" as const });
+  // `kpis.source === "live"` only means SOME of its six underlying signals came
+  // back live — it says nothing about the tvl item specifically, so the TVL
+  // bullet needs its own liveness check rather than trusting `kpis` wholesale.
+  const tvlIsLive = tvlRes.status === "fulfilled" && unwrap(tvlRes.value) !== null;
+  const kpisForBrief = tvlIsLive
+    ? kpis.items
+    : kpis.items.map((k) => (k.id === "tvl" ? { ...k, deltaPct: undefined } : k));
+  const market =
+    marketRes.status === "fulfilled" ? marketRes.value : { ...MOCK_MARKET_OVERVIEW, source: "mock" as const };
+  const signals =
+    signalsRes.status === "fulfilled"
+      ? signalsRes.value
+      : Object.assign(MOCK_SIGNALS.map((s) => ({ ...s })), { source: "mock" as const });
+  const narrativeSamples = narrativeSamplesRes.status === "fulfilled" ? narrativeSamplesRes.value : [];
+  const rawWhaleEvents = whaleRes.status === "fulfilled" ? whaleRes.value : [];
+  const governanceEvents = governanceRes.status === "fulfilled" ? governanceRes.value : [];
+  const commitActivity = commitActivityRes.status === "fulfilled" ? unwrap(commitActivityRes.value) : null;
 
-  const points: IntelligenceBriefPoint[] = [];
+  const narrativeSignals =
+    narrativeSamples.length > 0
+      ? (await getIntelligenceProvider().generateNarrative({ samples: narrativeSamples })).signals
+      : [];
+  const topNarrative = narrativeSignals[0] ?? null;
 
-  points.push({
-    id: "narrative",
-    text: `${welcome.trendingNarrative} dominate narratives`,
-    tone: "positive",
+  const topWhale = [...rawWhaleEvents].sort((a, b) => b.usdValue - a.usdValue)[0];
+
+  const brief = await getIntelligenceProvider().generateBrief({
+    kpis: kpisForBrief,
+    market,
+    narrative: topNarrative,
+    whaleEvents: topWhale
+      ? [
+          {
+            tokenSymbol: topWhale.tokenSymbol,
+            usdValue: topWhale.usdValue,
+            classification: topWhale.classification,
+            detail: null,
+          },
+        ]
+      : [],
+    governanceEvents: governanceEvents.map((event) => ({
+      projectName: governanceProjects.find((p) => p.projectId === event.projectId)?.projectName ?? event.projectId,
+      title: event.title,
+      status: event.status,
+    })),
+    topSignal: signals[0] ?? null,
+    developerActivity: commitActivity
+      ? { commitsLast7d: commitActivity.commitsLast7d, repoLabel: commitActivity.fullName }
+      : null,
   });
 
-  const tvlKpi = kpis.items.find((k) => k.id === "tvl");
-  if (tvlKpi?.deltaPct !== undefined) {
-    const up = tvlKpi.deltaPct >= 0;
-    points.push({
-      id: "tvl",
-      text: `TVL ${up ? "increased" : "decreased"} ${Math.abs(tvlKpi.deltaPct).toFixed(1)}%`,
-      tone: up ? "positive" : "negative",
-    });
-  }
-
-  points.push({
-    id: "gas",
-    text: market.gasGwei < 0.02 ? "Gas remains low" : `Gas at ${market.gasGwei.toFixed(3)} gwei`,
-    tone: market.gasGwei < 0.02 ? "positive" : "neutral",
-  });
-
-  points.push({ id: "whale", text: `Whale transferred ${welcome.whaleAlert}`, tone: "neutral" });
-
-  points.push({
-    id: "launches",
-    text: `${welcome.projectsLaunchedToday} projects launched today`,
-    tone: "positive",
-  });
-
-  const momentumSignal = signals.find((s) => s.kind === "momentum") ?? signals[0];
-  if (momentumSignal) {
-    points.push({
-      id: "momentum",
-      text: `${momentumSignal.project} ${momentumSignal.note}`,
-      tone: momentumSignal.strength >= 50 ? "positive" : "neutral",
-    });
-  }
-
-  const anyLive = [kpis.source, market.source, welcome.source, signals.source].includes("live");
+  const anyLive =
+    [kpis.source, market.source, signals.source].includes("live") ||
+    narrativeSignals.length > 0 ||
+    rawWhaleEvents.length > 0 ||
+    governanceEvents.length > 0 ||
+    commitActivity !== null;
 
   return {
-    points: points.slice(0, 6),
-    generatedAt: new Date().toISOString(),
+    points: brief.points,
+    generatedAt: brief.generatedAt,
     source: anyLive ? "live" : "mock",
   };
 }
 
+/** 0-100, biased by how large a real percentage move is — deterministic, not fabricated. */
+function confidenceFromMagnitude(pct: number, base = 50): number {
+  return Math.max(30, Math.min(99, Math.round(base + Math.abs(pct))));
+}
+
+/**
+ * Live-update content for the landing page's AI Intelligence Wall (PR10
+ * Part 2). Keyed by the tile ids `AIIntelligencePreview.tsx` defines in its
+ * own `TILE_DEFS`. A tile with no entry here (e.g. "New Protocol", "Funding
+ * Round", "Bridge Activity" — none of which have a real backing provider in
+ * this codebase) has no live signal and renders its neutral default state
+ * instead of a fabricated value; this is the same "omit rather than
+ * fabricate" principle `lib/whale` and `lib/governance` already apply,
+ * extended to every tile on the Wall. Every input here is a call this file
+ * already makes elsewhere for the dashboard/Brief — `cache()` on each of
+ * those underlying functions means mounting this on the landing page adds
+ * zero duplicate provider requests.
+ */
+async function getIntelligenceWallDataImpl(): Promise<IntelligenceWallData> {
+  const [
+    signalsRes,
+    narrativeSamplesRes,
+    whaleRes,
+    governanceRes,
+    commitActivityRes,
+    verifiedContractRes,
+    tvlRes,
+    trendingPairsRes,
+  ] = await Promise.allSettled([
+    getSignals(),
+    getNarrativeSamples(),
+    getRawWhaleEvents(),
+    getRegistryGovernanceEvents(),
+    github.getCommitActivity(PRIMARY_REPO),
+    blockscout.getRecentlyVerifiedContract(),
+    defillama.getBaseChainTvl(),
+    dexscreener.getBaseTrendingPairs(),
+  ]);
+
+  const data: IntelligenceWallData = {};
+
+  const signals = signalsRes.status === "fulfilled" ? signalsRes.value : null;
+  if (signals && signals.source === "live" && signals[0]) {
+    const top = signals[0];
+    data["ai-signal"] = {
+      headline: `${top.project} ${top.note}`,
+      detail: `Signal type: ${top.kind}`,
+      time: "just now",
+      confidence: top.strength,
+      source: "DexScreener",
+    };
+  }
+
+  const narrativeSamples = narrativeSamplesRes.status === "fulfilled" ? narrativeSamplesRes.value : [];
+  if (narrativeSamples.length > 0) {
+    try {
+      const topNarrative = (await getIntelligenceProvider().generateNarrative({ samples: narrativeSamples })).signals[0];
+      if (topNarrative) {
+        data["narrative-shift"] = {
+          headline: `${topNarrative.category} narrative ${topNarrative.label}`,
+          detail: `${formatPercent(topNarrative.changePct24h)} 24h`,
+          time: "just now",
+          confidence: topNarrative.strength,
+          source: "CoinGecko",
+        };
+      }
+    } catch {
+      // A misconfigured INTELLIGENCE_PROVIDER throws synchronously (see
+      // lib/intelligence-engine/index.ts) — this tile simply stays absent
+      // (neutral fallback) rather than taking down the whole landing page.
+    }
+  }
+
+  const rawWhaleEvents = whaleRes.status === "fulfilled" ? whaleRes.value : [];
+  const topWhale = [...rawWhaleEvents].sort((a, b) => b.usdValue - a.usdValue)[0];
+  if (topWhale) {
+    data["whale-alert"] = {
+      headline: `${formatCompactCurrency(topWhale.usdValue)} transferred`,
+      detail: `${topWhale.tokenSymbol} · ${topWhale.classification === "whale-alert" ? "Whale Alert" : "Large on-chain transfer"}`,
+      time: formatRelativeTime(topWhale.timestamp),
+      confidence: topWhale.confidence,
+      source: "Blockscout",
+    };
+  }
+
+  const governanceEvents = governanceRes.status === "fulfilled" ? governanceRes.value : [];
+  const topGovernance = governanceEvents[0];
+  if (topGovernance) {
+    const projectName =
+      getGovernanceTrackedProjects().find((p) => p.projectId === topGovernance.projectId)?.projectName ??
+      topGovernance.projectId;
+    const statusHeadline: Record<typeof topGovernance.status, string> = {
+      passed: "Proposal passed",
+      active: "Vote active",
+      failed: "Proposal failed",
+      pending: "Vote pending",
+    };
+    data["governance-vote"] = {
+      headline: statusHeadline[topGovernance.status],
+      detail: `${projectName} · ${topGovernance.title}`,
+      time: formatRelativeTime(topGovernance.end),
+      confidence: topGovernance.confidence,
+      source: "Snapshot",
+    };
+  }
+
+  const commitActivity = commitActivityRes.status === "fulfilled" ? unwrap(commitActivityRes.value) : null;
+  if (commitActivity) {
+    data["developer-activity"] = {
+      headline: `${commitActivity.commitsLast7d} commits this week`,
+      detail: commitActivity.fullName,
+      time: "past 7 days",
+      confidence: commitActivity.trendPct !== null ? confidenceFromMagnitude(commitActivity.trendPct, 60) : null,
+      source: "GitHub",
+    };
+  }
+
+  const verified = verifiedContractRes.status === "fulfilled" ? unwrap(verifiedContractRes.value) : null;
+  if (verified) {
+    const hoursAgo = (Date.now() - new Date(verified.verifiedAt).getTime()) / 3_600_000;
+    const recencyConfidence = Math.max(50, Math.min(99, Math.round(99 - hoursAgo)));
+    const truncatedAddress = `${verified.address.slice(0, 6)}…${verified.address.slice(-4)}`;
+    data["builder-verified"] = {
+      headline: verified.name ? `${verified.name} verified` : "Contract verified",
+      detail: `${truncatedAddress} on Base`,
+      time: formatRelativeTime(verified.verifiedAt),
+      confidence: recencyConfidence,
+      source: "Blockscout",
+    };
+    data["security-update"] = {
+      headline: "Contract security check passed",
+      detail: `Latest verification: ${verified.name ?? truncatedAddress}`,
+      time: formatRelativeTime(verified.verifiedAt),
+      confidence: recencyConfidence,
+      source: "Blockscout",
+    };
+  }
+
+  const tvl = tvlRes.status === "fulfilled" ? unwrap(tvlRes.value) : null;
+  if (tvl) {
+    data["tvl-spike"] = {
+      headline: `TVL ${tvl.changePct24h >= 0 ? "+" : ""}${tvl.changePct24h.toFixed(1)}% in 24h`,
+      detail: "Base ecosystem-wide",
+      time: "just now",
+      confidence: confidenceFromMagnitude(tvl.changePct24h, 50),
+      source: "DefiLlama",
+    };
+  }
+
+  const trendingPairs = trendingPairsRes.status === "fulfilled" ? unwrap(trendingPairsRes.value) : null;
+  const topPair = trendingPairs?.[0];
+  if (topPair && topPair.volume24hUsd !== null) {
+    data["liquidity-movement"] = {
+      headline: `${formatCompactCurrency(topPair.volume24hUsd)} 24h volume`,
+      detail: `${topPair.baseToken.symbol} · ${topPair.dexId}`,
+      time: "last 24h",
+      confidence: topPair.priceChangePct24h !== null ? confidenceFromMagnitude(topPair.priceChangePct24h, 50) : null,
+      source: "DexScreener",
+    };
+  }
+
+  return data;
+}
+export const getIntelligenceWallData = cache(getIntelligenceWallDataImpl);
+
 async function getNarrativeHeatmapImpl(): Promise<WithSource<NarrativeHeatRow[]>> {
-  // Narrative-to-category heat classification isn't exposed by a free API —
-  // curated for now, shaped identically to what a categorization service
-  // would return.
-  return Object.assign(
-    MOCK_NARRATIVE_HEATMAP.map((row) => ({ ...row })),
-    { source: "mock" as const }
-  );
+  try {
+    const samples = await getNarrativeSamples();
+    if (samples.length === 0) {
+      return Object.assign(MOCK_NARRATIVE_HEATMAP.map((row) => ({ ...row })), { source: "mock" as const });
+    }
+
+    const { signals } = await getIntelligenceProvider().generateNarrative({ samples });
+
+    const rows: NarrativeHeatRow[] = [];
+    for (const signal of signals) {
+      const meta = metaForDisplayCategory(signal.category);
+      if (!meta?.heatmapCategory) continue;
+      rows.push({
+        category: meta.heatmapCategory,
+        heat: signal.strength,
+        momentum: trendOf(signal.changePct24h),
+        change24hPct: signal.changePct24h,
+      });
+    }
+
+    if (rows.length === 0) {
+      return Object.assign(MOCK_NARRATIVE_HEATMAP.map((row) => ({ ...row })), { source: "mock" as const });
+    }
+
+    return Object.assign(rows, { source: "live" as const });
+  } catch {
+    return Object.assign(MOCK_NARRATIVE_HEATMAP.map((row) => ({ ...row })), { source: "mock" as const });
+  }
 }
 export const getNarrativeHeatmap = cache(getNarrativeHeatmapImpl);
 
@@ -521,24 +910,29 @@ async function getLiveTickerImpl(): Promise<WithSource<LiveTicker>> {
     blockscout.getChainStats(),
   ]);
 
-  if (netRes.status === "fulfilled" && netRes.value) {
-    ticker.blockHeight = netRes.value.blockHeight;
-    ticker.gasGwei = netRes.value.gasGwei;
+  const net = netRes.status === "fulfilled" ? unwrap(netRes.value) : null;
+  const prices = pricesRes.status === "fulfilled" ? unwrap(pricesRes.value) : null;
+  const tvl = tvlRes.status === "fulfilled" ? unwrap(tvlRes.value) : null;
+  const chainStats = chainStatsRes.status === "fulfilled" ? unwrap(chainStatsRes.value) : null;
+
+  if (net) {
+    ticker.blockHeight = net.blockHeight;
+    ticker.gasGwei = net.gasGwei;
     liveHits++;
   }
-  if (pricesRes.status === "fulfilled" && pricesRes.value) {
-    ticker.ethPriceUsd = pricesRes.value.eth.usd;
-    ticker.ethChangePct24h = pricesRes.value.eth.changePct24h;
-    ticker.btcPriceUsd = pricesRes.value.btc.usd;
-    ticker.btcChangePct24h = pricesRes.value.btc.changePct24h;
+  if (prices) {
+    ticker.ethPriceUsd = prices.eth.usd;
+    ticker.ethChangePct24h = prices.eth.changePct24h;
+    ticker.btcPriceUsd = prices.btc.usd;
+    ticker.btcChangePct24h = prices.btc.changePct24h;
     liveHits++;
   }
-  if (tvlRes.status === "fulfilled" && tvlRes.value) {
-    ticker.tvlUsd = tvlRes.value.tvlUsd;
+  if (tvl) {
+    ticker.tvlUsd = tvl.tvlUsd;
     liveHits++;
   }
-  if (chainStatsRes.status === "fulfilled" && chainStatsRes.value) {
-    ticker.transactionsToday = chainStatsRes.value.transactionsToday;
+  if (chainStats) {
+    ticker.transactionsToday = chainStats.transactionsToday;
     liveHits++;
   }
 

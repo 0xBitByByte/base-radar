@@ -4,19 +4,17 @@ import { motion } from "framer-motion";
 
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { GlowBadge } from "@/components/ui/GlowBadge";
-import { formatCompactCurrencyParts, formatCompactNumberParts, formatGweiParts } from "@/lib/data/format";
+import { formatterForKpiFormat } from "@/lib/data/format";
 import { TICKER_METRICS, type KeyMetric } from "@/constants/site";
-
-function formatterFor(format: KeyMetric["format"]) {
-  if (format === "compactCurrency") return formatCompactCurrencyParts;
-  if (format === "gwei") return formatGweiParts;
-  return formatCompactNumberParts;
-}
 
 function TickerItem({ metric }: { metric: KeyMetric }) {
   return (
     <span className="flex shrink-0 items-center gap-2 text-sm">
-      <AnimatedNumber value={metric.value} format={formatterFor(metric.format)} className="text-base font-semibold" />
+      <AnimatedNumber
+        value={metric.value}
+        format={formatterForKpiFormat(metric.format)}
+        className="text-base font-semibold"
+      />
       <span className="text-radar-light-muted dark:text-radar-muted">{metric.label}</span>
     </span>
   );

@@ -68,6 +68,20 @@ export type ProjectVerification = {
   notes?: string;
 };
 
+/**
+ * Governance data source, if this project has one (PR10). Every field is
+ * optional, and the whole object should be omitted entirely rather than
+ * guessed — a project with no confirmed real governance space simply has
+ * no `governance` field, and `lib/governance` skips it rather than
+ * fabricating proposal data. See docs/PROJECT_REGISTRY.md.
+ */
+export type ProjectGovernance = {
+  /** Real, verified Snapshot.org space id, e.g. "aave.eth". */
+  snapshotSpace?: string;
+  governanceType?: "snapshot";
+  governanceUrl?: string;
+};
+
 export type Project = {
   /** Stable internal identifier, kebab-case, e.g. "aerodrome-finance". Never reused or renamed. */
   id: string;
@@ -91,4 +105,5 @@ export type Project = {
   social: SocialLinks;
   verification: ProjectVerification;
   providerIds: ProjectProviderIds;
+  governance?: ProjectGovernance;
 };

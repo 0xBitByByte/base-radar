@@ -162,6 +162,24 @@ export type IntelligenceBrief = {
   generatedAt: string;
 };
 
+/**
+ * Live-update content for one AI Intelligence Wall tile (landing page,
+ * `components/landing/AIIntelligencePreview.tsx`). Keyed by the tile `id`
+ * defined alongside that component's `TILE_DEFS` — a tile with no matching
+ * entry here has no live data source and renders its neutral default state
+ * rather than a fabricated value.
+ */
+export type WallTileUpdate = {
+  headline: string;
+  detail: string;
+  time: string;
+  /** 0-100, or `null` when the underlying signal has no meaningful confidence measure. */
+  confidence: number | null;
+  source: string;
+};
+
+export type IntelligenceWallData = Record<string, WallTileUpdate>;
+
 export type HeatmapCategory =
   | "AI"
   | "DeFi"

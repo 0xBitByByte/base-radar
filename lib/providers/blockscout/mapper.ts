@@ -1,6 +1,10 @@
 /** Raw Blockscout responses → domain models. Pure functions, no I/O. */
 
-import type { RawChainStats, RawSmartContractsResponse } from "@/lib/providers/blockscout/client";
+import type {
+  RawChainStats,
+  RawSmartContractsResponse,
+  RawTokenTransfersResponse,
+} from "@/lib/providers/blockscout/client";
 
 export type ChainStats = {
   totalAddresses: number;
@@ -38,4 +42,34 @@ export function mapRecentlyVerifiedContract(raw: RawSmartContractsResponse): Ver
     name: top.address.name,
     verifiedAt: top.verified_at,
   };
+}
+
+export type TokenTransfer = {
+  txHash: string;
+  timestamp: string | null;
+  from: string;
+  to: string;
+  /**
+   * Decimal-adjusted token amount (raw integer value / 10^decimals). Uses
+   * `Number`, not a bignum library — for whale-detection thresholding this
+   * is an approximation, not exact accounting, and that's an accepted
+   * tradeoff for this feature's precision needs.
+   */
+  amount: number;
+};
+
+export function mapTokenTransfers(raw: RawTokenTransfersResponse): TokenTransfer[] {
+  return raw.items
+    .filter((item): item is typeof item & { total: NonNullable<typeof item.total> } => item.total !== null)
+    .map((item) => {
+      const decimals = Number(item.total.decimals);
+      const amount = Number(item.total.value) / 10 ** decimals;
+      return {
+        txHash: item.tx_hash,
+        timestamp: item.timestamp,
+        from: item.from.hash,
+        to: item.to.hash,
+        amount,
+      };
+    });
 }

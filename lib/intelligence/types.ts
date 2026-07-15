@@ -34,6 +34,8 @@ import type { VerifiedContract } from "@/lib/providers/blockscout/service";
 import type { RepoStats } from "@/lib/providers/github/service";
 import type { NetworkStatus } from "@/lib/providers/base/service";
 import type { ProviderName } from "@/lib/providers/common/types";
+import type { NarrativeSignal, RiskLevel } from "@/lib/intelligence-engine";
+import type { GovernanceEvent } from "@/lib/governance";
 
 // ---------------------------------------------------------------------------
 // Output sections
@@ -173,6 +175,12 @@ export type Metadata = {
   generatedAt: string;
 };
 
+/** A qualitative risk read distinct from `Health` — see `lib/intelligence-engine`'s `generateRiskAnalysis`. */
+export type Risk = {
+  level: RiskLevel;
+  explanation: string;
+};
+
 export type ProjectIntelligence = {
   identity: Identity;
   market: Market;
@@ -187,6 +195,17 @@ export type ProjectIntelligence = {
   confidence: Confidence;
   freshness: Freshness;
   metadata: Metadata;
+  /** A generated 1-2 sentence summary from `lib/intelligence-engine` — real, already-computed Health/Confidence/TVL/GitHub figures in, plain-English text out. Never fabricated copy. */
+  summary: string;
+  /** This project's own category momentum, derived from its live 24h price/volume change. `null` when no live market data is available to derive it from. */
+  narrative: NarrativeSignal | null;
+  risk: Risk;
+  /**
+   * Real Snapshot governance events — `null` when this project has no
+   * `governance.snapshotSpace` configured in the registry (never fabricated),
+   * an empty array when configured but currently no proposals are returned.
+   */
+  governance: GovernanceEvent[] | null;
 };
 
 // ---------------------------------------------------------------------------

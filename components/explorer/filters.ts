@@ -1,20 +1,23 @@
-import { PROJECT_CATEGORIES, VERIFICATION_STATUSES } from "@/data/projects/enums";
+import { CHAINS, PROJECT_CATEGORIES, VERIFICATION_STATUSES } from "@/data/projects/enums";
 import { formatLabel } from "@/components/explorer/format";
+import { getSortedChains } from "@/lib/branding/chains";
 import { sortAlphabetically } from "@/lib/utils";
-import type { ProjectCategory, VerificationStatus } from "@/data/projects/enums";
+import type { Chain, ProjectCategory, VerificationStatus } from "@/data/projects/enums";
 import type { ConfidenceLevel, HealthLabel, ProjectIntelligence } from "@/lib/intelligence/types";
 
 /**
- * PR3's filter facets only — Category, Verification, Health, Confidence,
- * per this task's explicit scope. Tags, Status, Chain, Developer Activity,
- * TVL, Market Cap, Source Availability, and Risk are real MVP facets
- * (docs/explorer/05-data-mapping.md §10) deferred to a later PR.
+ * PR3's filter facets — Category, Verification, Health, Confidence — plus
+ * Chain (PR10 Part 8: chain data is already on every project, so this facet
+ * needed no new data, just a filter). Tags, Status, Developer Activity, TVL,
+ * Market Cap, Source Availability, and Risk are real MVP facets
+ * (docs/explorer/05-data-mapping.md §10) still deferred to a later PR.
  */
 export type ExplorerFilters = {
   categories: ProjectCategory[];
   verificationStatuses: VerificationStatus[];
   healthLabels: HealthLabel[];
   confidenceLevels: ConfidenceLevel[];
+  chains: Chain[];
 };
 
 export const EMPTY_FILTERS: ExplorerFilters = {
@@ -22,6 +25,7 @@ export const EMPTY_FILTERS: ExplorerFilters = {
   verificationStatuses: [],
   healthLabels: [],
   confidenceLevels: [],
+  chains: [],
 };
 
 const HEALTH_LABEL_ORDER: HealthLabel[] = ["excellent", "good", "fair", "poor", "unknown"];
@@ -52,6 +56,12 @@ export function availableConfidenceLevels(projects: ProjectIntelligence[]): Conf
   return availableValues(CONFIDENCE_LEVEL_ORDER, present);
 }
 
+/** Every chain actually present in `projects`, Base-first (`getSortedChains`) — the same priority order Grid/Table/Quick View's chain rows already use, not alphabetical. */
+export function availableChains(projects: ProjectIntelligence[]): Chain[] {
+  const present = new Set(projects.flatMap((project) => project.chain.chains));
+  return getSortedChains(availableValues(CHAINS, present)) as Chain[];
+}
+
 /**
  * Filters projects per docs/explorer/05-data-mapping.md §10 —
  * `identity.categories`, `community.verificationStatus`, `health.label`,
@@ -66,7 +76,7 @@ export function filterProjects(projects: ProjectIntelligence[], filters: Explore
 }
 
 function matchesFilters(project: ProjectIntelligence, filters: ExplorerFilters): boolean {
-  const { categories, verificationStatuses, healthLabels, confidenceLevels } = filters;
+  const { categories, verificationStatuses, healthLabels, confidenceLevels, chains } = filters;
 
   if (categories.length > 0 && !project.identity.categories.some((category) => categories.includes(category))) {
     return false;
@@ -80,6 +90,9 @@ function matchesFilters(project: ProjectIntelligence, filters: ExplorerFilters):
   if (confidenceLevels.length > 0 && !confidenceLevels.includes(project.confidence.level)) {
     return false;
   }
+  if (chains.length > 0 && !project.chain.chains.some((chain) => chains.includes(chain))) {
+    return false;
+  }
 
   return true;
 }
@@ -89,7 +102,8 @@ export function countActiveFilters(filters: ExplorerFilters): number {
     filters.categories.length +
     filters.verificationStatuses.length +
     filters.healthLabels.length +
-    filters.confidenceLevels.length
+    filters.confidenceLevels.length +
+    filters.chains.length
   );
 }
 

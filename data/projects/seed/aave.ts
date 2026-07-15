@@ -29,4 +29,9 @@ export const aave: Project = {
     coingeckoId: "aave",
     defillamaSlug: "aave-v3",
   },
+  governance: {
+    snapshotSpace: "aave.eth",
+    governanceType: "snapshot",
+    governanceUrl: "https://snapshot.org/#/aave.eth",
+  },
 };

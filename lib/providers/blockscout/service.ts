@@ -1,10 +1,12 @@
 /** Public API for the Blockscout provider — cache- and rate-limit-guarded. */
 
-import { fetchChainStats, fetchRecentSmartContracts } from "@/lib/providers/blockscout/client";
+import { fetchChainStats, fetchRecentSmartContracts, fetchTokenTransfers } from "@/lib/providers/blockscout/client";
 import {
   mapChainStats,
   mapRecentlyVerifiedContract,
+  mapTokenTransfers,
   type ChainStats,
+  type TokenTransfer,
   type VerifiedContract,
 } from "@/lib/providers/blockscout/mapper";
 import { getOrSet } from "@/lib/providers/common/cache";
@@ -39,4 +41,17 @@ export async function getRecentlyVerifiedContract(): Promise<ProviderResult<Veri
   );
 }
 
-export type { ChainStats, VerifiedContract };
+const TOKEN_TRANSFERS_CACHE_TTL_MS = 30_000;
+
+/** Most recent transfers for a single ERC-20 token contract — used for whale-transfer detection (`lib/whale`). */
+export async function getTokenTransfers(tokenAddress: string): Promise<ProviderResult<TokenTransfer[]>> {
+  return toProviderResult(PROVIDER, () =>
+    getOrSet(`${PROVIDER}:token-transfers:${tokenAddress}`, TOKEN_TRANSFERS_CACHE_TTL_MS, async () => {
+      assertRateLimit(PROVIDER, RATE_LIMIT);
+      const raw = await fetchTokenTransfers(tokenAddress);
+      return mapTokenTransfers(raw);
+    })
+  );
+}
+
+export type { ChainStats, TokenTransfer, VerifiedContract };

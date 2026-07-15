@@ -4,7 +4,8 @@
  * depends on this one, never the other way around.
  */
 
-export type ProviderName = "coingecko" | "dexscreener" | "defillama" | "blockscout" | "github" | "base";
+export const PROVIDER_NAMES = ["coingecko", "dexscreener", "defillama", "blockscout", "github", "base"] as const;
+export type ProviderName = (typeof PROVIDER_NAMES)[number];
 
 /** Plain, structurally-typed error info — a `ProviderError` instance satisfies this shape. */
 export type ProviderErrorInfo = {

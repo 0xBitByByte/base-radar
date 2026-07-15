@@ -99,6 +99,8 @@ export function QuickViewDrawer({ project, onClose }: QuickViewDrawerProps) {
                       tvl={project.tvl}
                       health={project.health}
                       confidence={project.confidence}
+                      summary={project.summary}
+                      risk={project.risk}
                     />
                   </motion.div>
                   <motion.div variants={sectionVariants}>
@@ -108,10 +110,15 @@ export function QuickViewDrawer({ project, onClose }: QuickViewDrawerProps) {
                       tvl={project.tvl}
                       chain={project.chain}
                       contracts={project.contracts}
+                      narrative={project.narrative}
                     />
                   </motion.div>
                   <motion.div variants={sectionVariants}>
-                    <QuickViewCommunity community={project.community} github={project.github} />
+                    <QuickViewCommunity
+                      community={project.community}
+                      github={project.github}
+                      governance={project.governance}
+                    />
                   </motion.div>
                   <motion.div variants={sectionVariants}>
                     <QuickViewSources sources={project.sources} freshness={project.freshness} />

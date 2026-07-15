@@ -12,12 +12,14 @@ import { FilterGroup } from "@/components/explorer/FilterGroup";
 import { ClearFiltersButton } from "@/components/explorer/ClearFiltersButton";
 import {
   availableCategories,
+  availableChains,
   availableConfidenceLevels,
   availableHealthLabels,
   availableVerificationStatuses,
   countActiveFilters,
   type ExplorerFilters,
 } from "@/components/explorer/filters";
+import { CHAIN_BRANDING } from "@/lib/branding/chains";
 import type { VerificationStatus } from "@/data/projects/enums";
 import type { ProjectIntelligence } from "@/lib/intelligence/types";
 
@@ -113,6 +115,12 @@ export function ExplorerFilterBar({
       label: "Confidence",
       options: availableConfidenceLevels(projects),
       formatOption: formatLabel,
+    },
+    {
+      key: "chains",
+      label: "Chain",
+      options: availableChains(projects),
+      formatOption: (value) => CHAIN_BRANDING[value]?.label ?? formatLabel(value),
     },
   ];
 

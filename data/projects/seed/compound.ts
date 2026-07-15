@@ -29,4 +29,9 @@ export const compound: Project = {
     coingeckoId: "compound-governance-token",
     defillamaSlug: "compound-v3",
   },
+  governance: {
+    snapshotSpace: "comp-vote.eth",
+    governanceType: "snapshot",
+    governanceUrl: "https://snapshot.org/#/comp-vote.eth",
+  },
 };
