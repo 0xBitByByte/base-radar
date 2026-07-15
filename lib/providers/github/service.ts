@@ -1,7 +1,7 @@
 /** Public API for the GitHub provider — cache- and rate-limit-guarded. */
 
-import { fetchLatestRelease, fetchRepo, type RawRelease } from "@/lib/providers/github/client";
-import { mapRepoStats, type RepoStats } from "@/lib/providers/github/mapper";
+import { fetchCommitActivity, fetchLatestRelease, fetchRepo, type RawRelease } from "@/lib/providers/github/client";
+import { mapCommitActivity, mapRepoStats, type CommitActivity, type RepoStats } from "@/lib/providers/github/mapper";
 import { getOrSet } from "@/lib/providers/common/cache";
 import { assertRateLimit, type RateLimitConfig } from "@/lib/providers/common/rate-limit";
 import type { ProviderResult } from "@/lib/providers/common/types";
@@ -33,4 +33,19 @@ export async function getRepoStats(fullName: string): Promise<ProviderResult<Rep
   );
 }
 
-export type { RepoStats };
+/** Weekly commit-count trend for a repo — used for real "Developer Activity"/"GitHub Trend" fields (PR10 Part 3, and the Base Radar Brief). */
+export async function getCommitActivity(fullName: string): Promise<ProviderResult<CommitActivity>> {
+  return toProviderResult(PROVIDER, () =>
+    getOrSet(`${PROVIDER}:commit-activity:${fullName}`, CACHE_TTL_MS, async () => {
+      assertRateLimit(PROVIDER, RATE_LIMIT);
+      const weeks = await fetchCommitActivity(fullName);
+      const mapped = mapCommitActivity(fullName, weeks);
+      if (!mapped) {
+        throw new Error(`No commit activity data available yet for ${fullName} (GitHub may still be computing it)`);
+      }
+      return mapped;
+    })
+  );
+}
+
+export type { CommitActivity, RepoStats };

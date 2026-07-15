@@ -117,6 +117,21 @@ export function formatGweiParts(value: number): KpiValueParts {
   return { integer, decimal: `.${fraction}`, unit: "gwei" };
 }
 
+/**
+ * The value-format vocabulary used across `Kpi`, `DashboardStat`, and
+ * `KeyMetric` — each names its currency case slightly differently
+ * ("currency" vs "compactCurrency"), so this union covers both rather than
+ * forcing one of those types to rename its field.
+ */
+export type KpiValueFormat = "currency" | "compactCurrency" | "number" | "compactNumber" | "gwei";
+
+/** One shared lookup for the `formatterFor()` that used to be hand-duplicated in KPIRow.tsx, KeyMetrics.tsx, and Hero.tsx. */
+export function formatterForKpiFormat(format: KpiValueFormat): (value: number) => KpiValueParts {
+  if (format === "currency" || format === "compactCurrency") return formatCompactCurrencyParts;
+  if (format === "gwei") return formatGweiParts;
+  return formatCompactNumberParts;
+}
+
 export function formatPercent(value: number, opts?: { showSign?: boolean }): string {
   const sign = opts?.showSign !== false && value > 0 ? "+" : "";
   return `${sign}${value.toFixed(1)}%`;

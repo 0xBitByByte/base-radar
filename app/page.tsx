@@ -11,8 +11,11 @@ import { ClosingCTA } from "@/components/landing/ClosingCTA";
 import { SectionDivider } from "@/components/landing/SectionDivider";
 import { ScrollProgress } from "@/components/landing/ScrollProgress";
 import { TrustedDataSources } from "@/components/landing/TrustedDataSources";
+import { getIntelligenceWallData } from "@/lib/data/aggregate";
 
-export default function Home() {
+export default async function Home() {
+  const wallData = await getIntelligenceWallData();
+
   return (
     <div className="flex min-h-screen flex-col bg-radar-light-bg dark:bg-radar-bg">
       <Navbar />
@@ -22,7 +25,7 @@ export default function Home() {
         <FeaturedEcosystem />
         <KeyMetrics />
         <SectionDivider />
-        <AIIntelligencePreview />
+        <AIIntelligencePreview wallData={wallData} />
         <SectionDivider />
         <WhyBaseRadar />
         <SectionDivider />

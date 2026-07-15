@@ -5,13 +5,7 @@ import { motion } from "framer-motion";
 import { ArrowDown, ArrowUp, Minus } from "lucide-react";
 
 import { cn, TREND_COLOR_VAR } from "@/lib/utils";
-import {
-  formatCompactCurrencyParts,
-  formatCompactNumberParts,
-  formatGweiParts,
-  formatPercent,
-  formatRelativeTime,
-} from "@/lib/data/format";
+import { formatPercent, formatRelativeTime, formatterForKpiFormat } from "@/lib/data/format";
 import type { Kpi, Trend } from "@/lib/data/types";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { Sparkline } from "@/components/ui/Sparkline";
@@ -29,12 +23,6 @@ const TREND_ICON: Record<Trend, typeof ArrowUp> = {
   flat: Minus,
 };
 
-function formatterFor(kpi: Kpi) {
-  if (kpi.format === "currency") return formatCompactCurrencyParts;
-  if (kpi.format === "gwei") return formatGweiParts;
-  return formatCompactNumberParts;
-}
-
 type KPIRowProps = {
   items: Kpi[];
   lastUpdated: string;
@@ -46,7 +34,7 @@ export function KPIRow({ items, lastUpdated }: KPIRowProps) {
       {items.map((kpi, index) => {
         const trend = kpi.trend ?? "flat";
         const TrendIcon = TREND_ICON[trend];
-        const format = formatterFor(kpi);
+        const format = formatterForKpiFormat(kpi.format);
 
         return (
           <Tooltip

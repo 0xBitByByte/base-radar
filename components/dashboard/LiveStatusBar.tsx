@@ -2,7 +2,7 @@
 
 import { formatCompactCurrency, formatCompactNumber, formatGwei, formatPrice } from "@/lib/data/format";
 import type { LiveTicker, WithSource } from "@/lib/data/types";
-import { useLiveNetworkStatus } from "@/lib/hooks/useLiveNetworkStatus";
+import { useLiveTicker } from "@/lib/hooks/useLiveTicker";
 import { useNowTick } from "@/lib/hooks/useNowTick";
 import { cn } from "@/lib/utils";
 
@@ -36,11 +36,9 @@ function Divider() {
 }
 
 export function LiveStatusBar({ data }: LiveStatusBarProps) {
-  const { status, updatedAt } = useLiveNetworkStatus();
+  const { ticker, updatedAt } = useLiveTicker(data);
   const now = useNowTick(1000);
 
-  const blockHeight = status?.blockHeight ?? data.blockHeight;
-  const gasGwei = status?.gasGwei ?? data.gasGwei;
   const secondsAgo = updatedAt ? Math.max(0, Math.round((now - updatedAt) / 1000)) : null;
 
   return (
@@ -49,25 +47,25 @@ export function LiveStatusBar({ data }: LiveStatusBarProps) {
       role="status"
       aria-label="Live Base network status"
     >
-      <TickerItem label="Block" value={formatCompactNumber(blockHeight)} />
+      <TickerItem label="Block" value={formatCompactNumber(ticker.blockHeight)} />
       <Divider />
-      <TickerItem label="Gas" value={formatGwei(gasGwei)} />
+      <TickerItem label="Gas" value={formatGwei(ticker.gasGwei)} />
       <Divider />
       <TickerItem
         label="ETH"
-        value={formatPrice(data.ethPriceUsd)}
-        valueClassName={data.ethChangePct24h >= 0 ? "text-radar-success" : "text-radar-danger"}
+        value={formatPrice(ticker.ethPriceUsd)}
+        valueClassName={ticker.ethChangePct24h >= 0 ? "text-radar-success" : "text-radar-danger"}
       />
       <Divider />
       <TickerItem
         label="BTC"
-        value={formatPrice(data.btcPriceUsd)}
-        valueClassName={data.btcChangePct24h >= 0 ? "text-radar-success" : "text-radar-danger"}
+        value={formatPrice(ticker.btcPriceUsd)}
+        valueClassName={ticker.btcChangePct24h >= 0 ? "text-radar-success" : "text-radar-danger"}
       />
       <Divider />
-      <TickerItem label="TVL" value={formatCompactCurrency(data.tvlUsd)} />
+      <TickerItem label="TVL" value={formatCompactCurrency(ticker.tvlUsd)} />
       <Divider />
-      <TickerItem label="Transactions" value={formatCompactNumber(data.transactionsToday)} />
+      <TickerItem label="Transactions" value={formatCompactNumber(ticker.transactionsToday)} />
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
         <span className="text-radar-light-muted/70 whitespace-nowrap dark:text-radar-muted/50">

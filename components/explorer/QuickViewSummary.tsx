@@ -1,8 +1,11 @@
 import { MetricItem } from "@/components/explorer/MetricItem";
 import { QuickViewSectionLabel } from "@/components/explorer/QuickViewSectionLabel";
 import { ScoreBadge } from "@/components/explorer/ScoreBadge";
+import { GlowBadge, type GlowBadgeColor } from "@/components/ui/GlowBadge";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { formatCompactCurrency, formatPrice } from "@/lib/data/format";
-import type { Confidence, Health, Identity, Market, Tvl } from "@/lib/intelligence/types";
+import type { Confidence, Health, Identity, Market, Risk, Tvl } from "@/lib/intelligence/types";
+import type { RiskLevel } from "@/lib/intelligence-engine";
 
 type QuickViewSummaryProps = {
   identity: Identity;
@@ -10,6 +13,15 @@ type QuickViewSummaryProps = {
   tvl: Tvl;
   health: Health;
   confidence: Confidence;
+  summary: string;
+  risk: Risk;
+};
+
+const RISK_COLOR: Record<RiskLevel, GlowBadgeColor> = {
+  low: "success",
+  moderate: "warning",
+  elevated: "warning",
+  high: "danger",
 };
 
 /**
@@ -23,7 +35,7 @@ type QuickViewSummaryProps = {
  * visible here — unlike the Grid card, this is where a score's reasoning
  * becomes visible, not just its number ("no hidden calculations").
  */
-export function QuickViewSummary({ identity, market, tvl, health, confidence }: QuickViewSummaryProps) {
+export function QuickViewSummary({ identity, market, tvl, health, confidence, summary, risk }: QuickViewSummaryProps) {
   const priceAvailable = market.available && market.priceUsd !== null;
   const tvlAvailable = tvl.available && tvl.tvlUsd !== null;
   const headlineAvailable = priceAvailable || tvlAvailable;
@@ -35,6 +47,16 @@ export function QuickViewSummary({ identity, market, tvl, health, confidence }: 
         <p className="text-sm leading-relaxed text-radar-light-text dark:text-radar-white">
           {identity.shortDescription}
         </p>
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <QuickViewSectionLabel>AI Summary</QuickViewSectionLabel>
+        <p className="text-sm leading-relaxed text-radar-light-text dark:text-radar-white">{summary}</p>
+        <Tooltip content={risk.explanation}>
+          <GlowBadge color={RISK_COLOR[risk.level]} className="w-fit capitalize">
+            {risk.level} risk
+          </GlowBadge>
+        </Tooltip>
       </section>
 
       <MetricItem

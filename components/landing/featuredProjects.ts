@@ -1,6 +1,7 @@
 import type { ProjectIntelligence, Health, Confidence, Sources } from "@/lib/intelligence/types";
 import type { Chain, ProjectCategory, ProjectTag, VerificationStatus } from "@/data/projects/enums";
 import type { ProviderName } from "@/lib/providers/common/types";
+import { buildNarrativeSignals, buildProjectSummary, buildRiskAnalysis } from "@/lib/intelligence-engine";
 
 /**
  * "Featured Base Ecosystem Projects" (PR9.2 landing section) reuses the real
@@ -44,6 +45,39 @@ function emptySources(): Sources {
 
 function buildFeaturedProject(spec: FeaturedProjectSpec): ProjectIntelligence {
   const now = new Date().toISOString();
+
+  // Reuses the exact same rule-based generation logic the real Intelligence
+  // Engine runs for a live project (`lib/intelligence-engine`'s pure
+  // functions) — fed this fixture's illustrative numbers, same as
+  // `health`/`confidence` above, rather than hand-writing a second copy of
+  // this text.
+  const summary = buildProjectSummary({
+    name: spec.name,
+    healthScore: spec.health.score,
+    healthLabel: spec.health.label,
+    confidenceScore: spec.confidence.score,
+    confidenceLevel: spec.confidence.level,
+    verificationStatus: spec.verificationStatus,
+    changePct24h: spec.changePct24h ?? null,
+    tvlUsd: spec.tvlUsd ?? null,
+    tvlChangePct24h: null,
+    githubStars: spec.githubStars ?? null,
+  });
+
+  const narrative =
+    spec.changePct24h != null
+      ? (buildNarrativeSignals({
+          samples: [{ category: spec.categories[0] ?? "General", changePct24h: spec.changePct24h, volumeUsd: 0 }],
+        })[0] ?? null)
+      : null;
+
+  const risk = buildRiskAnalysis({
+    healthScore: spec.health.score,
+    confidenceScore: spec.confidence.score,
+    verificationStatus: spec.verificationStatus,
+    freshness: "fresh",
+    hasRecentWhaleActivity: false,
+  });
 
   return {
     identity: {
@@ -105,6 +139,10 @@ function buildFeaturedProject(spec: FeaturedProjectSpec): ProjectIntelligence {
     confidence: { score: spec.confidence.score, level: spec.confidence.level, factors: [] },
     freshness: { newestSourceAt: now, oldestSourceAt: now, overall: "fresh", ageMsBySource: {} },
     metadata: { engineVersion: "landing-preview", generatedAt: now },
+    summary,
+    narrative,
+    risk,
+    governance: null,
   };
 }
 

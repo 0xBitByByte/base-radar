@@ -4,8 +4,7 @@
  * in this directory is an implementation detail of how these three
  * functions are built.
  *
- * Not wired into any route, page, or component yet — see the PR notes for
- * why that's deliberately out of scope for this change.
+ * Wired into the Explorer (Grid/Table/Quick View) via `app/dashboard/projects/page.tsx`.
  */
 
 import { getProject, getProjects } from "@/data/projects/helpers";
@@ -30,8 +29,20 @@ import { computeConfidence } from "@/lib/intelligence/confidence";
 import { computeFreshness } from "@/lib/intelligence/freshness";
 import { computeHealth } from "@/lib/intelligence/scoring";
 import type { ProjectIntelligence } from "@/lib/intelligence/types";
+import { getIntelligenceProvider } from "@/lib/intelligence-engine";
+import { getGovernanceProvider, type GovernanceEvent } from "@/lib/governance";
 
 const ENGINE_VERSION = "0.1.0";
+
+/** `null` when this project has no `governance.snapshotSpace` configured — never fabricated, per `lib/governance`'s registry-gated rule. */
+async function fetchProjectGovernanceEvents(project: Project): Promise<GovernanceEvent[] | null> {
+  const snapshotSpace = project.governance?.snapshotSpace;
+  if (!snapshotSpace) return null;
+
+  return getGovernanceProvider().fetchEvents({
+    projects: [{ projectId: project.id, projectName: project.name, snapshotSpace }],
+  });
+}
 
 /**
  * Builds the full intelligence record for one already-resolved project.
@@ -60,6 +71,62 @@ export async function buildProjectIntelligence(
   const freshness = computeFreshness(sources, generatedAt);
   const sourcesSummary = buildSourcesSummary(sources);
 
+  const intelligenceProvider = getIntelligenceProvider();
+
+  // allSettled, not all — a misconfigured GOVERNANCE_PROVIDER (or a future
+  // INTELLIGENCE_PROVIDER stub) throws synchronously, and `getAllProjectIntelligence`
+  // builds every registry project's record with the same helper. One
+  // provider failing should degrade that single project's fields, not fail
+  // every project in the batch.
+  const [summaryRes, narrativeRes, governanceRes] = await Promise.allSettled([
+    intelligenceProvider.generateProjectSummary({
+      name: identity.name,
+      healthScore: health.score,
+      healthLabel: health.label,
+      confidenceScore: confidence.score,
+      confidenceLevel: confidence.level,
+      verificationStatus: community.verificationStatus,
+      changePct24h: market.changePct24h,
+      tvlUsd: tvl.tvlUsd,
+      tvlChangePct24h: tvl.changePct24h,
+      githubStars: github.stars,
+    }),
+    market.available && market.changePct24h !== null
+      ? intelligenceProvider.generateNarrative({
+          samples: [
+            {
+              category: identity.categories[0] ?? "General",
+              changePct24h: market.changePct24h,
+              volumeUsd: trading.volume24hUsd ?? 0,
+            },
+          ],
+        })
+      : Promise.resolve({ signals: [] }),
+    fetchProjectGovernanceEvents(project),
+  ]);
+
+  const summary = summaryRes.status === "fulfilled" ? summaryRes.value.summary : "";
+  const narrative = narrativeRes.status === "fulfilled" ? (narrativeRes.value.signals[0] ?? null) : null;
+  const governance = governanceRes.status === "fulfilled" ? governanceRes.value : null;
+
+  // Per-project whale detection isn't computed here — it would multiply
+  // Blockscout transfer-history calls across every registry project on
+  // every Explorer load. Whale activity stays a dashboard/ecosystem-wide
+  // signal (`lib/whale`); this risk factor is simply never triggered here
+  // rather than fabricating a "no activity" claim.
+  let risk: ProjectIntelligence["risk"];
+  try {
+    risk = await intelligenceProvider.generateRiskAnalysis({
+      healthScore: health.score,
+      confidenceScore: confidence.score,
+      verificationStatus: community.verificationStatus,
+      freshness: freshness.overall,
+      hasRecentWhaleActivity: false,
+    });
+  } catch {
+    risk = { level: "moderate", explanation: "Risk analysis unavailable." };
+  }
+
   return {
     identity,
     market,
@@ -74,6 +141,10 @@ export async function buildProjectIntelligence(
     confidence,
     freshness,
     metadata: { engineVersion: ENGINE_VERSION, generatedAt },
+    summary,
+    narrative,
+    risk,
+    governance,
   };
 }
 

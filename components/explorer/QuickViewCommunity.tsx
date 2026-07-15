@@ -3,13 +3,24 @@ import { MetricItem } from "@/components/explorer/MetricItem";
 import { GITHUB_STARS_INFO_TOOLTIP } from "@/components/explorer/metricTooltips";
 import { QuickViewSectionLabel } from "@/components/explorer/QuickViewSectionLabel";
 import { VerificationBadge } from "@/components/explorer/VerificationBadge";
+import { GlowBadge, type GlowBadgeColor } from "@/components/ui/GlowBadge";
 import { formatCompactNumber, formatNumber } from "@/lib/data/format";
 import type { Community, GithubIntel } from "@/lib/intelligence/types";
 import type { SocialPlatform } from "@/lib/branding/types";
+import type { GovernanceEvent, GovernanceStatus } from "@/lib/governance";
 
 type QuickViewCommunityProps = {
   community: Community;
   github: GithubIntel;
+  /** `null` means this project has no governance source configured — the section is omitted entirely, never shown empty. */
+  governance: GovernanceEvent[] | null;
+};
+
+const GOVERNANCE_STATUS_COLOR: Record<GovernanceStatus, GlowBadgeColor> = {
+  active: "accent",
+  passed: "success",
+  failed: "danger",
+  pending: "muted",
 };
 
 /** One shared card for the group, instead of one bordered box per stat — same data, lighter chrome. */
@@ -26,7 +37,7 @@ const METRIC_GROUP_CLASS =
  * (`ExplorerStatusBadge`/`ExplorerDataCoverage`) — not duplicated
  * responsibility, since neither location recomputes anything.
  */
-export function QuickViewCommunity({ community, github }: QuickViewCommunityProps) {
+export function QuickViewCommunity({ community, github, governance }: QuickViewCommunityProps) {
   const starsAvailable = github.available && github.stars !== null;
   const forksAvailable = github.available && github.forks !== null;
   const issuesAvailable = github.available && github.openIssues !== null;
@@ -92,6 +103,36 @@ export function QuickViewCommunity({ community, github }: QuickViewCommunityProp
           <p className="text-xs text-radar-light-muted dark:text-radar-muted">No community links listed for this project.</p>
         )}
       </section>
+
+      {governance && (
+        <section className="flex flex-col gap-2">
+          <QuickViewSectionLabel>Governance</QuickViewSectionLabel>
+          {governance.length > 0 ? (
+            <ul className="flex flex-col gap-2">
+              {governance.map((event) => (
+                <li
+                  key={event.proposalId}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 dark:border-white/10 dark:bg-white/[0.02]"
+                >
+                  <a
+                    href={event.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="min-w-0 truncate text-xs font-medium text-radar-light-text hover:underline dark:text-radar-white"
+                  >
+                    {event.title}
+                  </a>
+                  <GlowBadge color={GOVERNANCE_STATUS_COLOR[event.status]} className="shrink-0 capitalize">
+                    {event.status}
+                  </GlowBadge>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-xs text-radar-light-muted dark:text-radar-muted">No active governance proposals.</p>
+          )}
+        </section>
+      )}
     </div>
   );
 }

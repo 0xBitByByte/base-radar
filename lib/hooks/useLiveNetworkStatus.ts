@@ -3,21 +3,16 @@
 /**
  * Client-side "hooks" layer sitting between UI and services, per the
  * UI -> Hooks -> Services -> Providers architecture: components never call
- * `lib/data/providers/*` directly for anything that needs to refresh on an
+ * `lib/providers/*` directly for anything that needs to refresh on an
  * interval — they call a hook, and the hook owns the polling lifecycle.
  */
 
 import { useEffect, useState } from "react";
 
-import { getBaseNetworkStatus } from "@/lib/data/providers/baseRpc";
+import { getBaseNetworkStatus } from "@/lib/providers/base/service";
+import type { NetworkStatus } from "@/lib/providers/base/service";
 
-export type LiveNetworkStatus = {
-  gasGwei: number;
-  blockHeight: number;
-  txCountLatestBlock: number;
-  estimatedTps: number;
-  chainId: number;
-};
+export type LiveNetworkStatus = NetworkStatus;
 
 const DEFAULT_POLL_MS = 45_000;
 
@@ -29,9 +24,9 @@ export function useLiveNetworkStatus(pollMs: number = DEFAULT_POLL_MS) {
     let cancelled = false;
 
     async function poll() {
-      const next = await getBaseNetworkStatus();
-      if (!cancelled && next) {
-        setStatus(next);
+      const result = await getBaseNetworkStatus();
+      if (!cancelled && result.ok) {
+        setStatus(result.data);
         setUpdatedAt(Date.now());
       }
     }

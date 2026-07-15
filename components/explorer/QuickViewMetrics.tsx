@@ -7,6 +7,7 @@ import { formatLabel } from "@/components/explorer/format";
 import { cn } from "@/lib/utils";
 import { formatCompactCurrency, formatGwei, formatNumber, formatPercent } from "@/lib/data/format";
 import type { ChainInfo, Contracts, Market, Trading, Tvl } from "@/lib/intelligence/types";
+import type { NarrativeSignal } from "@/lib/intelligence-engine";
 
 type QuickViewMetricsProps = {
   market: Market;
@@ -14,6 +15,7 @@ type QuickViewMetricsProps = {
   tvl: Tvl;
   chain: ChainInfo;
   contracts: Contracts;
+  narrative: NarrativeSignal | null;
 };
 
 /** One shared card per related group of stats, instead of one bordered box per number — same data, lighter chrome. */
@@ -34,7 +36,7 @@ const METRIC_GROUP_CLASS =
  * renders its reserved-slot empty state here. Never substitutes the
  * project logo or invents a fake image.
  */
-export function QuickViewMetrics({ market, trading, tvl, chain, contracts }: QuickViewMetricsProps) {
+export function QuickViewMetrics({ market, trading, tvl, chain, contracts, narrative }: QuickViewMetricsProps) {
   const marketCapAvailable = market.available && market.marketCapUsd !== null;
   const fdvAvailable = market.available && market.fullyDilutedValuationUsd !== null;
   const changeAvailable = market.available && market.changePct24h !== null;
@@ -77,6 +79,11 @@ export function QuickViewMetrics({ market, trading, tvl, chain, contracts }: Qui
             unavailable={!volumeAvailable}
           />
         </div>
+        {narrative && (
+          <p className="text-xs text-radar-light-muted dark:text-radar-muted">
+            {narrative.category} narrative: {narrative.label} ({formatPercent(narrative.changePct24h)} 24h)
+          </p>
+        )}
       </section>
 
       <section className="flex flex-col gap-2">

@@ -21,13 +21,12 @@ import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { GlassCard } from "@/components/ui/GlassCard";
 import { GradientButton } from "@/components/ui/GradientButton";
 import { GlowBadge } from "@/components/ui/GlowBadge";
-import { formatCompactCurrencyParts, formatCompactNumberParts, formatGweiParts } from "@/lib/data/format";
+import { formatterForKpiFormat } from "@/lib/data/format";
 import {
   DASHBOARD_STATS,
   DASHBOARD_HIGHLIGHTS,
   TRUST_INDICATORS,
   type DashboardHighlight,
-  type DashboardStat,
 } from "@/constants/site";
 
 const STAT_ICONS: Record<string, LucideIcon> = {
@@ -43,13 +42,6 @@ const HIGHLIGHT_ICONS: Record<DashboardHighlight["icon"], LucideIcon> = {
   hot: Flame,
   signal: Radio,
 };
-
-/** Same three shared `*Parts` formatters `KPIRow` uses for the real dashboard — the Hero preview's numbers are the same KPI rendering pipeline, not a lookalike. */
-function formatterFor(format: DashboardStat["format"]) {
-  if (format === "compactCurrency") return formatCompactCurrencyParts;
-  if (format === "gwei") return formatGweiParts;
-  return formatCompactNumberParts;
-}
 
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
@@ -189,7 +181,7 @@ export function Hero() {
                       <div className="mt-2 flex items-baseline gap-2">
                         <AnimatedNumber
                           value={live.stats[index]}
-                          format={formatterFor(stat.format)}
+                          format={formatterForKpiFormat(stat.format)}
                           duration={1.2}
                           className="whitespace-nowrap"
                         />

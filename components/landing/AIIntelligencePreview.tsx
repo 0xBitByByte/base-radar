@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { GlassCard } from "@/components/ui/GlassCard";
+import type { IntelligenceWallData, WallTileUpdate } from "@/lib/data/types";
 
 type TileTone = "primary" | "accent" | "success" | "warning" | "danger";
 /** Only two size tiers now (PR9.5.1 §1) — the section must fit one desktop
@@ -28,23 +29,12 @@ type TileTone = "primary" | "accent" | "success" | "warning" | "danger";
  * while keeping every row the same fixed height. */
 type TileSize = "wide" | "small";
 
-/** The card's flipped-side content (PR9.5.1 §1) — title stays, plus the
- * "live update" fields the brief asks for: headline, supporting detail,
- * a relative time, and a confidence percentage. */
-type TileUpdate = {
-  headline: string;
-  detail: string;
-  time: string;
-  confidence: number;
-};
-
 type TileDef = {
   id: string;
   tone: TileTone;
   size: TileSize;
   icon: LucideIcon;
   title: string;
-  update: TileUpdate;
 };
 
 /** Icon-chip tint only — PR9.5.1 §1 explicitly bans colored *card*
@@ -74,118 +64,29 @@ const TONE_ACCENT_TEXT: Record<TileTone, string> = {
   danger: "text-radar-danger",
 };
 
+/**
+ * Tile shells — id/title/icon/tone/size only, the frozen branding/layout
+ * surface (PR9.5.1). Each tile's live *content* (headline/detail/time/
+ * confidence/source) comes from `wallData`, fetched server-side in
+ * `app/page.tsx` from the real provider layer (PR10 Part 2). A tile with no
+ * matching `wallData` entry — "New Protocol", "Funding Round", and "Bridge
+ * Activity" have no real backing provider anywhere in this codebase — falls
+ * back to a neutral "awaiting live signal" state instead of a fabricated
+ * value; see `Tile`'s render below.
+ */
 const TILE_DEFS: TileDef[] = [
-  {
-    id: "whale-alert",
-    tone: "warning",
-    size: "wide",
-    icon: Fish,
-    title: "Whale Alert",
-    update: { headline: "$4.8M transferred", detail: "Coinbase → Aerodrome", time: "2 mins ago", confidence: 94 },
-  },
-  {
-    id: "ai-signal",
-    tone: "primary",
-    size: "wide",
-    icon: Sparkles,
-    title: "AI Signal",
-    update: {
-      headline: "AI Gaming momentum building",
-      detail: "Cross-protocol signal detected",
-      time: "5 mins ago",
-      confidence: 88,
-    },
-  },
-  {
-    id: "narrative-shift",
-    tone: "primary",
-    size: "wide",
-    icon: TrendingUp,
-    title: "Narrative Shift",
-    update: {
-      headline: "AI Agents narrative rising",
-      detail: "Mentions up 3.2x this week",
-      time: "12 mins ago",
-      confidence: 85,
-    },
-  },
-  {
-    id: "bridge-activity",
-    tone: "primary",
-    size: "wide",
-    icon: ArrowLeftRight,
-    title: "Bridge Activity",
-    update: { headline: "$8.9M net inflow", detail: "Ethereum → Base", time: "8 mins ago", confidence: 93 },
-  },
-  {
-    id: "security-update",
-    tone: "success",
-    size: "wide",
-    icon: ShieldAlert,
-    title: "Security Update",
-    update: { headline: "Risk assessment: Low", detail: "Contract re-audited", time: "1 hr ago", confidence: 97 },
-  },
-  {
-    id: "new-protocol",
-    tone: "accent",
-    size: "wide",
-    icon: Compass,
-    title: "New Protocol",
-    update: { headline: "Added to registry", detail: "New DEX on Base", time: "3 mins ago", confidence: 82 },
-  },
-  {
-    id: "funding-round",
-    tone: "success",
-    size: "small",
-    icon: Rocket,
-    title: "Funding Round",
-    update: {
-      headline: "$12M seed raised",
-      detail: "Undisclosed Base protocol",
-      time: "18 mins ago",
-      confidence: 91,
-    },
-  },
-  {
-    id: "governance-vote",
-    tone: "accent",
-    size: "small",
-    icon: Landmark,
-    title: "Governance Vote",
-    update: { headline: "Quorum reached", detail: "Proposal #142 passed", time: "34 mins ago", confidence: 99 },
-  },
-  {
-    id: "tvl-spike",
-    tone: "success",
-    size: "small",
-    icon: Zap,
-    title: "TVL Spike",
-    update: { headline: "+13% in 24h", detail: "Aerodrome Finance", time: "40 mins ago", confidence: 92 },
-  },
-  {
-    id: "builder-verified",
-    tone: "success",
-    size: "small",
-    icon: BadgeCheck,
-    title: "Builder Verified",
-    update: { headline: "Protocol reviewed", detail: "Code audit passed", time: "2 hrs ago", confidence: 96 },
-  },
-  {
-    id: "developer-activity",
-    tone: "accent",
-    size: "small",
-    icon: Code2,
-    title: "Developer Activity",
-    update: { headline: "42 commits today", detail: "Across 6 repositories", time: "27 mins ago", confidence: 90 },
-  },
-  {
-    id: "liquidity-movement",
-    tone: "warning",
-    size: "small",
-    icon: Droplets,
-    title: "Liquidity Movement",
-    update: { headline: "$1.3M LP inflow", detail: "BASE/ETH pool", time: "51 mins ago", confidence: 87 },
-  },
+  { id: "whale-alert", tone: "warning", size: "wide", icon: Fish, title: "Whale Alert" },
+  { id: "ai-signal", tone: "primary", size: "wide", icon: Sparkles, title: "AI Signal" },
+  { id: "narrative-shift", tone: "primary", size: "wide", icon: TrendingUp, title: "Narrative Shift" },
+  { id: "bridge-activity", tone: "primary", size: "wide", icon: ArrowLeftRight, title: "Bridge Activity" },
+  { id: "security-update", tone: "success", size: "wide", icon: ShieldAlert, title: "Security Update" },
+  { id: "new-protocol", tone: "accent", size: "wide", icon: Compass, title: "New Protocol" },
+  { id: "funding-round", tone: "success", size: "small", icon: Rocket, title: "Funding Round" },
+  { id: "governance-vote", tone: "accent", size: "small", icon: Landmark, title: "Governance Vote" },
+  { id: "tvl-spike", tone: "success", size: "small", icon: Zap, title: "TVL Spike" },
+  { id: "builder-verified", tone: "success", size: "small", icon: BadgeCheck, title: "Builder Verified" },
+  { id: "developer-activity", tone: "accent", size: "small", icon: Code2, title: "Developer Activity" },
+  { id: "liquidity-movement", tone: "warning", size: "small", icon: Droplets, title: "Liquidity Movement" },
 ];
 
 const SIZE_CLASS: Record<TileSize, string> = { wide: "col-span-2", small: "col-span-1" };
@@ -229,14 +130,16 @@ function AIIntelligenceBackground() {
 
 /**
  * One tile. Default state: icon + title only. Flipped state: title + a
- * short live update (headline, detail, time, confidence) — PR9.5.1 §1.
- * The flip is a plain keyed `motion.div` (not `AnimatePresence`): PR9.5's
- * `AnimatePresence mode="wait"` silently stalled re-renders under real
- * cycling (confirmed via React fiber inspection — state updated but the
- * DOM never did), so this keeps React's native key-based remount and lets
- * `initial`/`animate` alone drive the `rotateX` entrance.
+ * short live update (headline, detail, time, confidence) when `update` is
+ * real data, or a neutral "awaiting live signal" message when it's `null`
+ * (PR9.5.1 §1, content sourcing per PR10 Part 2). The flip is a plain keyed
+ * `motion.div` (not `AnimatePresence`): PR9.5's `AnimatePresence
+ * mode="wait"` silently stalled re-renders under real cycling (confirmed
+ * via React fiber inspection — state updated but the DOM never did), so
+ * this keeps React's native key-based remount and lets `initial`/`animate`
+ * alone drive the `rotateX` entrance.
  */
-function Tile({ tile, isFlipped }: { tile: TileDef; isFlipped: boolean }) {
+function Tile({ tile, isFlipped, update }: { tile: TileDef; isFlipped: boolean; update: WallTileUpdate | null }) {
   return (
     <GlassCard className="relative flex h-full flex-col overflow-hidden p-4">
       <motion.div
@@ -252,21 +155,36 @@ function Tile({ tile, isFlipped }: { tile: TileDef; isFlipped: boolean }) {
             <span className="truncate text-xs font-semibold text-radar-light-text dark:text-radar-white">
               {tile.title}
             </span>
-            <span className="truncate text-[11px] font-medium text-radar-light-text/90 dark:text-white/90">
-              {tile.update.headline}
-            </span>
-            <span className="truncate text-[10px] text-radar-light-muted dark:text-radar-muted">
-              {tile.update.detail}
-            </span>
-            <div className="mt-0.5 flex items-center justify-between text-[10px]">
-              <span className="flex items-center gap-1 text-radar-light-muted dark:text-radar-muted">
-                <span className={`size-1.5 shrink-0 rounded-full ${TONE_DOT[tile.tone]}`} aria-hidden="true" />
-                <span className="truncate">{tile.update.time}</span>
-              </span>
-              <span className={`shrink-0 font-semibold ${TONE_ACCENT_TEXT[tile.tone]}`}>
-                {tile.update.confidence}%
-              </span>
-            </div>
+            {update ? (
+              <>
+                <span className="truncate text-[11px] font-medium text-radar-light-text/90 dark:text-white/90">
+                  {update.headline}
+                </span>
+                <span className="truncate text-[10px] text-radar-light-muted dark:text-radar-muted">
+                  {update.detail}
+                </span>
+                <div className="mt-0.5 flex items-center justify-between text-[10px]">
+                  <span className="flex items-center gap-1 text-radar-light-muted dark:text-radar-muted">
+                    <span className={`size-1.5 shrink-0 rounded-full ${TONE_DOT[tile.tone]}`} aria-hidden="true" />
+                    <span className="truncate">{update.time}</span>
+                  </span>
+                  {update.confidence !== null && (
+                    <span className={`shrink-0 font-semibold ${TONE_ACCENT_TEXT[tile.tone]}`}>
+                      {update.confidence}%
+                    </span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="truncate text-[11px] font-medium text-radar-light-muted dark:text-radar-muted">
+                  Awaiting live signal
+                </span>
+                <span className="truncate text-[10px] text-radar-light-muted/70 dark:text-radar-muted/70">
+                  Monitoring the Base ecosystem
+                </span>
+              </>
+            )}
           </div>
         ) : (
           <div className="flex h-full flex-col items-start justify-center gap-2">
@@ -295,7 +213,7 @@ function Tile({ tile, isFlipped }: { tile: TileDef; isFlipped: boolean }) {
  * section must fit one desktop viewport (700-800px) — a fixed
  * `lg:auto-rows-[120px]` × 3-row grid with trimmed section padding.
  */
-export function AIIntelligencePreview() {
+export function AIIntelligencePreview({ wallData = {} }: { wallData?: IntelligenceWallData }) {
   const prefersReducedMotion = useReducedMotion();
   const [stateIndices, setStateIndices] = useState<Record<string, 0 | 1>>(() =>
     Object.fromEntries(TILE_DEFS.map((tile) => [tile.id, 0]))
@@ -420,7 +338,7 @@ export function AIIntelligencePreview() {
                 setHoveredId(tile.id);
               }}
             >
-              <Tile tile={tile} isFlipped={isFlipped} />
+              <Tile tile={tile} isFlipped={isFlipped} update={wallData[tile.id] ?? null} />
             </motion.div>
           );
         })}
