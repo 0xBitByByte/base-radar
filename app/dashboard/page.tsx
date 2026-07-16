@@ -16,7 +16,7 @@ import { WelcomeHeader } from "@/components/dashboard/WelcomeHeader";
 import { IntelligenceBrief } from "@/components/dashboard/IntelligenceBrief";
 import { KPIRow } from "@/components/dashboard/KPIRow";
 import { PortfolioWidget } from "@/components/dashboard/PortfolioWidget";
-import { MarketWidget } from "@/components/dashboard/MarketWidget";
+import { MarketWidgetLive } from "@/components/dashboard/MarketWidgetLive";
 import { TrendingWidget } from "@/components/dashboard/TrendingWidget";
 import { AIProjectsWidget } from "@/components/dashboard/AIProjectsWidget";
 import { WhaleActivityWidget } from "@/components/dashboard/WhaleActivityWidget";
@@ -82,7 +82,7 @@ export default async function DashboardPage() {
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
           <PortfolioWidget data={portfolio} lastUpdated={lastUpdated} />
-          <MarketWidget data={market} lastUpdated={lastUpdated} />
+          <MarketWidgetLive data={market} lastUpdated={lastUpdated} />
           <TrendingWidget data={trending} lastUpdated={lastUpdated} />
           <AIProjectsWidget data={aiProjects} lastUpdated={lastUpdated} />
           <WhaleActivityWidget data={whaleEvents} lastUpdated={lastUpdated} />

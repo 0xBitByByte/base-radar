@@ -4,7 +4,9 @@ import { Code2, GitBranch, Globe, Layers, Wallet } from "lucide-react";
 import { MetricItem } from "@/components/explorer/MetricItem";
 import { MetricItemSkeleton } from "@/components/explorer/MetricItemSkeleton";
 import { ProfileCommitsAsync } from "@/components/explorer/ProfileCommitsAsync";
+import { ProfileNetworkLive } from "@/components/explorer/ProfileNetworkLive";
 import { ProfileSectionCard } from "@/components/explorer/ProfileSectionCard";
+import { ProfileTvlLive } from "@/components/explorer/ProfileTvlLive";
 import { ProfileTransfersAsync } from "@/components/explorer/ProfileTransfersAsync";
 import { ProfileTvlChangeTilesAsync } from "@/components/explorer/ProfileTvlChangeTilesAsync";
 import { ProfileTvlChartAsync } from "@/components/explorer/ProfileTvlChartAsync";
@@ -12,7 +14,7 @@ import { GITHUB_STARS_INFO_TOOLTIP } from "@/components/explorer/metricTooltips"
 import { EmptyState } from "@/components/ui/EmptyState";
 import { WidgetSkeleton } from "@/components/dashboard/WidgetSkeleton";
 import { CHAIN_BRANDING } from "@/lib/branding/chains";
-import { formatCompactCurrency, formatCompactNumber, formatDate, formatGwei, formatNumber, formatPercent, formatRelativeTime } from "@/lib/data/format";
+import { formatCompactCurrency, formatCompactNumber, formatDate, formatNumber, formatPercent, formatRelativeTime } from "@/lib/data/format";
 import type { ChainInfo, Contracts, GithubIntel, Trading, Tvl } from "@/lib/intelligence/types";
 import type { SparklinePoint } from "@/lib/data/types";
 import type { CommitActivity } from "@/lib/providers/github/service";
@@ -108,7 +110,7 @@ export function ProfileMetrics({
         {tvlAvailable || trading.available ? (
           <>
             <div className={METRIC_GROUP_CLASS}>
-              <MetricItem bare emphasize label="TVL" value={tvlAvailable ? formatCompactCurrency(tvl.tvlUsd as number) : undefined} unavailable={!tvlAvailable} />
+              <ProfileTvlLive defillamaSlug={defillamaSlug} tvlUsd={tvlAvailable ? (tvl.tvlUsd as number) : null} changePct24h={tvl.changePct24h} />
               <Suspense fallback={<><MetricItemSkeleton emphasize /><MetricItemSkeleton emphasize /></>}>
                 <ProfileTvlChangeTilesAsync resultPromise={tvlHistoryPromise} />
               </Suspense>
@@ -149,9 +151,11 @@ export function ProfileMetrics({
       >
         {/* Network figures read as informative, not urgent — deliberately not `emphasize` (the bold treatment Price/TVL/Engineering use), per PR12.1e Req 6. */}
         <div className={METRIC_GROUP_CLASS}>
-          <MetricItem bare label="Gas Price" value={networkAvailable && chain.network.gasGwei !== null ? formatGwei(chain.network.gasGwei) : undefined} unavailable={!networkAvailable || chain.network.gasGwei === null} />
-          <MetricItem bare label="Block Height" value={networkAvailable && chain.network.blockHeight !== null ? formatNumber(chain.network.blockHeight) : undefined} unavailable={!networkAvailable || chain.network.blockHeight === null} />
-          <MetricItem bare label="Est. TPS" value={networkAvailable && chain.network.estimatedTps !== null ? formatNumber(chain.network.estimatedTps) : undefined} unavailable={!networkAvailable || chain.network.estimatedTps === null} />
+          <ProfileNetworkLive
+            gasGwei={networkAvailable ? chain.network.gasGwei : null}
+            blockHeight={networkAvailable ? chain.network.blockHeight : null}
+            estimatedTps={networkAvailable ? chain.network.estimatedTps : null}
+          />
           <MetricItem
             bare
             label="Verified Contracts"

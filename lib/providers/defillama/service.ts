@@ -80,21 +80,15 @@ export async function getBaseProjectCount(): Promise<ProviderResult<number>> {
 
 /** For the Project Profile's TVL chart (PR11 Part 5) — real per-protocol historical TVL, keyed by DefiLlama slug. */
 export async function getProtocolTvlHistory(slug: string): Promise<ProviderResult<SparklinePoint[]>> {
-  const label = `getProtocolTvlHistory:${slug}`;
-  console.time(label);
-  try {
-    return await toProviderResult(PROVIDER, () =>
-      getOrSet(`${PROVIDER}:protocol-tvl:${slug}`, CACHE_TTL_MS, async () => {
-        assertRateLimit(PROVIDER, RATE_LIMIT);
-        const raw = await fetchProtocolTvlHistory(slug);
-        const mapped = mapProtocolTvlHistory(raw, CHAIN);
-        if (!mapped) throw new ProviderParseError(PROVIDER, `No TVL history returned for protocol "${slug}"`);
-        return mapped;
-      })
-    );
-  } finally {
-    console.timeEnd(label);
-  }
+  return toProviderResult(PROVIDER, () =>
+    getOrSet(`${PROVIDER}:protocol-tvl:${slug}`, CACHE_TTL_MS, async () => {
+      assertRateLimit(PROVIDER, RATE_LIMIT);
+      const raw = await fetchProtocolTvlHistory(slug);
+      const mapped = mapProtocolTvlHistory(raw, CHAIN);
+      if (!mapped) throw new ProviderParseError(PROVIDER, `No TVL history returned for protocol "${slug}"`);
+      return mapped;
+    })
+  );
 }
 
 export type { ChainTvl, Protocol };
