@@ -45,7 +45,11 @@ export type SocialPlatform =
   | "medium"
   | "mirror"
   | "farcaster"
-  | "linktree";
+  | "linktree"
+  | "blog"
+  | "forum"
+  | "linkedin"
+  | "governance";
 
 export type SocialBrand = {
   label: string;

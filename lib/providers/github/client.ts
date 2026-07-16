@@ -9,6 +9,10 @@ export type RawRepo = {
   stargazers_count: number;
   forks_count: number;
   open_issues_count: number;
+  language: string | null;
+  license: { name: string } | null;
+  created_at: string;
+  pushed_at: string;
 };
 
 export type RawRelease = {

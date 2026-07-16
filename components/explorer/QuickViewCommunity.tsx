@@ -1,26 +1,18 @@
-import { SocialLink } from "@/components/branding/SocialLink";
+import { CommunityLinks } from "@/components/explorer/CommunityLinks";
+import { GovernanceList } from "@/components/explorer/GovernanceList";
 import { MetricItem } from "@/components/explorer/MetricItem";
 import { GITHUB_STARS_INFO_TOOLTIP } from "@/components/explorer/metricTooltips";
 import { QuickViewSectionLabel } from "@/components/explorer/QuickViewSectionLabel";
 import { VerificationBadge } from "@/components/explorer/VerificationBadge";
-import { GlowBadge, type GlowBadgeColor } from "@/components/ui/GlowBadge";
 import { formatCompactNumber, formatNumber } from "@/lib/data/format";
 import type { Community, GithubIntel } from "@/lib/intelligence/types";
-import type { SocialPlatform } from "@/lib/branding/types";
-import type { GovernanceEvent, GovernanceStatus } from "@/lib/governance";
+import type { GovernanceEvent } from "@/lib/governance";
 
 type QuickViewCommunityProps = {
   community: Community;
   github: GithubIntel;
   /** `null` means this project has no governance source configured — the section is omitted entirely, never shown empty. */
   governance: GovernanceEvent[] | null;
-};
-
-const GOVERNANCE_STATUS_COLOR: Record<GovernanceStatus, GlowBadgeColor> = {
-  active: "accent",
-  passed: "success",
-  failed: "danger",
-  pending: "muted",
 };
 
 /** One shared card for the group, instead of one bordered box per stat — same data, lighter chrome. */
@@ -42,16 +34,6 @@ export function QuickViewCommunity({ community, github, governance }: QuickViewC
   const forksAvailable = github.available && github.forks !== null;
   const issuesAvailable = github.available && github.openIssues !== null;
   const releaseAvailable = github.available && github.latestReleaseTag !== null;
-
-  const socialLinks: Array<{ platform: SocialPlatform; href: string | null }> = [
-    { platform: "x", href: community.socials.twitter },
-    { platform: "discord", href: community.socials.discord },
-    { platform: "telegram", href: community.socials.telegram },
-    { platform: "farcaster", href: community.socials.farcaster },
-  ];
-  const availableSocialLinks = socialLinks.filter(
-    (entry): entry is { platform: SocialPlatform; href: string } => entry.href !== null
-  );
 
   return (
     <div className="flex flex-col gap-6 px-5 py-6">
@@ -93,44 +75,13 @@ export function QuickViewCommunity({ community, github, governance }: QuickViewC
 
       <section className="flex flex-col gap-2">
         <QuickViewSectionLabel>Community</QuickViewSectionLabel>
-        {availableSocialLinks.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {availableSocialLinks.map(({ platform, href }) => (
-              <SocialLink key={platform} platform={platform} href={href} />
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-radar-light-muted dark:text-radar-muted">No community links listed for this project.</p>
-        )}
+        <CommunityLinks socials={community.socials} />
       </section>
 
       {governance && (
         <section className="flex flex-col gap-2">
           <QuickViewSectionLabel>Governance</QuickViewSectionLabel>
-          {governance.length > 0 ? (
-            <ul className="flex flex-col gap-2">
-              {governance.map((event) => (
-                <li
-                  key={event.proposalId}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 dark:border-white/10 dark:bg-white/[0.02]"
-                >
-                  <a
-                    href={event.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="min-w-0 truncate text-xs font-medium text-radar-light-text hover:underline dark:text-radar-white"
-                  >
-                    {event.title}
-                  </a>
-                  <GlowBadge color={GOVERNANCE_STATUS_COLOR[event.status]} className="shrink-0 capitalize">
-                    {event.status}
-                  </GlowBadge>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-xs text-radar-light-muted dark:text-radar-muted">No active governance proposals.</p>
-          )}
+          <GovernanceList events={governance} />
         </section>
       )}
     </div>

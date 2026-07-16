@@ -3,8 +3,10 @@
 import type {
   RawHistoricalTvlPoint,
   RawLlamaProtocol,
+  RawProtocolDetail,
   RawStablecoinChartPoint,
 } from "@/lib/providers/defillama/client";
+import type { SparklinePoint } from "@/lib/data/types";
 
 export type ChainTvl = {
   tvlUsd: number;
@@ -63,4 +65,18 @@ export function mapChainProtocols(raw: RawLlamaProtocol[], chain: string): Proto
     )
     .map(mapProtocol)
     .sort((a, b) => b.tvlUsd - a.tvlUsd);
+}
+
+/**
+ * Prefers the protocol's Base-chain-specific TVL series (`chainTvls[chain]`)
+ * over its all-chains total (`tvl`) when available — most Base ecosystem
+ * projects are single-chain anyway, but for a multi-chain protocol the
+ * Base-specific series is the honest one to show on a Base-focused profile.
+ * `null` when the protocol has no real history for this chain at all
+ * (never fabricated as a flat/empty line).
+ */
+export function mapProtocolTvlHistory(raw: RawProtocolDetail, chain: string): SparklinePoint[] | null {
+  const points = raw.chainTvls?.[chain]?.tvl ?? raw.tvl;
+  if (!points || points.length === 0) return null;
+  return points.map((point) => ({ t: point.date, v: point.totalLiquidityUSD }));
 }

@@ -9,6 +9,10 @@ export type RepoStats = {
   openIssues: number;
   latestReleaseTag: string | null;
   latestReleasePublishedAt: string | null;
+  language: string | null;
+  license: string | null;
+  createdAt: string;
+  pushedAt: string;
 };
 
 export function mapRepoStats(fullName: string, repo: RawRepo, release: RawRelease | null): RepoStats {
@@ -19,6 +23,10 @@ export function mapRepoStats(fullName: string, repo: RawRepo, release: RawReleas
     openIssues: repo.open_issues_count,
     latestReleaseTag: release?.tag_name ?? null,
     latestReleasePublishedAt: release?.published_at ?? null,
+    language: repo.language ?? null,
+    license: repo.license?.name ?? null,
+    createdAt: repo.created_at,
+    pushedAt: repo.pushed_at,
   };
 }
 

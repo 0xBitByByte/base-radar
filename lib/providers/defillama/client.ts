@@ -41,3 +41,16 @@ export async function fetchStablecoinChart(chain: string): Promise<RawStablecoin
 export async function fetchAllProtocols(): Promise<RawLlamaProtocol[]> {
   return fetchJson<RawLlamaProtocol[]>("defillama", "https://api.llama.fi/protocols");
 }
+
+export type RawProtocolTvlPoint = { date: number; totalLiquidityUSD: number };
+
+/** The per-protocol detail endpoint's shape is distinct from `/protocols`' list-entry shape above (real per-date TVL series here, not a single current number). */
+export type RawProtocolDetail = {
+  tvl?: RawProtocolTvlPoint[];
+  chainTvls?: Record<string, { tvl: RawProtocolTvlPoint[] }>;
+};
+
+/** For the Project Profile's TVL chart (PR11) — real historical TVL for one protocol, not the whole chain. */
+export async function fetchProtocolTvlHistory(slug: string): Promise<RawProtocolDetail> {
+  return fetchJson<RawProtocolDetail>("defillama", `https://api.llama.fi/protocol/${slug}`);
+}

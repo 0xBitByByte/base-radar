@@ -3,11 +3,13 @@
 import {
   fetchAllProtocols,
   fetchHistoricalChainTvl,
+  fetchProtocolTvlHistory,
   fetchStablecoinChart,
 } from "@/lib/providers/defillama/client";
 import {
   mapChainProtocols,
   mapChainTvl,
+  mapProtocolTvlHistory,
   mapStablecoinMcap,
   type ChainTvl,
   type Protocol,
@@ -17,6 +19,7 @@ import { ProviderParseError } from "@/lib/providers/common/errors";
 import { assertRateLimit, type RateLimitConfig } from "@/lib/providers/common/rate-limit";
 import type { ProviderResult } from "@/lib/providers/common/types";
 import { nowIso, toProviderResult } from "@/lib/providers/common/utilities";
+import type { SparklinePoint } from "@/lib/data/types";
 
 const PROVIDER = "defillama" as const;
 const CHAIN = "Base";
@@ -73,6 +76,19 @@ export async function getBaseProjectCount(): Promise<ProviderResult<number>> {
   const protocols = await getBaseProtocols();
   if (!protocols.ok) return protocols;
   return { ok: true, data: protocols.data.length, source: PROVIDER, fetchedAt: nowIso() };
+}
+
+/** For the Project Profile's TVL chart (PR11 Part 5) — real per-protocol historical TVL, keyed by DefiLlama slug. */
+export async function getProtocolTvlHistory(slug: string): Promise<ProviderResult<SparklinePoint[]>> {
+  return toProviderResult(PROVIDER, () =>
+    getOrSet(`${PROVIDER}:protocol-tvl:${slug}`, CACHE_TTL_MS, async () => {
+      assertRateLimit(PROVIDER, RATE_LIMIT);
+      const raw = await fetchProtocolTvlHistory(slug);
+      const mapped = mapProtocolTvlHistory(raw, CHAIN);
+      if (!mapped) throw new ProviderParseError(PROVIDER, `No TVL history returned for protocol "${slug}"`);
+      return mapped;
+    })
+  );
 }
 
 export type { ChainTvl, Protocol };

@@ -34,7 +34,7 @@ import type { VerifiedContract } from "@/lib/providers/blockscout/service";
 import type { RepoStats } from "@/lib/providers/github/service";
 import type { NetworkStatus } from "@/lib/providers/base/service";
 import type { ProviderName } from "@/lib/providers/common/types";
-import type { NarrativeSignal, RiskLevel } from "@/lib/intelligence-engine";
+import type { NarrativeSignal, RiskContributor, RiskLevel } from "@/lib/intelligence-engine";
 import type { GovernanceEvent } from "@/lib/governance";
 
 // ---------------------------------------------------------------------------
@@ -56,11 +56,32 @@ export type Identity = {
 
 export type Market = {
   available: boolean;
+  imageUrl: string | null;
+  symbol: string | null;
   priceUsd: number | null;
   marketCapUsd: number | null;
+  marketCapRank: number | null;
   fullyDilutedValuationUsd: number | null;
   changePct24h: number | null;
+  changePct7d: number | null;
+  changePct30d: number | null;
+  circulatingSupply: number | null;
+  totalSupply: number | null;
+  maxSupply: number | null;
+  athUsd: number | null;
+  athDate: string | null;
+  atlUsd: number | null;
+  atlDate: string | null;
   sparkline7d: number[];
+  /** CoinGecko's genesis/launch date — `null` when not on record, fetched only on the Project Profile page (per-coin endpoint, too heavy for the bulk ecosystem list). */
+  genesisDate: string | null;
+};
+
+export type TradingPool = {
+  dexId: string;
+  liquidityUsd: number | null;
+  volume24hUsd: number | null;
+  pairCreatedAt: number | null;
 };
 
 export type Trading = {
@@ -72,12 +93,18 @@ export type Trading = {
   priceChangePct24h: number | null;
   /** Number of matched DexScreener pairs this figure is aggregated from. */
   pairCount: number;
+  /** Matched pools, sorted by liquidity descending — real per-pool DexScreener data, not fabricated. */
+  pools: TradingPool[];
+  largestPool: TradingPool | null;
 };
 
 export type Tvl = {
   available: boolean;
   tvlUsd: number | null;
   changePct24h: number | null;
+  /** `null` when fewer than 7/30 days of history are available in `getProtocolTvlHistory`. */
+  changePct7d: number | null;
+  changePct30d: number | null;
   defillamaCategory: string | null;
 };
 
@@ -103,6 +130,14 @@ export type GithubIntel = {
   openIssues: number | null;
   latestReleaseTag: string | null;
   latestReleasePublishedAt: string | null;
+  language: string | null;
+  license: string | null;
+  createdAt: string | null;
+  pushedAt: string | null;
+  /** `null` when GitHub hasn't finished computing commit stats yet for this repo (a real, expected "not ready" state — see `github/client.ts`). */
+  commitsLast7d: number | null;
+  commitsPrev7d: number | null;
+  commitTrendPct: number | null;
 };
 
 export type ChainInfo = {
@@ -122,7 +157,15 @@ export type Community = {
     discord: string | null;
     telegram: string | null;
     farcaster: string | null;
+    docs: string | null;
+    blog: string | null;
+    forum: string | null;
+    medium: string | null;
+    mirror: string | null;
+    linkedin: string | null;
   };
+  /** Real Snapshot/governance forum URL — `null` when this project has no `governance.governanceUrl` configured (never fabricated). */
+  governanceUrl: string | null;
   /** Mirrors the registry's own editorial trust signal — see docs/PROJECT_REGISTRY.md. */
   verificationStatus: VerificationStatus;
 };
@@ -179,6 +222,7 @@ export type Metadata = {
 export type Risk = {
   level: RiskLevel;
   explanation: string;
+  contributors: RiskContributor[];
 };
 
 export type ProjectIntelligence = {

@@ -46,5 +46,7 @@ export type {
   ProjectSummaryOutput,
   RiskAnalysisInput,
   RiskAnalysisOutput,
+  RiskContributor,
+  RiskContributorSeverity,
   RiskLevel,
 } from "@/lib/intelligence-engine/types";

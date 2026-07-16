@@ -1,4 +1,4 @@
-import { BookOpen, FileText, Globe, MessageCircle, PenLine, Send } from "lucide-react";
+import { BookOpen, Briefcase, FileText, Globe, MessageCircle, MessagesSquare, Newspaper, PenLine, Send, Vote } from "lucide-react";
 
 import { DiscordMark, GithubMark, LinktreeMark, XMark } from "@/components/ui/BrandIcons";
 import { SITE } from "@/constants/site";
@@ -32,11 +32,15 @@ export const SOCIAL_BRANDING: Record<SocialPlatform, SocialBrand> = {
   github: { label: "GitHub", Icon: GithubMark },
   discord: { label: "Discord", Icon: DiscordMark, hoverClassName: "hover:bg-[#5865F2]/10 hover:text-[#5865F2]" },
   telegram: { label: "Telegram", Icon: Send, hoverClassName: "hover:bg-[#26A5E4]/10 hover:text-[#26A5E4]" },
-  x: { label: "X (Twitter)", Icon: XMark },
+  x: { label: "X (Twitter)", Icon: XMark, hoverClassName: "hover:bg-[#1DA1F2]/10 hover:text-[#1DA1F2]" },
   medium: { label: "Medium", Icon: FileText },
   mirror: { label: "Mirror", Icon: PenLine },
-  farcaster: { label: "Farcaster", Icon: MessageCircle },
+  farcaster: { label: "Farcaster", Icon: MessageCircle, hoverClassName: "hover:bg-[#8A63D2]/10 hover:text-[#8A63D2]" },
   linktree: { label: "Linktree", Icon: LinktreeMark, hoverClassName: "hover:bg-[#43E660]/10 hover:text-[#43E660]" },
+  blog: { label: "Blog", Icon: Newspaper },
+  forum: { label: "Forum", Icon: MessagesSquare },
+  linkedin: { label: "LinkedIn", Icon: Briefcase, hoverClassName: "hover:bg-[#0A66C2]/10 hover:text-[#0A66C2]" },
+  governance: { label: "Governance", Icon: Vote },
 };
 
 export type SocialNavLink = {

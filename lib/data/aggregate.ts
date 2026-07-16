@@ -374,7 +374,8 @@ async function getRawWhaleEventsImpl(): Promise<WhaleDetectionEvent[]> {
   if (watchedTokens.length === 0) return [];
   return getWhaleProvider().detect({ watchedTokens, usdThreshold: WHALE_USD_THRESHOLD });
 }
-const getRawWhaleEvents = cache(getRawWhaleEventsImpl);
+/** Exported for the Project Profile route (`app/dashboard/projects/[slug]/page.tsx`, PR11) — same `cache()`-wrapped batch detection pass, filtered down to one project there rather than re-running whale detection per-project. */
+export const getRawWhaleEvents = cache(getRawWhaleEventsImpl);
 
 async function getWhaleEventsImpl(): Promise<WithSource<WhaleEvent[]>> {
   try {

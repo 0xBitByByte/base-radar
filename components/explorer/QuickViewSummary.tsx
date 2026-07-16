@@ -1,11 +1,11 @@
 import { MetricItem } from "@/components/explorer/MetricItem";
 import { QuickViewSectionLabel } from "@/components/explorer/QuickViewSectionLabel";
+import { RISK_COLOR } from "@/components/explorer/riskColor";
 import { ScoreBadge } from "@/components/explorer/ScoreBadge";
-import { GlowBadge, type GlowBadgeColor } from "@/components/ui/GlowBadge";
+import { GlowBadge } from "@/components/ui/GlowBadge";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { formatCompactCurrency, formatPrice } from "@/lib/data/format";
 import type { Confidence, Health, Identity, Market, Risk, Tvl } from "@/lib/intelligence/types";
-import type { RiskLevel } from "@/lib/intelligence-engine";
 
 type QuickViewSummaryProps = {
   identity: Identity;
@@ -15,13 +15,6 @@ type QuickViewSummaryProps = {
   confidence: Confidence;
   summary: string;
   risk: Risk;
-};
-
-const RISK_COLOR: Record<RiskLevel, GlowBadgeColor> = {
-  low: "success",
-  moderate: "warning",
-  elevated: "warning",
-  high: "danger",
 };
 
 /**

@@ -28,9 +28,54 @@ import {
 import { computeConfidence } from "@/lib/intelligence/confidence";
 import { computeFreshness } from "@/lib/intelligence/freshness";
 import { computeHealth } from "@/lib/intelligence/scoring";
-import type { ProjectIntelligence } from "@/lib/intelligence/types";
+import type { ProjectSources, ProjectIntelligence } from "@/lib/intelligence/types";
 import { getIntelligenceProvider } from "@/lib/intelligence-engine";
 import { getGovernanceProvider, type GovernanceEvent } from "@/lib/governance";
+import * as coingecko from "@/lib/providers/coingecko/service";
+import * as github from "@/lib/providers/github/service";
+import * as defillama from "@/lib/providers/defillama/service";
+import type { CommitActivity } from "@/lib/providers/github/service";
+import type { SparklinePoint } from "@/lib/data/types";
+
+type ExtendedProjectData = {
+  genesisDate: string | null;
+  commitActivity: CommitActivity | null;
+  tvlHistory: SparklinePoint[] | null;
+};
+
+const EMPTY_EXTENDED: ExtendedProjectData = { genesisDate: null, commitActivity: null, tvlHistory: null };
+
+/**
+ * Single-project-only enrichment — heavier, per-coin/per-repo/per-protocol
+ * calls that are fine on the Project Profile page but would be wasteful (and
+ * rate-limit-risky) to run for every project on every Explorer load. Only
+ * `getProjectIntelligence` opts into this; `getAllProjectIntelligence`
+ * (Explorer's batch path) never does.
+ */
+async function gatherExtendedProjectData(project: Project, sources: ProjectSources): Promise<ExtendedProjectData> {
+  const [genesisRes, commitRes, tvlHistoryRes] = await Promise.allSettled([
+    sources.market.status === "live" && project.providerIds.coingeckoId
+      ? coingecko.getCoinDetail(project.providerIds.coingeckoId)
+      : Promise.resolve(null),
+    sources.github.status === "live" && sources.github.data?.fullName
+      ? github.getCommitActivity(sources.github.data.fullName)
+      : Promise.resolve(null),
+    sources.tvl.status === "live" && project.providerIds.defillamaSlug
+      ? defillama.getProtocolTvlHistory(project.providerIds.defillamaSlug)
+      : Promise.resolve(null),
+  ]);
+
+  const genesisDate =
+    genesisRes.status === "fulfilled" && genesisRes.value && genesisRes.value.ok ? genesisRes.value.data : null;
+  const commitActivity =
+    commitRes.status === "fulfilled" && commitRes.value && commitRes.value.ok ? commitRes.value.data : null;
+  const tvlHistory =
+    tvlHistoryRes.status === "fulfilled" && tvlHistoryRes.value && tvlHistoryRes.value.ok
+      ? tvlHistoryRes.value.data
+      : null;
+
+  return { genesisDate, commitActivity, tvlHistory };
+}
 
 const ENGINE_VERSION = "0.1.0";
 
@@ -52,21 +97,23 @@ async function fetchProjectGovernanceEvents(project: Project): Promise<Governanc
  */
 export async function buildProjectIntelligence(
   project: Project,
-  bulk?: ProviderBulkData
+  bulk?: ProviderBulkData,
+  options?: { extended?: boolean }
 ): Promise<ProjectIntelligence> {
   const sources = await gatherProjectSources(project, bulk);
   const generatedAt = new Date().toISOString();
+  const extended = options?.extended ? await gatherExtendedProjectData(project, sources) : EMPTY_EXTENDED;
 
   const identity = mergeIdentity(project);
-  const market = mergeMarket(sources);
+  const market = mergeMarket(sources, extended.genesisDate);
   const trading = mergeTrading(sources);
-  const tvl = mergeTvl(sources);
+  const tvl = mergeTvl(sources, extended.tvlHistory);
   const contracts = mergeContracts(project, sources);
-  const github = mergeGithub(sources);
+  const githubIntel = mergeGithub(sources, extended.commitActivity);
   const chain = mergeChain(project, sources);
   const community = mergeCommunity(project);
 
-  const health = computeHealth(project, { market, trading, tvl, github });
+  const health = computeHealth(project, { market, trading, tvl, github: githubIntel });
   const confidence = computeConfidence(project, sources);
   const freshness = computeFreshness(sources, generatedAt);
   const sourcesSummary = buildSourcesSummary(sources);
@@ -89,7 +136,7 @@ export async function buildProjectIntelligence(
       changePct24h: market.changePct24h,
       tvlUsd: tvl.tvlUsd,
       tvlChangePct24h: tvl.changePct24h,
-      githubStars: github.stars,
+      githubStars: githubIntel.stars,
     }),
     market.available && market.changePct24h !== null
       ? intelligenceProvider.generateNarrative({
@@ -114,6 +161,9 @@ export async function buildProjectIntelligence(
   // every Explorer load. Whale activity stays a dashboard/ecosystem-wide
   // signal (`lib/whale`); this risk factor is simply never triggered here
   // rather than fabricating a "no activity" claim.
+  const verifiedContractPct =
+    contracts.count > 0 ? (contracts.items.filter((c) => c.verified === true).length / contracts.count) * 100 : null;
+
   let risk: ProjectIntelligence["risk"];
   try {
     risk = await intelligenceProvider.generateRiskAnalysis({
@@ -122,9 +172,14 @@ export async function buildProjectIntelligence(
       verificationStatus: community.verificationStatus,
       freshness: freshness.overall,
       hasRecentWhaleActivity: false,
+      verifiedContractPct,
+      liquidityUsd: trading.liquidityUsd,
+      tvlChangePct7d: tvl.changePct7d,
+      githubCommitsLast7d: githubIntel.commitsLast7d,
+      governanceActiveCount: governance ? governance.filter((event) => event.status === "active").length : null,
     });
   } catch {
-    risk = { level: "moderate", explanation: "Risk analysis unavailable." };
+    risk = { level: "moderate", explanation: "Risk analysis unavailable.", contributors: [] };
   }
 
   return {
@@ -133,7 +188,7 @@ export async function buildProjectIntelligence(
     trading,
     tvl,
     contracts,
-    github,
+    github: githubIntel,
     chain,
     community,
     health,
@@ -152,7 +207,7 @@ export async function buildProjectIntelligence(
 export async function getProjectIntelligence(idOrSlug: string): Promise<ProjectIntelligence | null> {
   const project = getProject(idOrSlug);
   if (!project) return null;
-  return buildProjectIntelligence(project);
+  return buildProjectIntelligence(project, undefined, { extended: true });
 }
 
 /** Builds intelligence records for every project in the registry, sharing one round of bulk provider fetches across all of them. */
