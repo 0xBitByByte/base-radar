@@ -9,7 +9,7 @@ import * as coingecko from "@/lib/providers/coingecko/service";
 import * as defillama from "@/lib/providers/defillama/service";
 import * as github from "@/lib/providers/github/service";
 import { ProfileHeader } from "@/components/explorer/ProfileHeader";
-import { ProfileTokenAndPrice } from "@/components/explorer/ProfileTokenAndPrice";
+import { ProfileTokenAndPriceLive } from "@/components/explorer/ProfileTokenAndPriceLive";
 import { ProfileMetrics } from "@/components/explorer/ProfileMetrics";
 import { ProfileExecutiveSummary } from "@/components/explorer/ProfileExecutiveSummary";
 import { ProfileAIInsight } from "@/components/explorer/ProfileAIInsight";
@@ -240,7 +240,7 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
         </div>
 
         <div className="order-1 flex flex-col gap-4 lg:col-span-8">
-          <ProfileTokenAndPrice
+          <ProfileTokenAndPriceLive
             identity={profile.identity}
             market={market}
             trading={profile.trading}
