@@ -35,23 +35,17 @@ export async function getRepoStats(fullName: string): Promise<ProviderResult<Rep
 
 /** Weekly commit-count trend for a repo — used for real "Developer Activity"/"GitHub Trend" fields (PR10 Part 3, and the Base Radar Brief). */
 export async function getCommitActivity(fullName: string): Promise<ProviderResult<CommitActivity>> {
-  const label = `getCommitActivity:${fullName}`;
-  console.time(label);
-  try {
-    return await toProviderResult(PROVIDER, () =>
-      getOrSet(`${PROVIDER}:commit-activity:${fullName}`, CACHE_TTL_MS, async () => {
-        assertRateLimit(PROVIDER, RATE_LIMIT);
-        const weeks = await fetchCommitActivity(fullName);
-        const mapped = mapCommitActivity(fullName, weeks);
-        if (!mapped) {
-          throw new Error(`No commit activity data available yet for ${fullName} (GitHub may still be computing it)`);
-        }
-        return mapped;
-      })
-    );
-  } finally {
-    console.timeEnd(label);
-  }
+  return toProviderResult(PROVIDER, () =>
+    getOrSet(`${PROVIDER}:commit-activity:${fullName}`, CACHE_TTL_MS, async () => {
+      assertRateLimit(PROVIDER, RATE_LIMIT);
+      const weeks = await fetchCommitActivity(fullName);
+      const mapped = mapCommitActivity(fullName, weeks);
+      if (!mapped) {
+        throw new Error(`No commit activity data available yet for ${fullName} (GitHub may still be computing it)`);
+      }
+      return mapped;
+    })
+  );
 }
 
 export type { CommitActivity, RepoStats };

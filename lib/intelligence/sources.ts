@@ -54,23 +54,15 @@ export type ProviderBulkData = {
  * (`lib/providers/common/cache.ts`) de-dupes concurrent and repeated calls
  * within each provider's TTL window.
  */
-let bulkCallCounter = 0;
-
 export async function fetchProviderBulkData(): Promise<ProviderBulkData> {
-  const label = `fetchProviderBulkData:${++bulkCallCounter}`;
-  console.time(label);
-  try {
-    const [markets, pairs, protocols, verifiedContract, network] = await Promise.all([
-      coingecko.getBaseEcosystemMarkets(250),
-      dexscreener.getBaseTrendingPairs(),
-      defillama.getBaseProtocols(),
-      blockscout.getRecentlyVerifiedContract(),
-      base.getBaseNetworkStatus(),
-    ]);
-    return { markets, pairs, protocols, verifiedContract, network };
-  } finally {
-    console.timeEnd(label);
-  }
+  const [markets, pairs, protocols, verifiedContract, network] = await Promise.all([
+    coingecko.getBaseEcosystemMarkets(250),
+    dexscreener.getBaseTrendingPairs(),
+    defillama.getBaseProtocols(),
+    blockscout.getRecentlyVerifiedContract(),
+    base.getBaseNetworkStatus(),
+  ]);
+  return { markets, pairs, protocols, verifiedContract, network };
 }
 
 function unavailableSlice<T>(detail: string): ProviderSlice<T> {
@@ -177,28 +169,22 @@ async function matchGithub(project: Project): Promise<ProviderSlice<github.RepoS
  * shared, chain-wide results aren't looked up redundantly.
  */
 export async function gatherProjectSources(project: Project, bulk?: ProviderBulkData): Promise<ProjectSources> {
-  const label = `gatherProjectSources:${project.slug}`;
-  console.time(label);
-  try {
-    // Fetching the shared bulk data (when not already supplied) and resolving
-    // GitHub for this one project are independent — run them concurrently
-    // rather than one after the other.
-    const [data, githubSlice] = await Promise.all([
-      bulk ? Promise.resolve(bulk) : fetchProviderBulkData(),
-      matchGithub(project),
-    ]);
+  // Fetching the shared bulk data (when not already supplied) and resolving
+  // GitHub for this one project are independent — run them concurrently
+  // rather than one after the other.
+  const [data, githubSlice] = await Promise.all([
+    bulk ? Promise.resolve(bulk) : fetchProviderBulkData(),
+    matchGithub(project),
+  ]);
 
-    return {
-      market: matchMarket(project, data.markets),
-      trading: matchTrading(project, data.pairs),
-      tvl: matchTvl(project, data.protocols),
-      network: matchNetwork(project, data.network),
-      verifiedContract: matchVerifiedContract(project, data.verifiedContract),
-      github: githubSlice,
-    };
-  } finally {
-    console.timeEnd(label);
-  }
+  return {
+    market: matchMarket(project, data.markets),
+    trading: matchTrading(project, data.pairs),
+    tvl: matchTvl(project, data.protocols),
+    network: matchNetwork(project, data.network),
+    verifiedContract: matchVerifiedContract(project, data.verifiedContract),
+    github: githubSlice,
+  };
 }
 
 /** Projects `ProjectSources` into the public, per-provider `Sources` attribution section. */
