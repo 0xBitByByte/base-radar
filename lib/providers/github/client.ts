@@ -46,6 +46,12 @@ export async function fetchLatestRelease(fullName: string): Promise<RawRelease> 
  * stats; `fetchJson`'s retry (transient 5xx/timeout only) won't catch a
  * 202, so an empty array here is a real, expected "not ready yet" outcome,
  * not a failure — the mapper treats it as "no data" rather than throwing.
+ *
+ * Uses the shared default timeout/retry budget — this is no longer a
+ * page-blocking concern (the Project Profile page fetches this off the
+ * critical render path and streams it in via `Suspense`, see
+ * `ProfileCommitsAsync`), so there's no remaining benefit to cutting a
+ * still-computing repo's request short.
  */
 export async function fetchCommitActivity(fullName: string): Promise<RawCommitActivityWeek[]> {
   return fetchJson<RawCommitActivityWeek[]>(

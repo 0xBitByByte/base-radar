@@ -29,8 +29,14 @@ import type {
 import type { CommitActivity } from "@/lib/providers/github/service";
 import type { SparklinePoint } from "@/lib/data/types";
 
-/** Real percentage change between the oldest point in `history` at least `days` old and the most recent point. `null` when the series doesn't reach back that far. */
-function changePctOverDays(history: SparklinePoint[] | null, days: number): number | null {
+/**
+ * Real percentage change between the oldest point in `history` at least
+ * `days` old and the most recent point. `null` when the series doesn't
+ * reach back that far. Exported (not just used internally by `mergeTvl`) so
+ * the Project Profile page can apply the exact same math to a TVL history
+ * series that streams in after first paint, instead of re-deriving it.
+ */
+export function changePctOverDays(history: SparklinePoint[] | null, days: number): number | null {
   if (!history || history.length < 2) return null;
   const latest = history[history.length - 1];
   // DefiLlama timestamps are unix seconds.

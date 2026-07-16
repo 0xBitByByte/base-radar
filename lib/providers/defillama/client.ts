@@ -50,7 +50,18 @@ export type RawProtocolDetail = {
   chainTvls?: Record<string, { tvl: RawProtocolTvlPoint[] }>;
 };
 
-/** For the Project Profile's TVL chart (PR11) — real historical TVL for one protocol, not the whole chain. */
+/**
+ * For the Project Profile's TVL chart (PR11) — real historical TVL for one
+ * protocol, not the whole chain. For long-running, multi-chain protocols
+ * (Uniswap, Curve, ...) this endpoint returns years of daily history and has
+ * been observed taking 8-25s to respond. That's no longer a page-blocking
+ * concern (the Project Profile page fetches this off the critical render
+ * path and streams it in via `Suspense` — see `ProfileTvlChartAsync`/
+ * `ProfileTvlChangeTilesAsync`), so this uses the shared default
+ * timeout/retry budget rather than a tightened one: a real, slow-but-
+ * eventually-successful response now gets its full chance to arrive instead
+ * of being cut short for no remaining benefit.
+ */
 export async function fetchProtocolTvlHistory(slug: string): Promise<RawProtocolDetail> {
   return fetchJson<RawProtocolDetail>("defillama", `https://api.llama.fi/protocol/${slug}`);
 }

@@ -60,13 +60,19 @@ export async function getEthPrice(): Promise<ProviderResult<AssetPrice>> {
 
 /** Genesis/launch date for a single coin — heavier per-coin endpoint, only called on the Project Profile page. */
 export async function getCoinDetail(id: string): Promise<ProviderResult<string | null>> {
-  return toProviderResult(PROVIDER, () =>
-    getOrSet(`${PROVIDER}:coin-detail:${id}`, CACHE_TTL_MS, async () => {
-      assertRateLimit(PROVIDER, RATE_LIMIT);
-      const raw = await fetchCoinDetail(id);
-      return mapGenesisDate(raw);
-    })
-  );
+  const label = `getCoinDetail:${id}`;
+  console.time(label);
+  try {
+    return await toProviderResult(PROVIDER, () =>
+      getOrSet(`${PROVIDER}:coin-detail:${id}`, CACHE_TTL_MS, async () => {
+        assertRateLimit(PROVIDER, RATE_LIMIT);
+        const raw = await fetchCoinDetail(id);
+        return mapGenesisDate(raw);
+      })
+    );
+  } finally {
+    console.timeEnd(label);
+  }
 }
 
 /** Historical price series for a given period, used by the Price chart's period filters. */

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import {
   Activity,
   Brain,
@@ -13,14 +14,20 @@ import {
 } from "lucide-react";
 
 import { ProfileSectionCard } from "@/components/explorer/ProfileSectionCard";
-import { ProfileTimeline } from "@/components/explorer/ProfileTimeline";
+import { ProfileTimelineAsync } from "@/components/explorer/ProfileTimelineAsync";
 import { QuickViewSectionLabel } from "@/components/explorer/QuickViewSectionLabel";
+import { WidgetSkeleton } from "@/components/dashboard/WidgetSkeleton";
 import { formatPercent } from "@/lib/data/format";
 import { cn } from "@/lib/utils";
-import type { Confidence, Health, Risk } from "@/lib/intelligence/types";
+import type { Confidence, GithubIntel, Health, Risk, Tvl } from "@/lib/intelligence/types";
 import type { NarrativeSignal, RiskContributorSeverity } from "@/lib/intelligence-engine";
 import type { GovernanceEvent } from "@/lib/governance";
-import type { TimelineEvent } from "@/lib/intelligence/timeline";
+import type { WhaleEvent } from "@/lib/whale/types";
+import type { Signal } from "@/lib/data/types";
+import type { SparklinePoint } from "@/lib/data/types";
+import type { CommitActivity } from "@/lib/providers/github/service";
+import type { TokenTransfer } from "@/lib/providers/blockscout/service";
+import type { ProviderResult } from "@/lib/providers/common/types";
 
 type ProfileIntelligenceProps = {
   narrative: NarrativeSignal | null;
@@ -28,7 +35,15 @@ type ProfileIntelligenceProps = {
   health: Health;
   confidence: Confidence;
   governance: GovernanceEvent[] | null;
-  timelineEvents: TimelineEvent[];
+  /** First-paint `GithubIntel`/`Tvl` — passed through to `ProfileTimelineAsync`, which merges in the streamed commit-activity/TVL-history fields once they resolve. */
+  github: GithubIntel;
+  tvl: Tvl;
+  whaleEvents: WhaleEvent[];
+  signals: Signal[];
+  tokenSymbol: string | null;
+  commitActivityPromise: Promise<ProviderResult<CommitActivity> | null>;
+  tvlHistoryPromise: Promise<ProviderResult<SparklinePoint[]> | null>;
+  transfersPromise: Promise<ProviderResult<TokenTransfer[]> | null>;
 };
 
 /** Card border/background tint per contributor severity — the same semantic palette every other severity indicator on this page uses (success/warning/danger), plus a neutral tint for factors this codebase has no real data source for. */
@@ -129,7 +144,14 @@ export function ProfileIntelligence({
   health,
   confidence,
   governance,
-  timelineEvents,
+  github,
+  tvl,
+  whaleEvents,
+  signals,
+  tokenSymbol,
+  commitActivityPromise,
+  tvlHistoryPromise,
+  transfersPromise,
 }: ProfileIntelligenceProps) {
   const activeGovernanceCount = governance?.filter((event) => event.status === "active").length ?? 0;
 
@@ -235,7 +257,29 @@ export function ProfileIntelligence({
           Whale transfers, governance, GitHub releases and commits, TVL swings, risk alerts, and signals, merged into one
           newest-first feed — no event type shown twice.
         </p>
-        <ProfileTimeline events={timelineEvents} />
+        {/*
+          Streaming Architecture pass — commit activity, TVL history, and
+          token transfers are the feed's three slow inputs; governance/whale/
+          signal/risk events are already fast. Rather than render a partial
+          feed on first paint that can never update itself (this is
+          server-rendered HTML, not client state), the whole feed waits
+          behind one `<Suspense>` for the slowest of the three, then builds
+          the complete, real timeline in one pass.
+        */}
+        <Suspense fallback={<WidgetSkeleton className="h-48 rounded-xl" />}>
+          <ProfileTimelineAsync
+            github={github}
+            tvl={tvl}
+            risk={risk}
+            governanceEvents={governance ?? []}
+            whaleEvents={whaleEvents}
+            signals={signals}
+            tokenSymbol={tokenSymbol}
+            commitActivityPromise={commitActivityPromise}
+            tvlHistoryPromise={tvlHistoryPromise}
+            transfersPromise={transfersPromise}
+          />
+        </Suspense>
       </ProfileSectionCard>
 
       {governance && (

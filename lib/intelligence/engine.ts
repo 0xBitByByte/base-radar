@@ -53,28 +53,34 @@ const EMPTY_EXTENDED: ExtendedProjectData = { genesisDate: null, commitActivity:
  * (Explorer's batch path) never does.
  */
 async function gatherExtendedProjectData(project: Project, sources: ProjectSources): Promise<ExtendedProjectData> {
-  const [genesisRes, commitRes, tvlHistoryRes] = await Promise.allSettled([
-    sources.market.status === "live" && project.providerIds.coingeckoId
-      ? coingecko.getCoinDetail(project.providerIds.coingeckoId)
-      : Promise.resolve(null),
-    sources.github.status === "live" && sources.github.data?.fullName
-      ? github.getCommitActivity(sources.github.data.fullName)
-      : Promise.resolve(null),
-    sources.tvl.status === "live" && project.providerIds.defillamaSlug
-      ? defillama.getProtocolTvlHistory(project.providerIds.defillamaSlug)
-      : Promise.resolve(null),
-  ]);
+  const label = `gatherExtendedProjectData:${project.slug}`;
+  console.time(label);
+  try {
+    const [genesisRes, commitRes, tvlHistoryRes] = await Promise.allSettled([
+      sources.market.status === "live" && project.providerIds.coingeckoId
+        ? coingecko.getCoinDetail(project.providerIds.coingeckoId)
+        : Promise.resolve(null),
+      sources.github.status === "live" && sources.github.data?.fullName
+        ? github.getCommitActivity(sources.github.data.fullName)
+        : Promise.resolve(null),
+      sources.tvl.status === "live" && project.providerIds.defillamaSlug
+        ? defillama.getProtocolTvlHistory(project.providerIds.defillamaSlug)
+        : Promise.resolve(null),
+    ]);
 
-  const genesisDate =
-    genesisRes.status === "fulfilled" && genesisRes.value && genesisRes.value.ok ? genesisRes.value.data : null;
-  const commitActivity =
-    commitRes.status === "fulfilled" && commitRes.value && commitRes.value.ok ? commitRes.value.data : null;
-  const tvlHistory =
-    tvlHistoryRes.status === "fulfilled" && tvlHistoryRes.value && tvlHistoryRes.value.ok
-      ? tvlHistoryRes.value.data
-      : null;
+    const genesisDate =
+      genesisRes.status === "fulfilled" && genesisRes.value && genesisRes.value.ok ? genesisRes.value.data : null;
+    const commitActivity =
+      commitRes.status === "fulfilled" && commitRes.value && commitRes.value.ok ? commitRes.value.data : null;
+    const tvlHistory =
+      tvlHistoryRes.status === "fulfilled" && tvlHistoryRes.value && tvlHistoryRes.value.ok
+        ? tvlHistoryRes.value.data
+        : null;
 
-  return { genesisDate, commitActivity, tvlHistory };
+    return { genesisDate, commitActivity, tvlHistory };
+  } finally {
+    console.timeEnd(label);
+  }
 }
 
 const ENGINE_VERSION = "0.1.0";
@@ -207,7 +213,14 @@ export async function buildProjectIntelligence(
 export async function getProjectIntelligence(idOrSlug: string): Promise<ProjectIntelligence | null> {
   const project = getProject(idOrSlug);
   if (!project) return null;
-  return buildProjectIntelligence(project, undefined, { extended: true });
+
+  const label = `getProjectIntelligence:${idOrSlug}`;
+  console.time(label);
+  try {
+    return await buildProjectIntelligence(project, undefined, { extended: true });
+  } finally {
+    console.timeEnd(label);
+  }
 }
 
 /** Builds intelligence records for every project in the registry, sharing one round of bulk provider fetches across all of them. */

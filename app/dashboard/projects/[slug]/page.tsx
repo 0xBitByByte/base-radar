@@ -2,11 +2,12 @@ import { notFound } from "next/navigation";
 
 import { getProject } from "@/data/projects/helpers";
 import { getRawWhaleEvents, getSignals } from "@/lib/data/aggregate";
-import { getProjectIntelligence } from "@/lib/intelligence/engine";
+import { buildProjectIntelligence } from "@/lib/intelligence/engine";
 import { buildAiInsight, buildAiVerdict, buildExecutiveSummaryBullets, buildHealthScorecard } from "@/lib/intelligence/scorecard";
-import { buildProjectTimeline } from "@/lib/intelligence/timeline";
 import * as blockscout from "@/lib/providers/blockscout/service";
+import * as coingecko from "@/lib/providers/coingecko/service";
 import * as defillama from "@/lib/providers/defillama/service";
+import * as github from "@/lib/providers/github/service";
 import { ProfileHeader } from "@/components/explorer/ProfileHeader";
 import { ProfileTokenAndPrice } from "@/components/explorer/ProfileTokenAndPrice";
 import { ProfileMetrics } from "@/components/explorer/ProfileMetrics";
@@ -20,22 +21,40 @@ import { ProfileSectionNav } from "@/components/explorer/ProfileSectionNav";
 import { ProfileSummaryBanner } from "@/components/explorer/ProfileSummaryBanner";
 import { ProjectHealthScorecard } from "@/components/explorer/ProjectHealthScorecard";
 import type { SparklinePoint } from "@/lib/data/types";
-import type { TokenTransfer } from "@/lib/providers/blockscout/service";
 
 type ProjectProfilePageProps = {
   params: Promise<{ slug: string }>;
 };
 
 /**
- * The Project Profile route (PR11) — the "complete research experience"
- * `QuickViewDrawer`'s own doc comment already names as a future milestone.
- * `async`, awaits everything at the top level via one `Promise.allSettled`
- * (no inner Suspense split), matching `app/dashboard/page.tsx`'s and
- * `app/dashboard/projects/page.tsx`'s established pattern so this route's
- * own `loading.tsx` genuinely fires while data is in flight. Whale events
- * and signals are the exact same `cache()`-wrapped, ecosystem-wide batch
- * results `lib/data/aggregate.ts` already computes for the dashboard —
- * filtered down to this one project here, never re-detected.
+ * The Project Profile route (PR11). Streaming Architecture pass — this page
+ * used to await one combined `getProjectIntelligence(slug)` (which always
+ * fetched GitHub commit activity + DefiLlama TVL history + CoinGecko genesis
+ * date, the three genuinely slow provider calls in this codebase) before
+ * rendering anything. It now calls the same, unmodified
+ * `buildProjectIntelligence` with `{ extended: false }` — an option that
+ * function already exposed for exactly this "skip the heavy per-project
+ * extras" case (`getAllProjectIntelligence`, the Explorer's batch path, has
+ * always used it) — so Health/Risk/Confidence/AI Insight/Executive Summary
+ * compute from real market/trading/tvl-snapshot/network/contracts/github-repo
+ * data and render immediately. The three slow calls, plus the token-transfer
+ * fetch, are kicked off unawaited right after and passed down as promises;
+ * each is unwrapped by its own small `"use client"` `use()` component behind
+ * its own `<Suspense>` — the same pattern `DashboardLayout`/
+ * `LiveStatusBarAsync` already use for the live ticker, not a new one.
+ *
+ * Tradeoff, stated plainly: Health/Risk/Confidence/AI Insight/Executive
+ * Summary are computed once, from the fast data only, and never
+ * recomputed — this is server-rendered HTML with no client-side re-run once
+ * the slow data streams in. Commit activity therefore never influences this
+ * render's Risk "Developer Health" contributor or AI Insight's commit-count
+ * bullet (both already have a graceful `null`-input branch for exactly this
+ * case — this reuses it, it doesn't add a new one), and neither TVL's 7d/30d
+ * change nor genesis date reach the Executive Summary bullets that read
+ * them. Every one of those fields is still shown, in full, in its own
+ * streamed widget below (Score Matrix's Market Momentum tile, the Health
+ * Scorecard, Engineering Health's Commits (7d) tile, TVL & Liquidity's
+ * chart) once it resolves.
  */
 export default async function ProjectProfilePage({ params }: ProjectProfilePageProps) {
   const { slug } = await params;
@@ -43,38 +62,26 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
   const registryProject = getProject(slug);
   if (!registryProject) notFound();
 
-  const [profileRes, whaleRes, signalsRes, tvlHistoryRes] = await Promise.allSettled([
-    getProjectIntelligence(slug),
+  // Genesis date is fast (67-378ms observed) — unlike commit activity/TVL
+  // history it isn't worth deferring behind its own Suspense boundary, so
+  // it's fetched here, in parallel with the fast intelligence build, rather
+  // than bundled into `extended`.
+  const genesisPromise = registryProject.providerIds.coingeckoId
+    ? coingecko.getCoinDetail(registryProject.providerIds.coingeckoId)
+    : Promise.resolve(null);
+
+  const [profileRes, genesisRes, whaleRes, signalsRes] = await Promise.allSettled([
+    buildProjectIntelligence(registryProject, undefined, { extended: false }),
+    genesisPromise,
     getRawWhaleEvents(),
     getSignals(),
-    registryProject.providerIds.defillamaSlug
-      ? defillama.getProtocolTvlHistory(registryProject.providerIds.defillamaSlug)
-      : Promise.resolve(null),
   ]);
 
   const profile = profileRes.status === "fulfilled" ? profileRes.value : null;
   if (!profile) notFound();
 
-  // Real per-token-contract transfer feed (PR12.1c Req 5.5) — Blockscout's
-  // `getTokenTransfers` was previously only used for whale detection.
-  // Base-only (Blockscout's Base instance has no cross-chain data), and only
-  // fetched when this project actually has a token contract configured on
-  // its primary chain.
-  const tokenContract = profile.contracts.items.find(
-    (item) => item.chain === profile.chain.primaryChain && item.type === "token"
-  );
-  const transfersResult =
-    tokenContract && profile.chain.primaryChain === "base"
-      ? await blockscout.getTokenTransfers(tokenContract.address)
-      : null;
-  const recentTransfers: TokenTransfer[] | null = transfersResult?.ok ? transfersResult.data : null;
-  const recentTransfersUnavailableReason = !tokenContract
-    ? "No token contract is configured for this project on its primary chain."
-    : profile.chain.primaryChain !== "base"
-      ? "Recent transfers are only available for projects with a token contract on Base."
-      : transfersResult && !transfersResult.ok
-        ? transfersResult.error.message
-        : "No recent transfer data was returned by Blockscout.";
+  const genesisResult = genesisRes.status === "fulfilled" ? genesisRes.value : null;
+  const market = { ...profile.market, genesisDate: genesisResult?.ok ? genesisResult.data : null };
 
   const allWhaleEvents = whaleRes.status === "fulfilled" ? whaleRes.value : [];
   const whaleEvents = allWhaleEvents.filter((event) => event.projectId === profile.identity.id);
@@ -84,24 +91,32 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
     (signal) => signal.project.toLowerCase() === profile.identity.name.toLowerCase()
   );
 
-  const tvlHistoryResult = tvlHistoryRes.status === "fulfilled" ? tvlHistoryRes.value : null;
-  const tvlHistory: SparklinePoint[] | null = tvlHistoryResult?.ok ? tvlHistoryResult.data : null;
+  // The three genuinely slow provider calls this page depends on, plus
+  // token transfers — kicked off now, deliberately never awaited here.
+  // Each is passed straight through as a promise to a streamed component;
+  // the page finishes rendering without waiting on any of them.
+  const commitActivityPromise =
+    profile.github.available && profile.github.fullName
+      ? github.getCommitActivity(profile.github.fullName)
+      : Promise.resolve(null);
+
+  const tvlHistoryPromise =
+    profile.tvl.available && registryProject.providerIds.defillamaSlug
+      ? defillama.getProtocolTvlHistory(registryProject.providerIds.defillamaSlug)
+      : Promise.resolve(null);
+
+  const tokenContract = profile.contracts.items.find(
+    (item) => item.chain === profile.chain.primaryChain && item.type === "token"
+  );
+  const transfersPromise =
+    tokenContract && profile.chain.primaryChain === "base"
+      ? blockscout.getTokenTransfers(tokenContract.address)
+      : Promise.resolve(null);
 
   const priceHistory: SparklinePoint[] | null =
     profile.market.sparkline7d.length > 0
       ? profile.market.sparkline7d.map((price, index) => ({ t: index, v: price }))
       : null;
-
-  const timeline = buildProjectTimeline({
-    github: profile.github,
-    governanceEvents: profile.governance ?? [],
-    whaleEvents,
-    signals,
-    tvl: profile.tvl,
-    risk: profile.risk,
-    tokenTransfers: recentTransfers,
-    tokenSymbol: profile.market.symbol,
-  });
 
   const githubUrl = profile.github.available && profile.github.fullName ? `https://github.com/${profile.github.fullName}` : null;
   const narrativeLabel = profile.narrative?.label ?? null;
@@ -227,7 +242,7 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
         <div className="order-1 flex flex-col gap-4 lg:col-span-8">
           <ProfileTokenAndPrice
             identity={profile.identity}
-            market={profile.market}
+            market={market}
             trading={profile.trading}
             contracts={profile.contracts}
             chain={profile.chain}
@@ -240,10 +255,10 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
             github={profile.github}
             contracts={profile.contracts}
             chain={profile.chain}
-            tvlHistory={tvlHistory}
+            tvlHistoryPromise={tvlHistoryPromise}
             defillamaSlug={registryProject.providerIds.defillamaSlug ?? null}
-            recentTransfers={recentTransfers}
-            recentTransfersUnavailableReason={recentTransfersUnavailableReason}
+            commitActivityPromise={commitActivityPromise}
+            transfersPromise={transfersPromise}
             tokenSymbol={profile.market.symbol}
           />
           <ProfileContracts contracts={profile.contracts} chain={profile.chain} />
@@ -266,7 +281,14 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
             health={profile.health}
             confidence={profile.confidence}
             governance={profile.governance}
-            timelineEvents={timeline}
+            github={profile.github}
+            tvl={profile.tvl}
+            whaleEvents={whaleEvents}
+            signals={signals}
+            tokenSymbol={profile.market.symbol}
+            commitActivityPromise={commitActivityPromise}
+            tvlHistoryPromise={tvlHistoryPromise}
+            transfersPromise={transfersPromise}
           />
         </div>
       </div>

@@ -1,30 +1,46 @@
+import { Suspense } from "react";
 import { Code2, GitBranch, Globe, Layers, Wallet } from "lucide-react";
 
-import { ProfileChart } from "@/components/explorer/ProfileChart";
 import { MetricItem } from "@/components/explorer/MetricItem";
+import { MetricItemSkeleton } from "@/components/explorer/MetricItemSkeleton";
+import { ProfileCommitsAsync } from "@/components/explorer/ProfileCommitsAsync";
 import { ProfileSectionCard } from "@/components/explorer/ProfileSectionCard";
-import { RecentTransactions } from "@/components/explorer/RecentTransactions";
+import { ProfileTransfersAsync } from "@/components/explorer/ProfileTransfersAsync";
+import { ProfileTvlChangeTilesAsync } from "@/components/explorer/ProfileTvlChangeTilesAsync";
+import { ProfileTvlChartAsync } from "@/components/explorer/ProfileTvlChartAsync";
 import { GITHUB_STARS_INFO_TOOLTIP } from "@/components/explorer/metricTooltips";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { WidgetSkeleton } from "@/components/dashboard/WidgetSkeleton";
 import { CHAIN_BRANDING } from "@/lib/branding/chains";
 import { formatCompactCurrency, formatCompactNumber, formatDate, formatGwei, formatNumber, formatPercent, formatRelativeTime } from "@/lib/data/format";
 import type { ChainInfo, Contracts, GithubIntel, Trading, Tvl } from "@/lib/intelligence/types";
 import type { SparklinePoint } from "@/lib/data/types";
+import type { CommitActivity } from "@/lib/providers/github/service";
 import type { TokenTransfer } from "@/lib/providers/blockscout/service";
+import type { ProviderResult } from "@/lib/providers/common/types";
 
 type ProfileMetricsProps = {
   trading: Trading;
   tvl: Tvl;
+  /** First-paint `GithubIntel` — real stars/forks/release fields; `commitsLast7d` is always `null` here (streamed separately via `commitActivityPromise`, never re-merged into this object). */
   github: GithubIntel;
   contracts: Contracts;
   chain: ChainInfo;
-  /** Real per-protocol TVL history from DefiLlama (PR11). `null` when the project has no `defillamaSlug` configured or the provider returned nothing. */
-  tvlHistory: SparklinePoint[] | null;
+  /**
+   * Real per-protocol TVL history from DefiLlama (PR11), passed unresolved
+   * (Streaming Architecture pass) — DefiLlama's per-protocol endpoint has
+   * been observed taking 4-25s for long-running, multi-chain protocols, so
+   * neither the sparkline chart nor the 7d/30d change tiles that derive from
+   * it block first paint anymore; only the two `Suspense`-wrapped async
+   * tiles below suspend on it.
+   */
+  tvlHistoryPromise: Promise<ProviderResult<SparklinePoint[]> | null>;
   /** `null` when this project has no DefiLlama slug configured — disables the "View on DefiLlama" source link (PR12.1 Req 7). */
   defillamaSlug: string | null;
-  /** Recent transfers for this project's token contract (PR12.1c Req 5.5) — `null` when no token contract is configured on the primary chain or the provider call failed. */
-  recentTransfers: TokenTransfer[] | null;
-  recentTransfersUnavailableReason: string;
+  /** GitHub's commit-activity endpoint, passed unresolved for the same reason as `tvlHistoryPromise` — it's computed asynchronously server-side by GitHub itself and has been observed taking several seconds on a cold repo. */
+  commitActivityPromise: Promise<ProviderResult<CommitActivity> | null>;
+  /** Recent transfers for this project's token contract (PR12.1c Req 5.5), passed unresolved — Blockscout's transfer-history endpoint has been observed taking 5-6s and feeds nothing else on first paint. */
+  transfersPromise: Promise<ProviderResult<TokenTransfer[]> | null>;
   tokenSymbol: string | null;
 };
 
@@ -45,6 +61,16 @@ const METRIC_GROUP_CLASS =
  * contract is configured, render via `RecentTransactions` instead. Section
  * ids (`tvl`/`network`/`developer`) are the `ProfileSectionNav` scroll
  * targets.
+ *
+ * Streaming Architecture pass — the three genuinely slow provider calls
+ * (DefiLlama's per-protocol TVL history, GitHub's commit-activity endpoint,
+ * Blockscout's token-transfer history) are passed down as unresolved
+ * promises instead of already-awaited values, each unwrapped by its own
+ * small `"use client"` `use()` component behind its own `<Suspense>` —
+ * the exact same pattern `DashboardLayout`/`LiveStatusBarAsync` already use
+ * for the live ticker. Everything else in this component (current TVL,
+ * DEX liquidity, network stats, GitHub stars/forks/release metadata)
+ * comes from fast provider calls and renders synchronously, unaffected.
  */
 export function ProfileMetrics({
   trading,
@@ -52,10 +78,10 @@ export function ProfileMetrics({
   github,
   contracts,
   chain,
-  tvlHistory,
+  tvlHistoryPromise,
   defillamaSlug,
-  recentTransfers,
-  recentTransfersUnavailableReason,
+  commitActivityPromise,
+  transfersPromise,
   tokenSymbol,
 }: ProfileMetricsProps) {
   const liquidityAvailable = trading.available && trading.liquidityUsd !== null;
@@ -69,6 +95,8 @@ export function ProfileMetrics({
   const networkAvailable = chain.network.available;
   const explorerUrl = CHAIN_BRANDING[chain.primaryChain]?.explorerUrl ?? null;
 
+  const tokenContract = contracts.items.find((item) => item.chain === chain.primaryChain && item.type === "token");
+
   return (
     <div className="flex flex-col gap-5">
       <ProfileSectionCard
@@ -81,8 +109,9 @@ export function ProfileMetrics({
           <>
             <div className={METRIC_GROUP_CLASS}>
               <MetricItem bare emphasize label="TVL" value={tvlAvailable ? formatCompactCurrency(tvl.tvlUsd as number) : undefined} unavailable={!tvlAvailable} />
-              <MetricItem bare emphasize label="TVL 7d Change" changeValue={tvl.changePct7d} />
-              <MetricItem bare emphasize label="TVL 30d Change" changeValue={tvl.changePct30d} />
+              <Suspense fallback={<><MetricItemSkeleton emphasize /><MetricItemSkeleton emphasize /></>}>
+                <ProfileTvlChangeTilesAsync resultPromise={tvlHistoryPromise} />
+              </Suspense>
               <MetricItem bare emphasize label="DEX Liquidity" value={liquidityAvailable ? formatCompactCurrency(trading.liquidityUsd as number) : undefined} unavailable={!liquidityAvailable} />
               <MetricItem bare emphasize label="Tracked Pools" value={trading.available ? formatNumber(trading.pairCount) : undefined} unavailable={!trading.available} />
               <MetricItem
@@ -93,11 +122,9 @@ export function ProfileMetrics({
                 unavailable={!trading.largestPool}
               />
             </div>
-            {tvlHistory && tvlHistory.length > 1 ? (
-              <ProfileChart data={tvlHistory} variant="currency" color="var(--color-radar-accent)" height={130} />
-            ) : tvlAvailable ? (
-              <p className="text-xs text-radar-light-muted dark:text-radar-muted">No historical TVL series returned by DefiLlama for this protocol yet.</p>
-            ) : null}
+            <Suspense fallback={<WidgetSkeleton className="h-[130px] rounded-xl" />}>
+              <ProfileTvlChartAsync resultPromise={tvlHistoryPromise} tvlAvailable={tvlAvailable} />
+            </Suspense>
             {tvlAvailable && (
               <p className="text-xs text-radar-light-muted dark:text-radar-muted">
                 Protocol revenue/fees aren&apos;t available from any connected provider yet.
@@ -132,12 +159,15 @@ export function ProfileMetrics({
             unavailable={verifiedPct === null}
           />
         </div>
-        <RecentTransactions
-          transfers={recentTransfers}
-          tokenSymbol={tokenSymbol}
-          explorerUrl={explorerUrl}
-          unavailableReason={recentTransfersUnavailableReason}
-        />
+        <Suspense fallback={<WidgetSkeleton className="h-16 rounded-xl" />}>
+          <ProfileTransfersAsync
+            resultPromise={transfersPromise}
+            hasTokenContract={Boolean(tokenContract)}
+            isPrimaryChainBase={chain.primaryChain === "base"}
+            tokenSymbol={tokenSymbol}
+            explorerUrl={explorerUrl}
+          />
+        </Suspense>
         <p className="text-xs text-radar-light-muted dark:text-radar-muted">
           Per-project transaction counts, wallet counts, and unique users aren&apos;t shown — Blockscout&apos;s public API only exposes
           chain-wide totals, not per-contract figures, for any project in this registry.
@@ -157,7 +187,9 @@ export function ProfileMetrics({
               <MetricItem bare emphasize label="GitHub Stars" value={starsAvailable ? formatCompactNumber(github.stars as number) : undefined} unavailable={!starsAvailable} infoTooltip={GITHUB_STARS_INFO_TOOLTIP} />
               <MetricItem bare emphasize label="Forks" value={forksAvailable ? formatNumber(github.forks as number) : undefined} unavailable={!forksAvailable} />
               <MetricItem bare emphasize label="Open Issues" value={issuesAvailable ? formatNumber(github.openIssues as number) : undefined} unavailable={!issuesAvailable} />
-              <MetricItem bare emphasize label="Commits (7d)" value={github.commitsLast7d !== null ? formatNumber(github.commitsLast7d) : undefined} unavailable={github.commitsLast7d === null} />
+              <Suspense fallback={<MetricItemSkeleton emphasize />}>
+                <ProfileCommitsAsync resultPromise={commitActivityPromise} />
+              </Suspense>
             </div>
 
             {/* Secondary — real repo metadata, smaller supporting typography, never `emphasize`. */}
@@ -169,11 +201,6 @@ export function ProfileMetrics({
               <MetricItem bare label="Last Push" value={github.pushedAt ? formatRelativeTime(github.pushedAt) : undefined} unavailable={!github.pushedAt} />
               <MetricItem bare label="Contributors" unavailable infoTooltip="GitHub's contributor-count endpoint isn't wired yet — this codebase currently reads repo/release/commit-activity data only." />
             </div>
-            {github.commitsLast7d === null && (
-              <p className="text-xs text-radar-light-muted dark:text-radar-muted">
-                GitHub is still computing this repo&apos;s commit history — commit trend will appear once it&apos;s ready.
-              </p>
-            )}
           </>
         ) : (
           <EmptyState
