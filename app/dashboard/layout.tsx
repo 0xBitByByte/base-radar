@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import { getLiveTicker } from "@/lib/data/aggregate";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 
-import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://base-radar.vercel.app"),
