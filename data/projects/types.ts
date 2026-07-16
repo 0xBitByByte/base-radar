@@ -34,6 +34,12 @@ export type SocialLinks = {
   discord?: string;
   telegram?: string;
   farcaster?: string;
+  docs?: string;
+  blog?: string;
+  forum?: string;
+  medium?: string;
+  mirror?: string;
+  linkedin?: string;
 };
 
 /**

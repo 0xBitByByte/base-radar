@@ -137,6 +137,11 @@ export function formatPercent(value: number, opts?: { showSign?: boolean }): str
   return `${sign}${value.toFixed(1)}%`;
 }
 
+/** Plain calendar-date display (e.g. "Jan 15, 2021") — for real, non-relative dates like a token's genesis date or a repo's creation date. */
+export function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
+
 export function formatRelativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const minutes = Math.round(diffMs / 60_000);

@@ -1,5 +1,8 @@
+"use client";
+
 import { Info } from "lucide-react";
 
+import { ChangeValue } from "@/components/explorer/ChangeValue";
 import { cn } from "@/lib/utils";
 import { RichTooltip } from "@/components/ui/RichTooltip";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -13,6 +16,10 @@ type MetricItemProps = {
   infoTooltip?: string;
   /** Renders as a plain label+value stack with no border/background/padding of its own — for a group of metrics that already sit inside one shared card (Quick View). Grid/Table never pass this. */
   bare?: boolean;
+  /** Bumps the value to a larger, bolder size and the label to an uppercase eyebrow, so value/label contrast reads clearly — Project Profile's metric grids only (PR11.1/PR11.2); Quick View/Grid/Table never pass this, so their sizing is unchanged. */
+  emphasize?: boolean;
+  /** When set (including `null`), renders via the shared `ChangeValue` (green ▲/red ▼/gray) instead of the plain `value` string — PR12.1 Req 5's consistent positive/negative coloring. Takes priority over `value`. */
+  changeValue?: number | null;
 };
 
 /**
@@ -23,8 +30,11 @@ type MetricItemProps = {
  * component's — it only ever renders a string it's given, or an explicit
  * "unavailable" treatment, never a fabricated placeholder.
  */
-export function MetricItem({ label, value, unavailable, className, infoTooltip, bare }: MetricItemProps) {
-  const isUnavailable = unavailable || !value;
+// Needs "use client": the info-icon button's onClick can't cross a Server->Client
+// boundary when this is rendered directly from a Server Component (e.g. ProfileMetrics).
+export function MetricItem({ label, value, unavailable, className, infoTooltip, bare, emphasize, changeValue }: MetricItemProps) {
+  const hasChangeValue = changeValue !== undefined;
+  const isUnavailable = hasChangeValue ? unavailable || changeValue === null : unavailable || !value;
 
   return (
     <div
@@ -34,7 +44,12 @@ export function MetricItem({ label, value, unavailable, className, infoTooltip, 
         className
       )}
     >
-      <span className="flex items-center gap-1 text-[10.5px] text-radar-light-muted dark:text-radar-muted">
+      <span
+        className={cn(
+          "flex items-center gap-1 text-[10.5px] text-radar-light-muted dark:text-radar-muted",
+          emphasize && "font-medium tracking-wide uppercase"
+        )}
+      >
         {label}
         {infoTooltip && (
           <Tooltip content={<RichTooltip description={infoTooltip} />}>
@@ -49,14 +64,22 @@ export function MetricItem({ label, value, unavailable, className, infoTooltip, 
           </Tooltip>
         )}
       </span>
-      <span
-        className={cn(
-          "text-sm font-semibold tabular-nums",
-          isUnavailable ? "text-radar-light-muted dark:text-radar-muted" : "text-radar-light-text dark:text-radar-white"
-        )}
-      >
-        {isUnavailable ? "—" : value}
-      </span>
+      {hasChangeValue ? (
+        <ChangeValue
+          value={changeValue}
+          className={cn("font-semibold", emphasize ? "text-xl font-bold tracking-tight" : "text-sm")}
+        />
+      ) : (
+        <span
+          className={cn(
+            "font-semibold tabular-nums",
+            emphasize ? "text-xl font-bold tracking-tight" : "text-sm",
+            isUnavailable ? "text-radar-light-muted dark:text-radar-muted" : "text-radar-light-text dark:text-radar-white"
+          )}
+        >
+          {isUnavailable ? "—" : value}
+        </span>
+      )}
     </div>
   );
 }

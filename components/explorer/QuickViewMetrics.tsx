@@ -1,10 +1,8 @@
-import { ChainBadge } from "@/components/branding/ChainBadge";
 import { ChainBadgeGroup } from "@/components/branding/ChainBadgeGroup";
 import { TokenLogo } from "@/components/branding/TokenLogo";
+import { ContractsList } from "@/components/explorer/ContractsList";
 import { MetricItem } from "@/components/explorer/MetricItem";
 import { QuickViewSectionLabel } from "@/components/explorer/QuickViewSectionLabel";
-import { formatLabel } from "@/components/explorer/format";
-import { cn } from "@/lib/utils";
 import { formatCompactCurrency, formatGwei, formatNumber, formatPercent } from "@/lib/data/format";
 import type { ChainInfo, Contracts, Market, Trading, Tvl } from "@/lib/intelligence/types";
 import type { NarrativeSignal } from "@/lib/intelligence-engine";
@@ -125,41 +123,7 @@ export function QuickViewMetrics({ market, trading, tvl, chain, contracts, narra
 
       <section className="flex flex-col gap-2">
         <QuickViewSectionLabel>Contracts</QuickViewSectionLabel>
-        {contracts.count > 0 ? (
-          <ul className="flex flex-col gap-2">
-            {contracts.items.map((contract) => (
-              <li
-                key={`${contract.chain}-${contract.address}`}
-                className="flex items-center justify-between gap-3 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 dark:border-white/10 dark:bg-white/[0.02]"
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="truncate text-xs font-medium text-radar-light-text dark:text-radar-white">
-                      {contract.label ?? formatLabel(contract.type)}
-                    </span>
-                    <ChainBadge chain={contract.chain} size="sm" className="shrink-0" />
-                  </div>
-                  <div className="truncate text-[11px] text-radar-light-muted dark:text-radar-muted">
-                    {contract.address}
-                  </div>
-                </div>
-                {/* `verified` is `boolean | null` — `null` means unknown, never a
-                    definite non-match, so it must read "Unknown," not "Not
-                    Verified" (docs/explorer/05 §14). */}
-                <span
-                  className={cn(
-                    "shrink-0 text-xs font-medium",
-                    contract.verified === true ? "text-radar-success" : "text-radar-light-muted dark:text-radar-muted"
-                  )}
-                >
-                  {contract.verified === true ? "Verified" : "Unknown"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-xs text-radar-light-muted dark:text-radar-muted">No contracts listed for this project.</p>
-        )}
+        <ContractsList contracts={contracts} />
       </section>
     </div>
   );

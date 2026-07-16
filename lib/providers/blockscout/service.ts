@@ -45,13 +45,19 @@ const TOKEN_TRANSFERS_CACHE_TTL_MS = 30_000;
 
 /** Most recent transfers for a single ERC-20 token contract — used for whale-transfer detection (`lib/whale`). */
 export async function getTokenTransfers(tokenAddress: string): Promise<ProviderResult<TokenTransfer[]>> {
-  return toProviderResult(PROVIDER, () =>
-    getOrSet(`${PROVIDER}:token-transfers:${tokenAddress}`, TOKEN_TRANSFERS_CACHE_TTL_MS, async () => {
-      assertRateLimit(PROVIDER, RATE_LIMIT);
-      const raw = await fetchTokenTransfers(tokenAddress);
-      return mapTokenTransfers(raw);
-    })
-  );
+  const label = `getTokenTransfers:${tokenAddress}`;
+  console.time(label);
+  try {
+    return await toProviderResult(PROVIDER, () =>
+      getOrSet(`${PROVIDER}:token-transfers:${tokenAddress}`, TOKEN_TRANSFERS_CACHE_TTL_MS, async () => {
+        assertRateLimit(PROVIDER, RATE_LIMIT);
+        const raw = await fetchTokenTransfers(tokenAddress);
+        return mapTokenTransfers(raw);
+      })
+    );
+  } finally {
+    console.timeEnd(label);
+  }
 }
 
 export type { ChainStats, TokenTransfer, VerifiedContract };

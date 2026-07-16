@@ -127,7 +127,7 @@ export function QuickViewDrawer({ project, onClose }: QuickViewDrawerProps) {
               </div>
 
               <div className="border-t border-radar-light-border dark:border-white/10">
-                <QuickViewActions />
+                <QuickViewActions slug={project.identity.slug} />
               </div>
             </>
           )}

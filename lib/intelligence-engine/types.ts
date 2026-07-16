@@ -107,17 +107,36 @@ export type NarrativeOutput = {
 
 export type RiskLevel = "low" | "moderate" | "elevated" | "high";
 
+export type RiskContributorSeverity = "low" | "moderate" | "high" | "unknown";
+
+export type RiskContributor = {
+  label: string;
+  detail: string;
+  severity: RiskContributorSeverity;
+};
+
 export type RiskAnalysisInput = {
   healthScore: number;
   confidenceScore: number;
   verificationStatus: string;
   freshness: string;
   hasRecentWhaleActivity: boolean;
+  /** Share (0-100) of this project's registered contracts confirmed verified. `null` when the project has no contracts on record. */
+  verifiedContractPct: number | null;
+  /** Real DexScreener-aggregated liquidity in USD. `null` when no trading data is available. */
+  liquidityUsd: number | null;
+  /** Real 7-day TVL change, derived from DefiLlama's per-protocol history. `null` when unavailable or the project has no TVL. */
+  tvlChangePct7d: number | null;
+  /** Real weekly commit count from GitHub. `null` when unavailable. */
+  githubCommitsLast7d: number | null;
+  /** Count of currently-active Snapshot proposals. `null` when this project has no governance configured (never fabricated as zero). */
+  governanceActiveCount: number | null;
 };
 
 export type RiskAnalysisOutput = {
   level: RiskLevel;
   explanation: string;
+  contributors: RiskContributor[];
 };
 
 // ---------------------------------------------------------------------------

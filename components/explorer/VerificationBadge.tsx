@@ -40,6 +40,8 @@ type VerificationBadgeProps = {
   status: VerificationStatus;
   /** Denser padding/font/icon size for the Table's Verification column, matching `ChainBadge`'s `size="sm"` density — Grid and Quick View keep the roomier default. */
   compact?: boolean;
+  /** Renders only the active status pill, skipping the 3 dimmed alternates — the Project Profile Hero's own identity block already carries plenty of context, so the "not Community, not Unverified, not Flagged" contrast this badge normally provides is less load-bearing there. Every other consumer (Grid/Table/Quick View) omits this and keeps the full 4-state row unchanged. */
+  hideAlternates?: boolean;
   className?: string;
 };
 
@@ -54,13 +56,13 @@ type VerificationBadgeProps = {
  * One shared component — Grid, Table, and Quick View all render the
  * identical markup, never a second version.
  */
-export function VerificationBadge({ status, compact, className }: VerificationBadgeProps) {
+export function VerificationBadge({ status, compact, hideAlternates, className }: VerificationBadgeProps) {
   // The active status always renders first — so its badge starts at the
   // same x-position in every row/card regardless of which status is
   // active (previously STATUS_ORDER's fixed verified→community→
   // unverified→flagged sequence meant the badge's position, and its
   // start x, shifted depending on which one was active).
-  const orderedStatuses = [status, ...STATUS_ORDER.filter((candidate) => candidate !== status)];
+  const orderedStatuses = hideAlternates ? [status] : [status, ...STATUS_ORDER.filter((candidate) => candidate !== status)];
 
   return (
     <div className={cn("inline-flex items-center gap-1", className)}>

@@ -20,6 +20,7 @@ import type {
   ProjectSummaryOutput,
   RiskAnalysisInput,
   RiskAnalysisOutput,
+  RiskContributor,
   RiskLevel,
 } from "@/lib/intelligence-engine/types";
 
@@ -169,10 +170,100 @@ export function buildNarrativeSignals(input: NarrativeInput): NarrativeSignal[] 
   return signals;
 }
 
+/**
+ * The seven named risk factors PR12 requires (Smart Contract Risk, Liquidity
+ * Risk, Centralization, TVL Stability, Developer Health, Governance
+ * Activity, Data Freshness) — each derived from a real, already-computed
+ * field. Where this codebase genuinely has no signal for a category
+ * (Centralization has no on-chain holder-distribution provider anywhere in
+ * this stack), the contributor says so honestly instead of inventing a
+ * number.
+ */
+function buildRiskContributors(input: RiskAnalysisInput): RiskContributor[] {
+  const contributors: RiskContributor[] = [];
+
+  if (input.verifiedContractPct === null) {
+    contributors.push({ label: "Smart Contract Risk", detail: "No contracts registered for this project yet.", severity: "unknown" });
+  } else if (input.verifiedContractPct >= 100) {
+    contributors.push({ label: "Smart Contract Risk", detail: "All registered contracts are verified on-chain.", severity: "low" });
+  } else if (input.verifiedContractPct >= 50) {
+    contributors.push({
+      label: "Smart Contract Risk",
+      detail: `${Math.round(input.verifiedContractPct)}% of registered contracts are verified on-chain.`,
+      severity: "moderate",
+    });
+  } else {
+    contributors.push({
+      label: "Smart Contract Risk",
+      detail: `Only ${Math.round(input.verifiedContractPct)}% of registered contracts are verified on-chain.`,
+      severity: "high",
+    });
+  }
+
+  if (input.liquidityUsd === null) {
+    contributors.push({ label: "Liquidity Risk", detail: "No live DEX liquidity data available for this project.", severity: "unknown" });
+  } else if (input.liquidityUsd >= 1_000_000) {
+    contributors.push({ label: "Liquidity Risk", detail: `${formatCompactCurrency(input.liquidityUsd)} in tracked DEX liquidity.`, severity: "low" });
+  } else if (input.liquidityUsd >= 100_000) {
+    contributors.push({ label: "Liquidity Risk", detail: `${formatCompactCurrency(input.liquidityUsd)} in tracked DEX liquidity — moderate depth.`, severity: "moderate" });
+  } else {
+    contributors.push({ label: "Liquidity Risk", detail: `Only ${formatCompactCurrency(input.liquidityUsd)} in tracked DEX liquidity.`, severity: "high" });
+  }
+
+  contributors.push({
+    label: "Centralization",
+    detail: "Not assessed — no on-chain holder-distribution or ownership-concentration data source is available.",
+    severity: "unknown",
+  });
+
+  if (input.tvlChangePct7d === null) {
+    contributors.push({ label: "TVL Stability", detail: "No 7-day TVL history available for this project.", severity: "unknown" });
+  } else if (Math.abs(input.tvlChangePct7d) <= 10) {
+    contributors.push({ label: "TVL Stability", detail: `TVL has moved ${input.tvlChangePct7d >= 0 ? "+" : ""}${input.tvlChangePct7d.toFixed(1)}% over 7 days — stable.`, severity: "low" });
+  } else if (Math.abs(input.tvlChangePct7d) <= 30) {
+    contributors.push({ label: "TVL Stability", detail: `TVL has moved ${input.tvlChangePct7d >= 0 ? "+" : ""}${input.tvlChangePct7d.toFixed(1)}% over 7 days.`, severity: "moderate" });
+  } else {
+    contributors.push({ label: "TVL Stability", detail: `TVL has swung ${input.tvlChangePct7d >= 0 ? "+" : ""}${input.tvlChangePct7d.toFixed(1)}% over 7 days — volatile.`, severity: "high" });
+  }
+
+  if (input.githubCommitsLast7d === null) {
+    contributors.push({ label: "Developer Health", detail: "No GitHub commit activity data available for this project.", severity: "unknown" });
+  } else if (input.githubCommitsLast7d >= 5) {
+    contributors.push({ label: "Developer Health", detail: `${input.githubCommitsLast7d} commits in the last 7 days — actively maintained.`, severity: "low" });
+  } else if (input.githubCommitsLast7d >= 1) {
+    contributors.push({ label: "Developer Health", detail: `${input.githubCommitsLast7d} commit${input.githubCommitsLast7d === 1 ? "" : "s"} in the last 7 days.`, severity: "moderate" });
+  } else {
+    contributors.push({ label: "Developer Health", detail: "No commits in the last 7 days.", severity: "high" });
+  }
+
+  if (input.governanceActiveCount === null) {
+    contributors.push({ label: "Governance Activity", detail: "This project has no on-chain governance configured.", severity: "unknown" });
+  } else if (input.governanceActiveCount > 0) {
+    contributors.push({ label: "Governance Activity", detail: `${input.governanceActiveCount} active governance proposal${input.governanceActiveCount === 1 ? "" : "s"}.`, severity: "low" });
+  } else {
+    contributors.push({ label: "Governance Activity", detail: "No active governance proposals right now.", severity: "moderate" });
+  }
+
+  const freshnessSeverity = input.freshness === "fresh" ? "low" : input.freshness === "mixed" ? "moderate" : input.freshness === "stale" ? "high" : "unknown";
+  const freshnessDetail =
+    input.freshness === "fresh"
+      ? "All live data sources were fetched recently."
+      : input.freshness === "mixed"
+        ? "Some live data sources are more recent than others."
+        : input.freshness === "stale"
+          ? "Live data sources haven't refreshed recently."
+          : "Data freshness could not be determined.";
+  contributors.push({ label: "Data Freshness", detail: freshnessDetail, severity: freshnessSeverity });
+
+  return contributors;
+}
+
 /** Pure logic behind `generateRiskAnalysis` — see `buildProjectSummary`'s doc comment for why this is exported standalone. */
 export function buildRiskAnalysis(input: RiskAnalysisInput): RiskAnalysisOutput {
+  const contributors = buildRiskContributors(input);
+
   if (input.verificationStatus === "flagged") {
-    return { level: "high", explanation: "Registry-flagged project — treat all data with caution." };
+    return { level: "high", explanation: "Registry-flagged project — treat all data with caution.", contributors };
   }
 
   let riskScore = 0;
@@ -209,12 +300,19 @@ export function buildRiskAnalysis(input: RiskAnalysisInput): RiskAnalysisOutput 
 
   const level: RiskLevel = riskScore >= 5 ? "high" : riskScore >= 3 ? "elevated" : riskScore >= 1 ? "moderate" : "low";
 
+  // A real, specific sentence built from this project's own contributor
+  // details rather than a generic "strong health/confidence" phrase — PR12
+  // Req 12 explicitly calls out replacing that boilerplate.
+  const positiveContributors = contributors.filter((c) => c.severity === "low").map((c) => c.detail);
+
   const explanation =
     reasons.length > 0
       ? `${level[0].toUpperCase()}${level.slice(1)} risk — ${reasons.join(", ")}.`
-      : "Low risk — strong health, confidence, and data freshness across all tracked signals.";
+      : positiveContributors.length > 0
+        ? `Low risk — ${positiveContributors.slice(0, 2).join(" ")}`
+        : "Low risk — no elevated signals found across health, confidence, verification, or freshness, though several factors below have no real data to assess yet.";
 
-  return { level, explanation };
+  return { level, explanation, contributors };
 }
 
 export class RuleBasedIntelligenceProvider implements IntelligenceProvider {
