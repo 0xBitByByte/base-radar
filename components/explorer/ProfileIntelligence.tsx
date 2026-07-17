@@ -1,6 +1,4 @@
-import { Suspense } from "react";
 import {
-  Activity,
   Brain,
   CircleAlert,
   CircleCheck,
@@ -14,20 +12,12 @@ import {
 } from "lucide-react";
 
 import { ProfileSectionCard } from "@/components/explorer/ProfileSectionCard";
-import { ProfileTimelineAsync } from "@/components/explorer/ProfileTimelineAsync";
 import { QuickViewSectionLabel } from "@/components/explorer/QuickViewSectionLabel";
-import { WidgetSkeleton } from "@/components/dashboard/WidgetSkeleton";
 import { formatPercent } from "@/lib/data/format";
 import { cn } from "@/lib/utils";
-import type { Confidence, GithubIntel, Health, Risk, Tvl } from "@/lib/intelligence/types";
+import type { Confidence, Health, Risk } from "@/lib/intelligence/types";
 import type { NarrativeSignal, RiskContributorSeverity } from "@/lib/intelligence-engine";
 import type { GovernanceEvent } from "@/lib/governance";
-import type { WhaleEvent } from "@/lib/whale/types";
-import type { Signal } from "@/lib/data/types";
-import type { SparklinePoint } from "@/lib/data/types";
-import type { CommitActivity } from "@/lib/providers/github/service";
-import type { TokenTransfer } from "@/lib/providers/blockscout/service";
-import type { ProviderResult } from "@/lib/providers/common/types";
 
 type ProfileIntelligenceProps = {
   narrative: NarrativeSignal | null;
@@ -35,15 +25,6 @@ type ProfileIntelligenceProps = {
   health: Health;
   confidence: Confidence;
   governance: GovernanceEvent[] | null;
-  /** First-paint `GithubIntel`/`Tvl` — passed through to `ProfileTimelineAsync`, which merges in the streamed commit-activity/TVL-history fields once they resolve. */
-  github: GithubIntel;
-  tvl: Tvl;
-  whaleEvents: WhaleEvent[];
-  signals: Signal[];
-  tokenSymbol: string | null;
-  commitActivityPromise: Promise<ProviderResult<CommitActivity> | null>;
-  tvlHistoryPromise: Promise<ProviderResult<SparklinePoint[]> | null>;
-  transfersPromise: Promise<ProviderResult<TokenTransfer[]> | null>;
 };
 
 /** Card border/background tint per contributor severity — the same semantic palette every other severity indicator on this page uses (success/warning/danger), plus a neutral tint for factors this codebase has no real data source for. */
@@ -68,11 +49,12 @@ const SEVERITY_ICON: Record<RiskContributorSeverity, typeof ShieldCheck> = {
   unknown: ShieldQuestion,
 };
 
+/** "Not Assessed" (not "Unknown") for the same reason `lib/intelligence/scorecard.ts`'s Score Matrix tiles use it — Goal 17 never shows a bare "Unknown"; this factor's own `detail` sentence already explains why it can't be scored yet, so the chip should read as "not enough data" rather than an unexplained mystery. */
 const SEVERITY_STATUS_LABEL: Record<RiskContributorSeverity, string> = {
   low: "Low Risk",
   moderate: "Moderate",
   high: "Elevated",
-  unknown: "Unknown",
+  unknown: "Not Assessed",
 };
 
 /**
@@ -121,38 +103,20 @@ function FactorCard({ factor }: { factor: string }) {
   );
 }
 
-/** A thin top border between sub-sections within one rail card (PR11.2 Part 6) — every sub-section but the first gets this, so Narrative/Risk/Health/Confidence and Whale/Signals/Timeline read as clearly separate rather than run together. */
+/** A thin top border between sub-sections within one rail card (PR11.2 Part 6) — every sub-section but the first gets this, so Narrative/Risk/Health/Confidence read as clearly separate rather than run together. */
 const DIVIDED_SECTION_CLASS = "flex flex-col gap-1.5 border-t border-radar-light-border pt-4 dark:border-white/10";
 
 /**
- * Intelligence rail — PR11 Part 4, regrouped in PR11.1 Part 3 into three
- * `ProfileSectionCard`s (AI Intelligence / Activity Feed / Governance)
- * instead of nine identically-weighted headings in a row, so related
- * content reads as one visual unit. Reuses the exact same real,
- * already-computed fields the Intelligence Engine produces
+ * AI Intelligence — PR11 Part 4, regrouped in PR11.1 Part 3. Reuses the
+ * exact same real, already-computed fields the Intelligence Engine produces
  * (`risk`/`health`/`confidence` factors, `narrative`). AI Summary itself is
- * shown once, in `ProfileSummaryBanner` — not repeated here. PR12.1d
- * Req 5 — Activity Feed used to show Whale Activity and Recent Signals as
- * their own separate lists ABOVE a Timeline that already merged those same
- * two sources plus governance/releases/commits/TVL/risk — real data was
- * being shown twice. It's now `ProfileTimeline`'s single merged,
- * newest-first feed only.
+ * shown once, in the Executive Intelligence section — not repeated here.
+ * PR13.3 Goal 6 moved the Activity Feed/Timeline card that used to render
+ * as this component's last sub-card out into its own top-level
+ * `ProfileActivityFeed` section (page.tsx now renders it last, per the
+ * mandated linear order) — no data or logic changed, only where it renders.
  */
-export function ProfileIntelligence({
-  narrative,
-  risk,
-  health,
-  confidence,
-  governance,
-  github,
-  tvl,
-  whaleEvents,
-  signals,
-  tokenSymbol,
-  commitActivityPromise,
-  tvlHistoryPromise,
-  transfersPromise,
-}: ProfileIntelligenceProps) {
+export function ProfileIntelligence({ narrative, risk, health, confidence, governance }: ProfileIntelligenceProps) {
   const activeGovernanceCount = governance?.filter((event) => event.status === "active").length ?? 0;
 
   return (
@@ -250,36 +214,6 @@ export function ProfileIntelligence({
             <p className="text-xs text-radar-light-muted dark:text-radar-muted">No live sources available.</p>
           )}
         </section>
-      </ProfileSectionCard>
-
-      <ProfileSectionCard title="Activity Feed" icon={Activity} className="gap-5">
-        <p className="text-xs text-radar-light-muted dark:text-radar-muted">
-          Whale transfers, governance, GitHub releases and commits, TVL swings, risk alerts, and signals, merged into one
-          newest-first feed — no event type shown twice.
-        </p>
-        {/*
-          Streaming Architecture pass — commit activity, TVL history, and
-          token transfers are the feed's three slow inputs; governance/whale/
-          signal/risk events are already fast. Rather than render a partial
-          feed on first paint that can never update itself (this is
-          server-rendered HTML, not client state), the whole feed waits
-          behind one `<Suspense>` for the slowest of the three, then builds
-          the complete, real timeline in one pass.
-        */}
-        <Suspense fallback={<WidgetSkeleton className="h-48 rounded-xl" />}>
-          <ProfileTimelineAsync
-            github={github}
-            tvl={tvl}
-            risk={risk}
-            governanceEvents={governance ?? []}
-            whaleEvents={whaleEvents}
-            signals={signals}
-            tokenSymbol={tokenSymbol}
-            commitActivityPromise={commitActivityPromise}
-            tvlHistoryPromise={tvlHistoryPromise}
-            transfersPromise={transfersPromise}
-          />
-        </Suspense>
       </ProfileSectionCard>
 
       {governance && (

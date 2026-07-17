@@ -16,6 +16,8 @@ export type GovernanceEvent = {
   provider: string;
   proposalId: string;
   title: string;
+  /** Real proposal description (PR13.7 Goal 12) — `null` when Snapshot returned an empty body, never fabricated. */
+  description: string | null;
   status: GovernanceStatus;
   start: string;
   end: string;

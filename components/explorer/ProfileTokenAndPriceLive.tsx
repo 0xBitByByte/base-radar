@@ -2,13 +2,14 @@
 
 import { ProfileTokenAndPrice } from "@/components/explorer/ProfileTokenAndPrice";
 import { useLivePrice } from "@/lib/hooks/useLivePrice";
-import type { ChainInfo, Contracts, Identity, Market, Trading } from "@/lib/intelligence/types";
+import type { ChainInfo, Contracts, Identity, Market, Trading, Tvl } from "@/lib/intelligence/types";
 import type { SparklinePoint } from "@/lib/data/types";
 
 type ProfileTokenAndPriceLiveProps = {
   identity: Identity;
   market: Market;
   trading: Trading;
+  tvl: Tvl;
   contracts: Contracts;
   chain: ChainInfo;
   priceHistory: SparklinePoint[] | null;
@@ -37,6 +38,7 @@ export function ProfileTokenAndPriceLive({
   identity,
   market,
   trading,
+  tvl,
   contracts,
   chain,
   priceHistory,
@@ -72,6 +74,7 @@ export function ProfileTokenAndPriceLive({
       identity={identity}
       market={liveMarket}
       trading={trading}
+      tvl={tvl}
       contracts={contracts}
       chain={chain}
       priceHistory={priceHistory}

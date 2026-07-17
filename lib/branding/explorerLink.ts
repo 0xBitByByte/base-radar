@@ -8,6 +8,8 @@ export type ExplorerLink = {
   tier: ExplorerLinkTier;
   /** One sentence describing exactly where the link goes — used as both the tooltip content and the accessible label (PR11.3 Part 1/3). */
   description: string;
+  /** The explorer service's real display name (e.g. "BaseScan", not "Base") — `null` only when the primary chain has no `CHAIN_BRANDING` entry at all. Exposed so callers can label a short "View on {serviceName}" pill without re-deriving the chain→explorer-name mapping themselves. */
+  serviceName: string | null;
 };
 
 /**
@@ -60,6 +62,7 @@ export function getExplorerLink(chain: ChainInfo, contracts: Contracts, identity
         href: `${brand.explorerUrl}/address/${verifiedContract.address}`,
         tier: "contract",
         description: `View verified contract on ${explorerName}`,
+        serviceName: explorerName,
       };
     }
 
@@ -69,16 +72,17 @@ export function getExplorerLink(chain: ChainInfo, contracts: Contracts, identity
         href: `${brand.explorerUrl}/token/${tokenContract.address}`,
         tier: "token",
         description: `View token contract on ${explorerName}`,
+        serviceName: explorerName,
       };
     }
   }
 
   if (identity.websiteUrl) {
-    return { href: identity.websiteUrl, tier: "website", description: "Open project website" };
+    return { href: identity.websiteUrl, tier: "website", description: "Open project website", serviceName: explorerName };
   }
 
   if (brand?.explorerUrl) {
-    return { href: brand.explorerUrl, tier: "explorer-home", description: `Open ${explorerName} homepage` };
+    return { href: brand.explorerUrl, tier: "explorer-home", description: `Open ${explorerName} homepage`, serviceName: explorerName };
   }
 
   return null;

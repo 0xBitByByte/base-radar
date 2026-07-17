@@ -92,7 +92,13 @@ export function mergeTrading(sources: ProjectSources): Trading {
 
   const pools: TradingPool[] = available
     ? pairs
-        .map((p) => ({ dexId: p.dexId, liquidityUsd: p.liquidityUsd, volume24hUsd: p.volume24hUsd, pairCreatedAt: p.pairCreatedAt }))
+        .map((p) => ({
+          dexId: p.dexId,
+          liquidityUsd: p.liquidityUsd,
+          volume24hUsd: p.volume24hUsd,
+          pairCreatedAt: p.pairCreatedAt,
+          baseTokenSymbol: p.baseToken.symbol,
+        }))
         .sort((a, b) => (b.liquidityUsd ?? 0) - (a.liquidityUsd ?? 0))
     : [];
 
@@ -145,6 +151,7 @@ export function mergeGithub(sources: ProjectSources, commitActivity: CommitActiv
     openIssues: repo?.openIssues ?? null,
     latestReleaseTag: repo?.latestReleaseTag ?? null,
     latestReleasePublishedAt: repo?.latestReleasePublishedAt ?? null,
+    latestReleaseNoteSummary: repo?.latestReleaseNoteSummary ?? null,
     language: repo?.language ?? null,
     license: repo?.license ?? null,
     createdAt: repo?.createdAt ?? null,

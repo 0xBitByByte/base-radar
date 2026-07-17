@@ -46,3 +46,16 @@ export async function fetchLatestBlock(): Promise<RawRpcBlock> {
 export async function fetchChainIdHex(): Promise<string> {
   return rpcCall<string>("eth_chainId");
 }
+
+/**
+ * PR13.7 Goal 14 — the "safe" block tag is a real, standard Ethereum
+ * JSON-RPC concept (the most recent block the network considers safe from
+ * reorg), the same free Base RPC endpoint this provider already calls.
+ * `false` for the second param — only the block number is needed, not full
+ * transaction objects.
+ */
+export type RawRpcBlockNumber = { number: string };
+
+export async function fetchSafeBlock(): Promise<RawRpcBlockNumber> {
+  return rpcCall<RawRpcBlockNumber>("eth_getBlockByNumber", ["safe", false]);
+}

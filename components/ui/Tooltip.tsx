@@ -28,7 +28,7 @@ export function Tooltip({ content, children, className }: TooltipProps) {
       </TooltipPrimitive.Trigger>
       {/* `container={document.body}` overrides Base UI's default portal-
           container resolution, which otherwise walks up to the nearest
-          ANCESTOR floating-element portal (e.g. `QuickViewDrawer`'s
+          ANCESTOR floating-element portal (e.g. `MobileSidebar`'s
           `Dialog.Portal`) and nests inside it instead of mounting fresh at
           `document.body`. That matters because `Dialog.Popup` carries a
           Tailwind v4 `translate-x-*` utility — compiled to the native CSS

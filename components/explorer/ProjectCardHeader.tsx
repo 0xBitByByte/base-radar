@@ -1,5 +1,6 @@
 import { ProjectLogo } from "@/components/branding/ProjectLogo";
 import { VerificationBadge } from "@/components/explorer/VerificationBadge";
+import { WatchButton } from "@/components/watchlist/WatchButton";
 import type { Community, Identity } from "@/lib/intelligence/types";
 
 type ProjectCardHeaderProps = {
@@ -26,6 +27,8 @@ export function ProjectCardHeader({ identity, community }: ProjectCardHeaderProp
         >
           {identity.name}
         </span>
+
+        <WatchButton projectId={identity.id} projectName={identity.name} size="sm" className="-my-1" />
       </div>
 
       <VerificationBadge status={community.verificationStatus} />

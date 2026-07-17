@@ -30,5 +30,20 @@ export async function getProjectPriceHistory(
 ): Promise<SparklinePoint[] | null> {
   const result = await coingecko.getMarketChart(coingeckoId, PERIOD_DAYS[period]);
   if (!result.ok) return null;
-  return result.data;
+  return result.data.prices;
+}
+
+/**
+ * PR13.7 Goal 9 — real volume-over-time for the same period, from the exact
+ * same cached `coingecko.getMarketChart` call `getProjectPriceHistory`
+ * already makes for this id+period (same cache key — a second call for a
+ * period already fetched is a cache hit, not a new network request).
+ */
+export async function getProjectVolumeHistory(
+  coingeckoId: string,
+  period: PricePeriod
+): Promise<SparklinePoint[] | null> {
+  const result = await coingecko.getMarketChart(coingeckoId, PERIOD_DAYS[period]);
+  if (!result.ok) return null;
+  return result.data.volumes;
 }

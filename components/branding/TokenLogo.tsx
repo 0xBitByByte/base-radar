@@ -21,7 +21,7 @@ type TokenLogoProps = {
  * call site today renders the reserved-slot state below; the
  * `logoUrl`/`symbol` branches exist for when that data lands, so those
  * call sites won't need a rewrite — never substituting the Project Logo in
- * the meantime (see `QuickViewMetrics`'s Market section).
+ * the meantime.
  */
 export function TokenLogo({ logoUrl, symbol, size = 20, className }: TokenLogoProps) {
   const [failed, setFailed] = useState(false);

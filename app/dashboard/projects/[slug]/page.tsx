@@ -3,22 +3,25 @@ import { notFound } from "next/navigation";
 import { getProject } from "@/data/projects/helpers";
 import { getRawWhaleEvents, getSignals } from "@/lib/data/aggregate";
 import { buildProjectIntelligence } from "@/lib/intelligence/engine";
-import { buildAiInsight, buildAiVerdict, buildExecutiveSummaryBullets, buildHealthScorecard } from "@/lib/intelligence/scorecard";
+import { buildIntelligenceReport } from "@/lib/intelligence/report";
+import { buildHealthScorecard } from "@/lib/intelligence/scorecard";
+import * as base from "@/lib/providers/base/service";
 import * as blockscout from "@/lib/providers/blockscout/service";
 import * as coingecko from "@/lib/providers/coingecko/service";
 import * as defillama from "@/lib/providers/defillama/service";
 import * as github from "@/lib/providers/github/service";
+import { ProfileActivityFeed } from "@/components/explorer/ProfileActivityFeed";
+import { ProfileBreadcrumb } from "@/components/explorer/ProfileBreadcrumb";
+import { ProfileCommunityMetrics } from "@/components/explorer/ProfileCommunityMetrics";
 import { ProfileHeader } from "@/components/explorer/ProfileHeader";
 import { ProfileTokenAndPriceLive } from "@/components/explorer/ProfileTokenAndPriceLive";
 import { ProfileMetrics } from "@/components/explorer/ProfileMetrics";
-import { ProfileExecutiveSummary } from "@/components/explorer/ProfileExecutiveSummary";
-import { ProfileAIInsight } from "@/components/explorer/ProfileAIInsight";
+import { ProfileExecutiveIntelligence } from "@/components/explorer/ProfileExecutiveIntelligence";
 import { ProfileIntelligence } from "@/components/explorer/ProfileIntelligence";
 import { ProfileContracts } from "@/components/explorer/ProfileContracts";
 import { ProfileGovernance } from "@/components/explorer/ProfileGovernance";
-import { ProfileCommunity } from "@/components/explorer/ProfileCommunity";
+import { ProfileQuickStats } from "@/components/explorer/ProfileQuickStats";
 import { ProfileSectionNav } from "@/components/explorer/ProfileSectionNav";
-import { ProfileSummaryBanner } from "@/components/explorer/ProfileSummaryBanner";
 import { ProjectHealthScorecard } from "@/components/explorer/ProjectHealthScorecard";
 import type { SparklinePoint } from "@/lib/data/types";
 
@@ -55,6 +58,16 @@ type ProjectProfilePageProps = {
  * streamed widget below (Score Matrix's Market Momentum tile, the Health
  * Scorecard, Engineering Health's Commits (7d) tile, TVL & Liquidity's
  * chart) once it resolves.
+ *
+ * PR13.3 — UX/information-hierarchy polish pass, presentation only. Sections
+ * were reordered into one strict linear flow (Header → Quick Stats →
+ * Executive Intelligence → Health Scorecard → Token & Price → Metrics →
+ * AI Intelligence → Contracts → Governance → Community → Activity Feed) and
+ * the previous 8/4 two-column grid was collapsed to a single column, so the
+ * mandated order reads top-to-bottom on every viewport instead of only on
+ * mobile. No provider call, Intelligence Engine function, or calculation
+ * changed — every section below still receives the exact same `profile.*`
+ * fields it always did.
  */
 export default async function ProjectProfilePage({ params }: ProjectProfilePageProps) {
   const { slug } = await params;
@@ -70,18 +83,31 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
     ? coingecko.getCoinDetail(registryProject.providerIds.coingeckoId)
     : Promise.resolve(null);
 
-  const [profileRes, genesisRes, whaleRes, signalsRes] = await Promise.allSettled([
+  // PR13.7 Goal 14 — real finality lag (Base RPC's cheapest, shortest-TTL
+  // provider), same "fast enough to not defer behind Suspense" treatment as
+  // `genesisPromise` above rather than a new streamed component.
+  const finalityPromise = base.getFinality();
+
+  const [profileRes, genesisRes, whaleRes, signalsRes, finalityRes] = await Promise.allSettled([
     buildProjectIntelligence(registryProject, undefined, { extended: false }),
     genesisPromise,
     getRawWhaleEvents(),
     getSignals(),
+    finalityPromise,
   ]);
 
   const profile = profileRes.status === "fulfilled" ? profileRes.value : null;
   if (!profile) notFound();
 
   const genesisResult = genesisRes.status === "fulfilled" ? genesisRes.value : null;
+  // Real, `null` only when CoinGecko has no genesis date for this token —
+  // merged in here (not inside `buildProjectIntelligence`) because this is
+  // the one fast-enough-to-not-defer extended field, fetched in parallel
+  // with the main intelligence build rather than bundled into `extended`.
   const market = { ...profile.market, genesisDate: genesisResult?.ok ? genesisResult.data : null };
+
+  const finalityResult = finalityRes.status === "fulfilled" ? finalityRes.value : null;
+  const finality = finalityResult?.ok ? finalityResult.data : null;
 
   const allWhaleEvents = whaleRes.status === "fulfilled" ? whaleRes.value : [];
   const whaleEvents = allWhaleEvents.filter((event) => event.projectId === profile.identity.id);
@@ -105,6 +131,19 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
       ? defillama.getProtocolTvlHistory(registryProject.providerIds.defillamaSlug)
       : Promise.resolve(null);
 
+  // PR13.7 Goal 2 — GitHub contributor count, extended/Profile-page-only,
+  // a real GitHub REST call the Provider Layer never made before.
+  const contributorCountPromise =
+    profile.github.available && profile.github.fullName
+      ? github.getContributorCount(profile.github.fullName)
+      : Promise.resolve(null);
+
+  // PR13.7 Goals 6/13 — up to 10 real releases, shared by the Scorecard's
+  // Developer evidence tile (release count) and the Timeline's version
+  // history (Goal 13) — one fetch, two consumers, never fetched twice.
+  const releasesPromise =
+    profile.github.available && profile.github.fullName ? github.getReleases(profile.github.fullName) : Promise.resolve(null);
+
   const tokenContract = profile.contracts.items.find(
     (item) => item.chain === profile.chain.primaryChain && item.type === "token"
   );
@@ -112,6 +151,16 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
     tokenContract && profile.chain.primaryChain === "base"
       ? blockscout.getTokenTransfers(tokenContract.address)
       : Promise.resolve(null);
+
+  // PR13.7 Goal 10 — real per-address Blockscout verification detail for
+  // every contract this project has registered (typically 0-3), fetched in
+  // parallel, extended/Profile-page-only. Base-chain-only, same as the
+  // token-transfer lookup above — Blockscout only indexes Base.
+  const contractDetailsPromise = Promise.all(
+    profile.contracts.items
+      .filter((item) => item.chain === "base")
+      .map((item) => blockscout.getContractDetail(item.address).then((result) => ({ address: item.address, result })))
+  );
 
   const priceHistory: SparklinePoint[] | null =
     profile.market.sparkline7d.length > 0
@@ -142,20 +191,6 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
   const communityLinkCount = communityLinkFields.filter(Boolean).length;
   const communityLinkTotal = communityLinkFields.length;
 
-  const aiVerdict = buildAiVerdict(profile.health, profile.confidence, profile.risk);
-
-  const executiveSummaryBullets = buildExecutiveSummaryBullets({
-    verificationStatus: profile.community.verificationStatus,
-    risk: profile.risk,
-    confidence: profile.confidence,
-    tvl: profile.tvl,
-    market: profile.market,
-    github: profile.github,
-    governance: profile.governance,
-    whaleEvents,
-    narrativeLabel,
-  });
-
   const scorecardTiles = buildHealthScorecard({
     health: profile.health,
     confidence: profile.confidence,
@@ -171,127 +206,132 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
     communityLinkTotal,
   });
 
-  const aiInsight = buildAiInsight({
+  const developerFallbackTile = scorecardTiles.find((tile) => tile.id === "developer")!;
+
+  const intelligenceReport = buildIntelligenceReport({
+    identity: profile.identity,
     health: profile.health,
     confidence: profile.confidence,
     risk: profile.risk,
     tvl: profile.tvl,
     market: profile.market,
     github: profile.github,
+    chain: profile.chain,
+    verificationStatus: profile.community.verificationStatus,
     governance: profile.governance,
     whaleEvents,
     sources: profile.sources,
     narrativeLabel,
+    scorecardTiles,
+    tradingPoolCount: profile.trading.pools.length,
+    coingeckoId: registryProject.providerIds.coingeckoId ?? null,
+    defillamaSlug: registryProject.providerIds.defillamaSlug ?? null,
+    contracts: profile.contracts,
+    community: profile.community,
   });
 
   return (
     <div className="flex flex-col gap-6">
+      <ProfileBreadcrumb projectName={profile.identity.name} />
+
       <ProfileHeader
         identity={profile.identity}
         community={profile.community}
         chain={profile.chain}
         contracts={profile.contracts}
         github={profile.github}
-        market={profile.market}
-        tvl={profile.tvl}
+        market={market}
+        health={profile.health}
+        confidence={profile.confidence}
+        risk={profile.risk}
+        coingeckoId={registryProject.providerIds.coingeckoId ?? null}
+        defillamaSlug={registryProject.providerIds.defillamaSlug ?? null}
       />
+
+      <ProfileCommunityMetrics github={profile.github} community={profile.community} contributorCountPromise={contributorCountPromise} />
+
+      <ProfileQuickStats market={profile.market} tvl={profile.tvl} trading={profile.trading} />
 
       <ProfileSectionNav />
 
       {/*
-        PR12.1e — a real 12-column CSS Grid for this page only (never
-        shared with Explorer/Dashboard/Landing). Full-width sections use
-        `lg:col-span-12`; the main content stream and the Intelligence
-        rail split 8/4. `order-*` (mobile) vs `lg:order-*` (desktop) let
-        the rail sit beside the main column on desktop while still
-        flowing to the very end — after Community, matching this page's
-        intended Hero→…→Community→Activity reading order — on mobile,
-        without duplicating any component or changing its own layout.
+        PR13.3 — one strict linear column (Header → Quick Stats →
+        Executive Intelligence → Health Scorecard → Token & Price →
+        Metrics → AI Intelligence → Contracts → Governance → Community →
+        Activity Feed), replacing the previous 8/4 two-column grid so the
+        mandated reading order holds on every viewport, not just mobile.
       */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        <div className="lg:col-span-12">
-          <ProfileExecutiveSummary
-            bullets={executiveSummaryBullets}
-            verdict={aiVerdict}
-            health={profile.health}
-            confidence={profile.confidence}
-            risk={profile.risk}
-            freshness={profile.freshness}
-          />
-        </div>
-        <div className="lg:col-span-12">
-          <ProfileSummaryBanner
-            verificationStatus={profile.community.verificationStatus}
-            tvl={profile.tvl}
-            health={profile.health}
-            confidence={profile.confidence}
-            github={profile.github}
-            narrativeLabel={narrativeLabel}
-            risk={profile.risk}
-            sources={profile.sources}
-            metadata={profile.metadata}
-          />
-        </div>
-        <div className="lg:col-span-12">
-          <ProjectHealthScorecard tiles={scorecardTiles} />
-        </div>
-        <div className="lg:col-span-12">
-          <ProfileAIInsight insight={aiInsight} />
-        </div>
+      <ProfileExecutiveIntelligence
+        report={intelligenceReport}
+        freshness={profile.freshness}
+        developerFallbackTile={developerFallbackTile}
+        commitActivityPromise={commitActivityPromise}
+        contributorCountPromise={contributorCountPromise}
+        releasesPromise={releasesPromise}
+      />
 
-        <div className="order-1 flex flex-col gap-4 lg:col-span-8">
-          <ProfileTokenAndPriceLive
-            identity={profile.identity}
-            market={market}
-            trading={profile.trading}
-            contracts={profile.contracts}
-            chain={profile.chain}
-            priceHistory={priceHistory}
-            coingeckoId={registryProject.providerIds.coingeckoId ?? null}
-          />
-          <ProfileMetrics
-            trading={profile.trading}
-            tvl={profile.tvl}
-            github={profile.github}
-            contracts={profile.contracts}
-            chain={profile.chain}
-            tvlHistoryPromise={tvlHistoryPromise}
-            defillamaSlug={registryProject.providerIds.defillamaSlug ?? null}
-            commitActivityPromise={commitActivityPromise}
-            transfersPromise={transfersPromise}
-            tokenSymbol={profile.market.symbol}
-          />
-          <ProfileContracts contracts={profile.contracts} chain={profile.chain} />
-          <ProfileGovernance governance={profile.governance} governanceUrl={profile.community.governanceUrl} />
-        </div>
+      <ProjectHealthScorecard
+        tiles={scorecardTiles}
+        health={profile.health}
+        confidence={profile.confidence}
+        risk={profile.risk}
+        verificationStatus={profile.community.verificationStatus}
+        commitActivityPromise={commitActivityPromise}
+        contributorCountPromise={contributorCountPromise}
+        releasesPromise={releasesPromise}
+      />
 
-        <div className="order-2 lg:order-3 lg:col-span-12">
-          <ProfileCommunity
-            socials={profile.community.socials}
-            governanceUrl={profile.community.governanceUrl}
-            websiteUrl={profile.identity.websiteUrl}
-            githubUrl={githubUrl}
-          />
-        </div>
+      <ProfileTokenAndPriceLive
+        identity={profile.identity}
+        market={market}
+        trading={profile.trading}
+        tvl={profile.tvl}
+        contracts={profile.contracts}
+        chain={profile.chain}
+        priceHistory={priceHistory}
+        coingeckoId={registryProject.providerIds.coingeckoId ?? null}
+      />
 
-        <div className="order-3 flex flex-col gap-4 lg:order-2 lg:col-span-4">
-          <ProfileIntelligence
-            narrative={profile.narrative}
-            risk={profile.risk}
-            health={profile.health}
-            confidence={profile.confidence}
-            governance={profile.governance}
-            github={profile.github}
-            tvl={profile.tvl}
-            whaleEvents={whaleEvents}
-            signals={signals}
-            tokenSymbol={profile.market.symbol}
-            commitActivityPromise={commitActivityPromise}
-            tvlHistoryPromise={tvlHistoryPromise}
-            transfersPromise={transfersPromise}
-          />
-        </div>
-      </div>
+      <ProfileMetrics
+        identity={profile.identity}
+        trading={profile.trading}
+        tvl={profile.tvl}
+        github={profile.github}
+        contracts={profile.contracts}
+        chain={profile.chain}
+        tvlHistoryPromise={tvlHistoryPromise}
+        defillamaSlug={registryProject.providerIds.defillamaSlug ?? null}
+        commitActivityPromise={commitActivityPromise}
+        transfersPromise={transfersPromise}
+        tokenSymbol={profile.market.symbol}
+        finality={finality}
+      />
+
+      <ProfileIntelligence
+        narrative={profile.narrative}
+        risk={profile.risk}
+        health={profile.health}
+        confidence={profile.confidence}
+        governance={profile.governance}
+      />
+
+      <ProfileContracts contracts={profile.contracts} chain={profile.chain} contractDetailsPromise={contractDetailsPromise} />
+
+      <ProfileGovernance governance={profile.governance} governanceUrl={profile.community.governanceUrl} />
+
+      <ProfileActivityFeed
+        github={profile.github}
+        tvl={profile.tvl}
+        risk={profile.risk}
+        governance={profile.governance}
+        whaleEvents={whaleEvents}
+        signals={signals}
+        tokenSymbol={profile.market.symbol}
+        commitActivityPromise={commitActivityPromise}
+        tvlHistoryPromise={tvlHistoryPromise}
+        transfersPromise={transfersPromise}
+        releasesPromise={releasesPromise}
+      />
     </div>
   );
 }

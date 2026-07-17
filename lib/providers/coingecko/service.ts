@@ -7,6 +7,7 @@ import {
   mapGenesisDate,
   mapMajorPrices,
   mapMarketChart,
+  mapMarketVolumeSeries,
   type AssetPrice,
   type CoinMarket,
   type MajorPrices,
@@ -69,13 +70,19 @@ export async function getCoinDetail(id: string): Promise<ProviderResult<string |
   );
 }
 
-/** Historical price series for a given period, used by the Price chart's period filters. */
-export async function getMarketChart(id: string, days: number | "max"): Promise<ProviderResult<SparklinePoint[] | null>> {
+export type MarketChart = {
+  prices: SparklinePoint[] | null;
+  /** PR13.7 Goal 9 — same raw response, same cache entry as `prices`; reading `total_volumes` costs nothing extra since the fetch already happened for the price series. */
+  volumes: SparklinePoint[] | null;
+};
+
+/** Historical price + volume series for a given period, used by the Price chart's period filters (prices) and Goal 9's Average Volume stat (volumes) — one cached fetch serves both. */
+export async function getMarketChart(id: string, days: number | "max"): Promise<ProviderResult<MarketChart>> {
   return toProviderResult(PROVIDER, () =>
     getOrSet(`${PROVIDER}:market-chart:${id}:${days}`, CACHE_TTL_MS, async () => {
       assertRateLimit(PROVIDER, RATE_LIMIT);
       const raw = await fetchMarketChart(id, days);
-      return mapMarketChart(raw);
+      return { prices: mapMarketChart(raw), volumes: mapMarketVolumeSeries(raw) };
     })
   );
 }

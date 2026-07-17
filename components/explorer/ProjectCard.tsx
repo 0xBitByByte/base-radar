@@ -21,7 +21,7 @@ import type { ProjectIntelligence } from "@/lib/intelligence/types";
 
 type ProjectCardProps = {
   project: ProjectIntelligence;
-  /** Opens Quick View for this project — docs/explorer/06 §4 (PR6). */
+  /** Opens this project's full Profile page (PR13.5 — the Quick View drawer this used to open has been removed). */
   onActivate?: () => void;
 };
 

@@ -12,7 +12,6 @@ import type {
   RepoStats,
   Signal,
   SparklinePoint,
-  WatchlistItem,
   WelcomeStats,
   WhaleEvent,
 } from "@/lib/data/types";
@@ -274,18 +273,6 @@ export const MOCK_NARRATIVE_HEATMAP: NarrativeHeatRow[] = [
   { category: "Social", heat: 71, momentum: "up", change24hPct: 9.1 },
   { category: "Infrastructure", heat: 55, momentum: "flat", change24hPct: 1.2 },
   { category: "Meme", heat: 39, momentum: "down", change24hPct: -3.2 },
-];
-
-export const MOCK_WATCHLIST: WatchlistItem[] = [
-  { id: "wl1", kind: "project", label: "Aerodrome Finance", sublabel: "DEX · AERO", changePct24h: 6.4 },
-  { id: "wl2", kind: "token", label: "cbBTC", sublabel: "Coinbase Wrapped BTC", changePct24h: 1.1 },
-  {
-    id: "wl3",
-    kind: "wallet",
-    label: "0x7a3f…9c21",
-    sublabel: "Smart money · last active 6m ago",
-  },
-  { id: "wl4", kind: "narrative", label: "AI Agents", sublabel: "Artificial Intelligence", changePct24h: 18.4 },
 ];
 
 export const MOCK_LIVE_TICKER: LiveTicker = {

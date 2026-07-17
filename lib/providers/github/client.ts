@@ -18,6 +18,8 @@ export type RawRepo = {
 export type RawRelease = {
   tag_name: string;
   published_at: string;
+  /** PR13.9 — real release notes, already present on this same response; `null` for tags with no notes written. Only read for the Timeline/Recent-Developments "supporting detail" use case, never for `/releases/latest`'s Engineering Health tile (which never needed it). */
+  body: string | null;
 };
 
 /** One week's commit activity — `days` is 7 ints (Sun-Sat), `total` their sum. Most recent week is last in the array. */
@@ -25,6 +27,11 @@ export type RawCommitActivityWeek = {
   days: number[];
   total: number;
   week: number;
+};
+
+export type RawContributor = {
+  login: string;
+  contributions: number;
 };
 
 const HEADERS = { accept: "application/vnd.github+json" };
@@ -35,6 +42,25 @@ export async function fetchRepo(fullName: string): Promise<RawRepo> {
 
 export async function fetchLatestRelease(fullName: string): Promise<RawRelease> {
   return fetchJson<RawRelease>("github", `https://api.github.com/repos/${fullName}/releases/latest`, {
+    headers: HEADERS,
+  });
+}
+
+/** Up to 10 most recent releases, newest first — real version history (PR13.7 Goal 13), not just the single latest tag. */
+export async function fetchReleases(fullName: string, perPage = 10): Promise<RawRelease[]> {
+  return fetchJson<RawRelease[]>("github", `https://api.github.com/repos/${fullName}/releases?per_page=${perPage}`, {
+    headers: HEADERS,
+  });
+}
+
+/**
+ * Up to 100 contributors, sorted by contribution count desc — GitHub has no
+ * cheap "just give me the count" endpoint, so this is the real page-1 list;
+ * the mapper reports `items.length` and whether it hit the 100-item cap
+ * (never claims an exact count beyond what was actually counted).
+ */
+export async function fetchContributors(fullName: string): Promise<RawContributor[]> {
+  return fetchJson<RawContributor[]>("github", `https://api.github.com/repos/${fullName}/contributors?per_page=100&anon=true`, {
     headers: HEADERS,
   });
 }

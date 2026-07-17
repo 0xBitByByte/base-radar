@@ -82,6 +82,8 @@ export type TradingPool = {
   liquidityUsd: number | null;
   volume24hUsd: number | null;
   pairCreatedAt: number | null;
+  /** DexScreener's `baseToken.symbol` — already produced by the mapper, just not previously carried through `mergeTrading` (PR13.7 Goal 9). */
+  baseTokenSymbol: string | null;
 };
 
 export type Trading = {
@@ -130,6 +132,8 @@ export type GithubIntel = {
   openIssues: number | null;
   latestReleaseTag: string | null;
   latestReleasePublishedAt: string | null;
+  /** One-line summary of the latest release's real notes — `null` when GitHub has no notes on record for it. */
+  latestReleaseNoteSummary: string | null;
   language: string | null;
   license: string | null;
   createdAt: string | null;

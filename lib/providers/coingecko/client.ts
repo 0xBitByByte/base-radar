@@ -55,6 +55,8 @@ export async function fetchCoinDetail(id: string): Promise<RawCoinDetail> {
 
 export type RawMarketChartRange = {
   prices: [number, number][];
+  /** PR13.7 Goal 9 — same `market_chart` response already fetched for the Price chart; CoinGecko always includes this volume series alongside `prices`, it just wasn't declared/read before. */
+  total_volumes?: [number, number][];
 };
 
 /** Historical price series for the Price chart's period filters (24H/7D/30D/90D/1Y/ALL) — the free `market_chart` endpoint, same provider, no key required. */

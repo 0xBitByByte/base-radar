@@ -21,6 +21,8 @@ const PROVIDER_TAG = "snapshot" as ProviderName;
 export type RawSnapshotProposal = {
   id: string;
   title: string;
+  /** Real proposal description/body, Markdown — PR13.7 Goal 12, Snapshot always has this field, it just wasn't requested before. */
+  body: string;
   state: "active" | "closed" | "pending";
   start: number;
   end: number;
@@ -39,6 +41,7 @@ const PROPOSALS_QUERY = `
     proposals(where: { space: $space }, orderBy: "created", orderDirection: desc, first: 20) {
       id
       title
+      body
       state
       start
       end

@@ -33,7 +33,7 @@ export function ProfileSectionCard({ title, icon: Icon, id, children, className,
     <section
       id={id}
       className={cn(
-        "scroll-mt-28 flex flex-col gap-3 rounded-2xl border border-radar-light-border bg-radar-light-card p-5 dark:border-white/10 dark:bg-radar-card sm:p-6",
+        "scroll-mt-28 flex flex-col gap-3 rounded-2xl border border-radar-light-border bg-radar-light-card p-5 shadow-sm transition-shadow duration-200 hover:shadow-md dark:border-white/10 dark:bg-radar-card sm:p-6",
         className
       )}
     >

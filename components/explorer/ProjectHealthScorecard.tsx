@@ -1,24 +1,27 @@
-import { ArrowDown, ArrowRight, ArrowUp, Award, Code2, Droplets, Fish, Gauge, Landmark, ShieldCheck, TrendingUp, Users, type LucideIcon } from "lucide-react";
+import { Suspense } from "react";
+import { BadgeCheck, Code2, Droplets, Gauge, HeartPulse, Landmark, ShieldAlert, Users, type LucideIcon } from "lucide-react";
 
+import { ProfileDeveloperTileAsync } from "@/components/explorer/ProfileDeveloperTileAsync";
 import { ProfileSectionCard } from "@/components/explorer/ProfileSectionCard";
 import { RichTooltip } from "@/components/ui/RichTooltip";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";
-import type { ScorecardSeverity, ScorecardTile, ScorecardTileId, ScorecardTrend } from "@/lib/intelligence/scorecard";
+import type { ScorecardSeverity, ScorecardTile } from "@/lib/intelligence/scorecard";
+import type { Confidence, Health, Risk } from "@/lib/intelligence/types";
+import type { VerificationStatus } from "@/data/projects/enums";
+import type { CommitActivity, ContributorCount, ReleaseSummary } from "@/lib/providers/github/service";
+import type { ProviderResult } from "@/lib/providers/common/types";
 
 type ProjectHealthScorecardProps = {
   tiles: ScorecardTile[];
-};
-
-const TILE_ICON: Record<ScorecardTileId, LucideIcon> = {
-  security: ShieldCheck,
-  liquidity: Droplets,
-  momentum: TrendingUp,
-  developer: Code2,
-  governance: Landmark,
-  community: Users,
-  whale: Fish,
-  aiRating: Award,
+  health: Health;
+  confidence: Confidence;
+  risk: Risk;
+  verificationStatus: VerificationStatus;
+  /** PR13.7 Goal 6 — real evidence for the Developer tile, streamed in once the extended GitHub calls resolve; the tile shown here from `tiles` (always "Not Assessed" in the fast path) is this Suspense boundary's fallback. */
+  commitActivityPromise: Promise<ProviderResult<CommitActivity> | null>;
+  contributorCountPromise: Promise<ProviderResult<ContributorCount> | null>;
+  releasesPromise: Promise<ProviderResult<ReleaseSummary[]> | null>;
 };
 
 const SEVERITY_CLASS: Record<ScorecardSeverity, string> = {
@@ -45,146 +48,205 @@ const SEVERITY_BAR_GRADIENT: Record<ScorecardSeverity, string> = {
   unknown: "bg-radar-light-muted/40 dark:bg-radar-muted/40",
 };
 
-const SEVERITY_CHIP_CLASS: Record<ScorecardSeverity, string> = {
-  excellent: "bg-radar-success/10 text-radar-success",
-  strong: "bg-radar-success/10 text-radar-success",
-  moderate: "bg-radar-warning/10 text-radar-warning",
-  weak: "bg-radar-danger/10 text-radar-danger",
-  unknown: "bg-radar-light-muted/10 text-radar-light-muted dark:bg-radar-muted/10 dark:text-radar-muted",
+const HEALTH_SEVERITY: Record<Health["label"], ScorecardSeverity> = {
+  excellent: "excellent",
+  good: "strong",
+  fair: "moderate",
+  poor: "weak",
+  unknown: "unknown",
 };
 
-const TREND_ICON: Record<ScorecardTrend, LucideIcon> = {
-  up: ArrowUp,
-  down: ArrowDown,
-  stable: ArrowRight,
+const CONFIDENCE_SEVERITY: Record<Confidence["level"], ScorecardSeverity> = {
+  high: "excellent",
+  medium: "moderate",
+  low: "weak",
 };
 
-const TREND_CLASS: Record<ScorecardTrend, string> = {
-  up: "text-radar-success",
-  down: "text-radar-danger",
-  stable: "text-radar-light-muted dark:text-radar-muted",
+const RISK_SEVERITY: Record<Risk["level"], ScorecardSeverity> = {
+  low: "excellent",
+  moderate: "moderate",
+  elevated: "moderate",
+  high: "weak",
 };
 
-const TREND_LABEL: Record<ScorecardTrend, string> = {
-  up: "Improving",
-  down: "Declining",
-  stable: "Stable",
+const VERIFICATION_SEVERITY: Record<VerificationStatus, ScorecardSeverity> = {
+  verified: "excellent",
+  community: "strong",
+  unverified: "moderate",
+  flagged: "weak",
 };
 
-const UNAVAILABLE_TOOLTIP = "This metric cannot currently be calculated because verified data is unavailable.";
+const VERIFICATION_LABEL: Record<VerificationStatus, string> = {
+  verified: "Verified",
+  community: "Community-Reviewed",
+  unverified: "Unverified",
+  flagged: "Flagged",
+};
 
-const HEADER_CELL_CLASS = "shrink-0 text-[10.5px] font-semibold tracking-wide text-radar-light-muted uppercase dark:text-radar-muted";
+export type MetaCard = {
+  id: string;
+  icon: LucideIcon;
+  title: string;
+  value: string;
+  helper: string;
+  severity: ScorecardSeverity;
+  progress: number | null;
+  tooltip: string;
+};
+
+const TILE_ICON: Record<string, LucideIcon> = {
+  developer: Code2,
+  community: Users,
+  liquidity: Droplets,
+  governance: Landmark,
+};
 
 /**
- * PR12.1 Req 1.5, redesigned into a single-matrix layout (Score Matrix
- * request) — Base Radar's signature "understand this project in 5 seconds"
- * element, rendered directly below the AI Intelligence Summary. Every row is
- * still one of `buildHealthScorecard()`'s pure derivations
- * (`lib/intelligence/scorecard.ts`) from fields the engine already computed
- * (Health, Confidence, Risk contributors, TVL, market momentum, GitHub
- * activity, governance, whale detection, community links) — this pass only
- * changes how those same 8 tiles are presented (one dense, scannable table
- * instead of 8 separate cards), not what they compute. A tile with no real
- * signal (`severity === "unknown"`) shows "—" in the score column and a
- * "Not Assessed" chip rather than a guess; only `momentum` carries a real
- * `trend` (the sign of its live price-change input) — every other row shows
- * a neutral dash instead of a fabricated arrow.
+ * PR13.4 Goal 3 — the compact tile grid (PR13.3) is redesigned into the
+ * spec's exact 8-card set: Health, Confidence, Risk, Verification (the same
+ * real, already-computed top-level `ProjectIntelligence` fields the Profile
+ * Header's badges already show — reused here, not recalculated) alongside
+ * four of the Health Scorecard's own tiles (Developer, Community, Liquidity,
+ * Governance — `buildHealthScorecard()`, unchanged). 4 columns × 2 rows on
+ * desktop, every card the same compact icon/title/value/helper-text shape.
  */
-export function ProjectHealthScorecard({ tiles }: ProjectHealthScorecardProps) {
+/** One card's markup — shared by every synchronous card and the async-swapped Developer card (`ProfileDeveloperTileAsync`, a Client Component, imports this directly rather than receiving it as a render-prop, since functions can't cross the Server→Client boundary as props), so a streamed-in evidence tile renders through the exact same recipe as every other tile. */
+export function ScorecardCardView({ card }: { card: MetaCard }) {
+  return (
+    <Tooltip className="block h-full" content={<RichTooltip title={card.title} description={card.tooltip} />}>
+      <div
+        role="listitem"
+        tabIndex={0}
+        className="flex h-full cursor-default flex-col gap-2.5 rounded-xl border border-radar-light-border bg-radar-light-surface p-3.5 outline-none transition-all duration-200 hover:-translate-y-0.5 hover:border-radar-primary/30 hover:bg-radar-light-card hover:shadow-md focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-radar-primary/50 motion-reduce:hover:translate-y-0 dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-radar-accent/30 dark:hover:bg-white/[0.04]"
+      >
+        <div className="flex items-center justify-between">
+          <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg", SEVERITY_ICON_BG[card.severity])}>
+            <card.icon className={cn("size-4 shrink-0", SEVERITY_CLASS[card.severity])} aria-hidden="true" />
+          </span>
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <span className="truncate text-[10.5px] font-semibold tracking-wide text-radar-light-muted uppercase dark:text-radar-muted">
+            {card.title}
+          </span>
+          <span className={cn("truncate text-lg font-bold tabular-nums", SEVERITY_CLASS[card.severity])}>{card.value}</span>
+        </div>
+
+        {card.progress !== null && (
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-radar-light-border dark:bg-white/10">
+            <div
+              className={cn("h-full rounded-full transition-[width] duration-700 ease-out motion-reduce:transition-none", SEVERITY_BAR_GRADIENT[card.severity])}
+              style={{ width: `${card.progress}%` }}
+            />
+          </div>
+        )}
+
+        <span className="w-fit rounded-full bg-radar-light-border/60 px-1.5 py-0.5 text-[10px] font-medium text-radar-light-muted dark:bg-white/5 dark:text-radar-muted">
+          {card.helper}
+        </span>
+
+        {/* Goal 6 — every tile explains itself inline, not only on hover; `title` carries the full sentence for anything the single line truncates. */}
+        <p className="truncate text-[10.5px] leading-snug text-radar-light-muted dark:text-radar-muted" title={card.tooltip}>
+          {card.tooltip}
+        </p>
+      </div>
+    </Tooltip>
+  );
+}
+
+export function scorecardTileToMetaCard(id: string, tile: ScorecardTile): MetaCard {
+  const unavailable = tile.severity === "unknown";
+  return {
+    id,
+    icon: TILE_ICON[id],
+    title: id === "developer" ? "Developer" : tile.label,
+    value: unavailable ? "—" : tile.scoreLabel,
+    helper: tile.statusLabel,
+    severity: tile.severity,
+    progress: tile.score,
+    tooltip: tile.detail,
+  };
+}
+
+export function ProjectHealthScorecard({
+  tiles,
+  health,
+  confidence,
+  risk,
+  verificationStatus,
+  commitActivityPromise,
+  contributorCountPromise,
+  releasesPromise,
+}: ProjectHealthScorecardProps) {
+  const findTile = (id: string) => tiles.find((tile) => tile.id === id)!;
+
+  const metaCards: MetaCard[] = [
+    {
+      id: "health",
+      icon: HeartPulse,
+      title: "Health",
+      value: `${health.score}/100`,
+      helper: health.label[0].toUpperCase() + health.label.slice(1),
+      severity: HEALTH_SEVERITY[health.label],
+      progress: health.score,
+      tooltip: "Base Radar's transparent Health score — see the Header badge and AI Intelligence section for the full factor breakdown.",
+    },
+    {
+      id: "confidence",
+      icon: Gauge,
+      title: "Confidence",
+      value: `${confidence.score}/100`,
+      helper: confidence.level[0].toUpperCase() + confidence.level.slice(1),
+      severity: CONFIDENCE_SEVERITY[confidence.level],
+      progress: confidence.score,
+      tooltip: "How much live data backed this analysis — see the AI Intelligence section for the full factor breakdown.",
+    },
+    {
+      id: "risk",
+      icon: ShieldAlert,
+      title: "Risk",
+      value: risk.level[0].toUpperCase() + risk.level.slice(1),
+      helper: `${risk.contributors.length} factor${risk.contributors.length === 1 ? "" : "s"} assessed`,
+      severity: RISK_SEVERITY[risk.level],
+      progress: null,
+      tooltip: risk.explanation,
+    },
+    {
+      id: "verification",
+      icon: BadgeCheck,
+      title: "Verification",
+      value: VERIFICATION_LABEL[verificationStatus],
+      helper: "Registry status",
+      severity: VERIFICATION_SEVERITY[verificationStatus],
+      progress: null,
+      tooltip: "Base Radar's own editorial trust signal — see docs/PROJECT_REGISTRY.md.",
+    },
+  ];
+
+  const developerFallback = scorecardTileToMetaCard("developer", findTile("developer"));
+  const restTileCards: MetaCard[] = (["community", "liquidity", "governance"] as const).map((id) =>
+    scorecardTileToMetaCard(id, findTile(id))
+  );
+
   return (
     <ProfileSectionCard title="Project Health Scorecard" icon={Gauge}>
-      <div role="table" aria-label="Project health score matrix" className="overflow-hidden rounded-xl border border-radar-light-border dark:border-white/10">
-        <div
-          role="row"
-          className="hidden items-center gap-4 border-b border-radar-light-border bg-radar-light-surface px-4 py-2 dark:border-white/10 dark:bg-white/[0.02] sm:flex"
-        >
-          <span role="columnheader" className={cn(HEADER_CELL_CLASS, "w-44")}>
-            Category
-          </span>
-          <span role="columnheader" className={cn(HEADER_CELL_CLASS, "w-24 text-right")}>
-            Score
-          </span>
-          <span role="columnheader" className={cn(HEADER_CELL_CLASS, "min-w-0 flex-1")}>
-            Progress
-          </span>
-          <span role="columnheader" className={cn(HEADER_CELL_CLASS, "w-10 text-center")}>
-            Trend
-          </span>
-          <span role="columnheader" className={cn(HEADER_CELL_CLASS, "w-32 text-right")}>
-            Status
-          </span>
-        </div>
+      <div role="list" aria-label="Project health score matrix" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {metaCards.map((card) => (
+          <ScorecardCardView key={card.id} card={card} />
+        ))}
 
-        <div role="rowgroup" className="divide-y divide-radar-light-border dark:divide-white/10">
-          {tiles.map((tile) => {
-            const Icon = TILE_ICON[tile.id];
-            const unavailable = tile.severity === "unknown";
-            const trendLabel = tile.trend ? `Trend: ${TREND_LABEL[tile.trend]}` : "Trend not tracked for this metric";
+        <Suspense fallback={<ScorecardCardView card={developerFallback} />}>
+          <ProfileDeveloperTileAsync
+            commitActivityPromise={commitActivityPromise}
+            contributorCountPromise={contributorCountPromise}
+            releasesPromise={releasesPromise}
+            fallback={findTile("developer")}
+          />
+        </Suspense>
 
-            return (
-              <Tooltip
-                key={tile.id}
-                className="block w-full"
-                content={
-                  <RichTooltip title={tile.label} description={unavailable ? UNAVAILABLE_TOOLTIP : tile.detail}>
-                    {unavailable && <p className="text-radar-light-muted dark:text-radar-muted">{tile.detail}</p>}
-                    <p className="text-radar-light-muted dark:text-radar-muted">Source: {tile.source}</p>
-                  </RichTooltip>
-                }
-              >
-                <div
-                  role="row"
-                  tabIndex={0}
-                  className="flex cursor-default flex-col gap-2.5 px-4 py-3 outline-none transition-colors hover:bg-radar-light-surface focus-visible:bg-radar-light-surface focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-radar-primary/50 dark:hover:bg-white/[0.03] dark:focus-visible:bg-white/[0.03] sm:flex-row sm:items-center sm:gap-4"
-                >
-                  <div role="cell" className="flex min-w-0 items-center gap-2 sm:w-44 sm:shrink-0">
-                    <span className={cn("flex size-6 shrink-0 items-center justify-center rounded-lg", SEVERITY_ICON_BG[tile.severity])}>
-                      <Icon className={cn("size-3.5 shrink-0", SEVERITY_CLASS[tile.severity])} aria-hidden="true" />
-                    </span>
-                    <span className="truncate text-sm font-medium text-radar-light-text dark:text-radar-white">{tile.label}</span>
-                  </div>
-
-                  <div role="cell" className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2 sm:flex-nowrap sm:gap-4">
-                    <span className={cn("shrink-0 text-right text-sm font-bold whitespace-nowrap tabular-nums sm:w-24 sm:text-base", SEVERITY_CLASS[tile.severity])}>
-                      {unavailable ? "—" : tile.scoreLabel}
-                    </span>
-
-                    <div className="order-last h-2 w-full min-w-0 overflow-hidden rounded-full bg-radar-light-border sm:order-none sm:w-auto sm:flex-1 dark:bg-white/10">
-                      {tile.score !== null && (
-                        <div
-                          className={cn(
-                            "h-full rounded-full transition-[width] duration-700 ease-out motion-reduce:transition-none",
-                            SEVERITY_BAR_GRADIENT[tile.severity]
-                          )}
-                          style={{ width: `${tile.score}%` }}
-                        />
-                      )}
-                    </div>
-
-                    <span className="flex w-8 shrink-0 items-center justify-center sm:w-10" aria-label={trendLabel} title={trendLabel}>
-                      {tile.trend ? (
-                        (() => {
-                          const TrendIcon = TREND_ICON[tile.trend];
-                          return <TrendIcon className={cn("size-3.5", TREND_CLASS[tile.trend])} aria-hidden="true" />;
-                        })()
-                      ) : (
-                        <span className="text-xs text-radar-light-muted/50 dark:text-radar-muted/40" aria-hidden="true">
-                          –
-                        </span>
-                      )}
-                    </span>
-
-                    <div className="ml-auto flex shrink-0 justify-end sm:ml-0 sm:w-32">
-                      <span className={cn("w-fit rounded-full px-2 py-0.5 text-[10.5px] font-medium whitespace-nowrap", SEVERITY_CHIP_CLASS[tile.severity])}>
-                        {tile.statusLabel}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </Tooltip>
-            );
-          })}
-        </div>
+        {restTileCards.map((card) => (
+          <ScorecardCardView key={card.id} card={card} />
+        ))}
       </div>
     </ProfileSectionCard>
   );

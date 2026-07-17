@@ -1,67 +1,88 @@
-import { Coins, Eye, FolderKanban, Star, TrendingUp, Wallet } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+"use client";
 
-import { cn } from "@/lib/utils";
-import { formatPercent } from "@/lib/data/format";
-import type { WatchlistItem, WatchlistItemKind, WithSource } from "@/lib/data/types";
+import Link from "next/link";
+import { Eye, Star } from "lucide-react";
+
+import { ProjectLogo } from "@/components/branding/ProjectLogo";
+import { ChangeValue } from "@/components/explorer/ChangeValue";
+import { ScoreBadge } from "@/components/explorer/ScoreBadge";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
 import { EmptyState } from "@/components/ui/EmptyState";
-
-const KIND_ICON: Record<WatchlistItemKind, LucideIcon> = {
-  project: FolderKanban,
-  wallet: Wallet,
-  token: Coins,
-  narrative: TrendingUp,
-};
+import { formatPrice } from "@/lib/data/format";
+import { useWatchedProjects } from "@/lib/hooks/useWatchedProjects";
+import type { ProjectIntelligence } from "@/lib/intelligence/types";
 
 type WatchlistWidgetProps = {
-  data: WithSource<WatchlistItem[]>;
+  /** The full registry's intelligence, already resolved by `app/dashboard/page.tsx` via `getAllProjectIntelligence()` — never fetched here, only filtered down to whatever's watched. */
+  projects: ProjectIntelligence[];
   lastUpdated: string;
 };
 
-export function WatchlistWidget({ data, lastUpdated }: WatchlistWidgetProps) {
+/**
+ * PR13.1 — replaces the previous mock "pinned wallets/tokens/narratives"
+ * concept with the real, `localStorage`-backed project watchlist. Reuses
+ * `getAllProjectIntelligence()`'s already-computed data (health, confidence,
+ * price, 24h change) — never rebuilds intelligence, only filters an
+ * already-fetched array down to watched project IDs via
+ * `useWatchedProjects`. Live: adding/removing a project anywhere in the app
+ * updates this widget on the same tick, no refresh.
+ */
+export function WatchlistWidget({ projects, lastUpdated }: WatchlistWidgetProps) {
+  const watched = useWatchedProjects(projects);
+
   return (
     <WidgetCard
       icon={<Star className="size-5" aria-hidden="true" />}
       title="Watchlist"
-      subtitle="Pinned projects, wallets, tokens and narratives"
+      subtitle="Saved projects"
       accent="primary"
-      source={data.source}
+      source="live"
       lastUpdated={lastUpdated}
     >
-      {data.length === 0 ? (
-        <EmptyState
-          icon={Eye}
-          title="Nothing pinned yet"
-          description="Star a project, wallet, token or narrative to track it here."
-        />
+      {watched.length === 0 ? (
+        <EmptyState icon={Eye} title="No watched projects yet." description="Star a project to track it here." />
       ) : (
         <ul className="flex flex-col gap-3">
-          {data.map((item) => {
-            const Icon = KIND_ICON[item.kind];
+          {watched.map((project) => {
+            const priceAvailable = project.market.available && project.market.priceUsd !== null;
+
             return (
-              <li key={item.id} className="flex items-center gap-3">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-radar-light-surface text-radar-light-muted dark:bg-white/5 dark:text-radar-muted">
-                  <Icon className="size-4" aria-hidden="true" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-semibold text-radar-light-text dark:text-radar-white">
-                    {item.label}
-                  </p>
-                  <p className="truncate text-[11px] text-radar-light-muted dark:text-radar-muted">
-                    {item.sublabel}
-                  </p>
-                </div>
-                {item.changePct24h !== undefined && (
-                  <span
-                    className={cn(
-                      "shrink-0 text-xs font-medium",
-                      item.changePct24h >= 0 ? "text-radar-success" : "text-radar-danger"
-                    )}
-                  >
-                    {formatPercent(item.changePct24h)}
-                  </span>
-                )}
+              <li key={project.identity.id}>
+                <Link
+                  href={`/dashboard/projects/${project.identity.slug}`}
+                  className="flex items-center gap-3 rounded-lg p-1 outline-none transition-colors hover:bg-radar-light-surface focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:hover:bg-white/5"
+                >
+                  <ProjectLogo logoUrl={project.identity.logoUrl} name={project.identity.name} size={32} />
+
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-semibold text-radar-light-text dark:text-radar-white">
+                      {project.identity.name}
+                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <ScoreBadge
+                        type="health"
+                        score={project.health.score}
+                        label={project.health.label}
+                        showLabel={false}
+                        bare
+                      />
+                      <ScoreBadge
+                        type="confidence"
+                        score={project.confidence.score}
+                        label={project.confidence.level}
+                        showLabel={false}
+                        bare
+                      />
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 text-right">
+                    <p className="text-xs font-semibold tabular-nums text-radar-light-text dark:text-radar-white">
+                      {priceAvailable ? formatPrice(project.market.priceUsd as number) : "—"}
+                    </p>
+                    <ChangeValue value={project.market.changePct24h} className="text-[11px]" />
+                  </div>
+                </Link>
               </li>
             );
           })}

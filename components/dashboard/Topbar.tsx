@@ -19,6 +19,15 @@ type TopbarProps = {
 function useBreadcrumb() {
   const pathname = usePathname();
   const segments = pathname.split("/").filter(Boolean);
+
+  // The Project Profile page (`/dashboard/projects/[slug]`) renders its own
+  // `ProfileBreadcrumb` — a real, clickable Dashboard/Projects/<project name>
+  // trail built from the actual fetched project, not this hook's generic
+  // slug-titlecase guess. Showing both at once would put two breadcrumb
+  // trails on screen for the same route, so this one steps aside there.
+  const isProjectProfileRoute = segments[0] === "dashboard" && segments[1] === "projects" && segments.length === 3;
+  if (isProjectProfileRoute) return [];
+
   return segments.map((segment, i) => ({
     label: segment
       .split("-")
@@ -61,7 +70,7 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
         <Menu className="size-5" />
       </button>
 
-      <nav aria-label="Breadcrumb" className="hidden items-center gap-1.5 text-sm lg:flex">
+      <nav aria-label="Breadcrumb" className={cn("hidden items-center gap-1.5 text-sm lg:flex", breadcrumb.length === 0 && "lg:hidden")}>
         {breadcrumb.map((crumb, i) => (
           <span key={crumb.href} className="flex items-center gap-1.5">
             {i > 0 && (

@@ -27,8 +27,8 @@ const HEALTH_COLOR: Record<string, string> = {
  * three-up stat row (AI Score / TVL / 24H) so the marquee reads as real
  * intelligence, not just a logo wall. Every field is real project data
  * (`identity`/`community`/`health`/`tvl`/`market`), the same shape
- * `ProjectCard`/`QuickViewDrawer` consume — nothing here is a one-off
- * lookalike computation.
+ * `ProjectCard` and the Project Profile page consume — nothing here is a
+ * one-off lookalike computation.
  */
 export function FeaturedProjectTile({ project, onActivate }: FeaturedProjectTileProps) {
   const { identity, community, health, tvl, market } = project;

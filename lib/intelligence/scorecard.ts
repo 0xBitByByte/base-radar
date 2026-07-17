@@ -1,18 +1,23 @@
 /**
- * PR12.1 — pure derivations for the Project Profile's Executive Summary and
- * Project Health Scorecard. Every value here is computed from fields the
- * Intelligence Engine already produced (`Health`, `Confidence`, `Risk`,
- * `Market`, `Tvl`, `GithubIntel`, governance events, whale events) — no new
- * provider calls, no invented scoring model. Where a tile has no real
- * underlying signal, it reports `score: null` and the component renders
- * "Not enough verified data" rather than a guess.
+ * PR12.1 — pure derivations for the Project Profile's Project Health
+ * Scorecard. Every value here is computed from fields the Intelligence
+ * Engine already produced (`Health`, `Confidence`, `Risk`, `Market`, `Tvl`,
+ * `GithubIntel`, governance events, whale events) — no new provider calls,
+ * no invented scoring model. Where a tile has no real underlying signal, it
+ * reports `score: null` and the component renders "Not enough verified
+ * data" rather than a guess.
+ *
+ * PR13.7 — `buildAiVerdict`, `buildExecutiveSummaryBullets`, and
+ * `buildAiInsight` (all previously here) are deleted: they independently
+ * re-derived overlapping facts into three separately-rendered cards, the
+ * direct cause of a confirmed duplication bug. `lib/intelligence/report.ts`'s
+ * `buildIntelligenceReport` replaces all three with one merged derivation.
  */
 
 import { clampScore } from "@/lib/intelligence/helpers";
-import type { Confidence, GithubIntel, Health, Market, Risk, Sources, Trading, Tvl } from "@/lib/intelligence/types";
+import type { Confidence, GithubIntel, Health, Market, Risk, Trading, Tvl } from "@/lib/intelligence/types";
 import type { GovernanceEvent } from "@/lib/governance/types";
 import type { WhaleEvent } from "@/lib/whale/types";
-import type { VerificationStatus } from "@/data/projects/enums";
 import type { ProviderName } from "@/lib/providers/common/types";
 
 export type ScorecardSeverity = "excellent" | "strong" | "moderate" | "weak" | "unknown";
@@ -48,25 +53,6 @@ export type ScorecardTile = {
    * real delta (the same live price-change percentage driving its score).
    */
   trend?: ScorecardTrend;
-};
-
-export type ExecutiveSummaryBulletTone = "positive" | "negative" | "neutral";
-
-export type ExecutiveSummaryBulletKind =
-  | "verification"
-  | "confidence"
-  | "tvl"
-  | "price"
-  | "developer"
-  | "whale"
-  | "governance"
-  | "outlook";
-
-export type ExecutiveSummaryBullet = {
-  text: string;
-  tone: ExecutiveSummaryBulletTone;
-  /** Which real signal this bullet came from — lets the component pick a distinct icon per bullet instead of one generic tone icon everywhere. */
-  kind: ExecutiveSummaryBulletKind;
 };
 
 const SEVERITY_SCORE: Record<Exclude<ScorecardSeverity, "unknown">, number> = {
@@ -276,126 +262,50 @@ export function buildHealthScorecard(input: ScorecardInput): ScorecardTile[] {
 }
 
 /**
- * The AI Summary banner's single headline phrase — a plain-English bucket
- * of the exact same Health/Confidence scores and Risk level already
- * computed elsewhere on this page, not an independent judgment call.
+ * PR13.7 Goal 6 — real, evidence-backed replacement for the Scorecard's
+ * Developer tile, built once the extended/streamed GitHub calls resolve
+ * (`ProfileDeveloperTileAsync`). The fast-path Developer tile is always
+ * "Not Assessed" — `commitsLast7d`/commit data isn't merged into the main
+ * `ProjectIntelligence` build until the extended/streamed path resolves
+ * (see `page.tsx`'s docstring on the fast/slow split) — so this tile can't
+ * reuse the Risk Analysis's own frozen "Developer Health" severity without
+ * either blocking first paint or showing stale data. Instead it computes
+ * its own transparent, bounded activity-volume score from the same three
+ * real numbers its `detail` text reports (commits/contributors/releases) —
+ * the same kind of documented, bounded transform the `momentum` tile above
+ * already uses for a live price-change percentage, not a fabricated model.
+ * Falls back to the original fast-path tile whenever none of the three
+ * numbers resolved to real data.
  */
-export function buildAiVerdict(health: Health, confidence: Confidence, risk: Risk): string {
-  if (risk.level === "high") return "High Risk — Proceed With Caution";
+export function buildDeveloperEvidenceTile(
+  commitsLast90d: number | null,
+  contributorCount: number | null,
+  releaseCount: number | null,
+  fallback: ScorecardTile
+): ScorecardTile {
+  if (commitsLast90d === null && contributorCount === null && releaseCount === null) {
+    return fallback;
+  }
 
-  const blended = (health.score + confidence.score) / 2;
-  if (blended >= 85 && risk.level === "low") return "Excellent Long-Term Project";
-  if (blended >= 70) return "Solid, Actively Maintained Project";
-  if (blended >= 50) return "Developing Project — Monitor Closely";
-  return "Limited Data — Insufficient For A Confident Rating";
+  const score = clampScore(30 + (commitsLast90d ?? 0) * 0.3 + (contributorCount ?? 0) * 2 + (releaseCount ?? 0) * 3);
+  const severity: ScorecardSeverity = score >= 80 ? "excellent" : score >= 60 ? "strong" : score >= 40 ? "moderate" : "weak";
+
+  const parts: string[] = [];
+  if (commitsLast90d !== null) parts.push(`${commitsLast90d} commit${commitsLast90d === 1 ? "" : "s"} in the last 90 days`);
+  if (contributorCount !== null) parts.push(`${contributorCount} contributor${contributorCount === 1 ? "" : "s"}`);
+  if (releaseCount !== null) parts.push(`${releaseCount} release${releaseCount === 1 ? "" : "s"} in the last year`);
+
+  return {
+    id: "developer",
+    label: "Engineering Health",
+    score,
+    scoreLabel: `${score}/100`,
+    statusLabel: SEVERITY_STATUS[severity],
+    severity,
+    detail: parts.length > 0 ? parts.join(", ") + "." : fallback.detail,
+    source: "GitHub repository activity",
+  };
 }
-
-function formatVerificationClause(status: VerificationStatus): string {
-  if (status === "verified") return "Verified";
-  if (status === "community") return "Community-reviewed";
-  if (status === "flagged") return "Registry-flagged";
-  return "Unverified";
-}
-
-export type ExecutiveSummaryInput = {
-  verificationStatus: VerificationStatus;
-  risk: Risk;
-  confidence: Confidence;
-  tvl: Tvl;
-  market: Market;
-  github: GithubIntel;
-  governance: GovernanceEvent[] | null;
-  whaleEvents: WhaleEvent[];
-  narrativeLabel: string | null;
-};
-
-/**
- * Up to 7 bullet points summarizing the entire project in one glance —
- * every clause traces back to a real, already-computed field. The
- * confidence disclaimer (when present) and the closing "AI Outlook" line
- * are never dropped even when other signals push the list toward the cap.
- */
-export function buildExecutiveSummaryBullets(input: ExecutiveSummaryInput): ExecutiveSummaryBullet[] {
-  const bullets: ExecutiveSummaryBullet[] = [];
-
-  bullets.push({
-    text: `${formatVerificationClause(input.verificationStatus)} project with ${input.risk.level} risk`,
-    tone: input.risk.level === "low" ? "positive" : input.risk.level === "high" ? "negative" : "neutral",
-    kind: "verification",
-  });
-
-  if (input.confidence.level === "low") {
-    bullets.push({
-      text: "Confidence in this analysis is limited — few live data sources are available for this project",
-      tone: "negative",
-      kind: "confidence",
-    });
-  }
-
-  if (input.tvl.available && input.tvl.changePct7d !== null) {
-    const up = input.tvl.changePct7d >= 0;
-    bullets.push({
-      text: `TVL ${up ? "increasing" : "decreasing"}: ${up ? "+" : ""}${input.tvl.changePct7d.toFixed(1)}% over the past 7 days`,
-      tone: up ? "positive" : "negative",
-      kind: "tvl",
-    });
-  }
-
-  if (input.market.available && input.market.changePct7d !== null) {
-    const up = input.market.changePct7d >= 0;
-    bullets.push({
-      text: `Price ${up ? "up" : "down"} ${up ? "+" : ""}${input.market.changePct7d.toFixed(1)}% over the past 7 days`,
-      tone: up ? "positive" : "negative",
-      kind: "price",
-    });
-  }
-
-  if (input.github.available && input.github.commitsLast7d !== null) {
-    bullets.push(
-      input.github.commitsLast7d > 0
-        ? { text: `Developer activity remains active: ${input.github.commitsLast7d} commits in the last 7 days`, tone: "positive", kind: "developer" }
-        : { text: "No recent commits in the last 7 days", tone: "neutral", kind: "developer" }
-    );
-  }
-
-  bullets.push(
-    input.whaleEvents.length === 0
-      ? { text: "No unusual whale activity detected", tone: "positive", kind: "whale" }
-      : { text: `${input.whaleEvents.length} large on-chain transfer${input.whaleEvents.length === 1 ? "" : "s"} detected recently`, tone: "neutral", kind: "whale" }
-  );
-
-  if (input.governance !== null) {
-    const activeCount = input.governance.filter((event) => event.status === "active").length;
-    bullets.push(
-      activeCount > 0
-        ? { text: `${activeCount} active governance proposal${activeCount === 1 ? "" : "s"}`, tone: "positive", kind: "governance" }
-        : { text: "Governance currently inactive", tone: "neutral", kind: "governance" }
-    );
-  }
-
-  const capped = bullets.slice(0, 6);
-  const outlook = input.narrativeLabel
-    ? input.narrativeLabel[0].toUpperCase() + input.narrativeLabel.slice(1)
-    : input.risk.level === "low"
-      ? "Stable"
-      : input.risk.level === "moderate"
-        ? "Neutral"
-        : "Cautious";
-  capped.push({ text: `AI Outlook: ${outlook}`, tone: "neutral", kind: "outlook" });
-
-  return capped;
-}
-
-export type AiInsightOutlookTone = "positive" | "negative" | "neutral";
-
-export type AiInsight = {
-  outlook: string;
-  outlookTone: AiInsightOutlookTone;
-  why: string[];
-  whatToWatch: string[];
-  confidenceLabel: "High" | "Medium" | "Low";
-  dataSources: string[];
-};
 
 export const PROVIDER_DISPLAY_NAME: Record<ProviderName, string> = {
   coingecko: "CoinGecko",
@@ -405,111 +315,3 @@ export const PROVIDER_DISPLAY_NAME: Record<ProviderName, string> = {
   github: "GitHub",
   base: "Base RPC",
 };
-
-const CONFIDENCE_LABEL: Record<Confidence["level"], "High" | "Medium" | "Low"> = {
-  high: "High",
-  medium: "Medium",
-  low: "Low",
-};
-
-export type AiInsightInput = {
-  health: Health;
-  confidence: Confidence;
-  risk: Risk;
-  tvl: Tvl;
-  market: Market;
-  github: GithubIntel;
-  governance: GovernanceEvent[] | null;
-  whaleEvents: WhaleEvent[];
-  sources: Sources;
-  narrativeLabel: string | null;
-};
-
-/**
- * PR12.1c Req 5.13 — "AI Insight" analyst note: a concise, plain-English
- * read of WHY the project currently looks the way it does and WHAT to
- * monitor next, generated entirely from fields the Intelligence Engine
- * already computed. Every clause traces to a real signal; nothing here is
- * an independent judgment beyond what `risk`/`health`/`confidence` already
- * concluded.
- */
-export function buildAiInsight(input: AiInsightInput): AiInsight {
-  const outlook = input.narrativeLabel
-    ? input.narrativeLabel[0].toUpperCase() + input.narrativeLabel.slice(1)
-    : input.risk.level === "low" && input.health.label !== "poor"
-      ? "Stable"
-      : input.risk.level === "high" || input.health.label === "poor"
-        ? "Cautious"
-        : "Neutral";
-  const outlookTone: AiInsightOutlookTone =
-    outlook === "Cautious" ? "negative" : outlook === "Stable" || outlook === "Bullish" ? "positive" : "neutral";
-
-  const why: string[] = [];
-
-  if (input.tvl.available && input.tvl.changePct7d !== null) {
-    const up = input.tvl.changePct7d >= 0;
-    why.push(`TVL has ${up ? "grown" : "declined"} ${Math.abs(input.tvl.changePct7d).toFixed(1)}% over the past 7 days.`);
-  }
-
-  if (input.github.available && input.github.commitsLast7d !== null) {
-    why.push(
-      input.github.commitsLast7d > 0
-        ? `Development activity is ongoing, with ${input.github.commitsLast7d} commit${input.github.commitsLast7d === 1 ? "" : "s"} in the last 7 days.`
-        : "No commits were recorded in the last 7 days — development activity has slowed."
-    );
-  }
-
-  why.push(
-    input.whaleEvents.length === 0
-      ? "No significant whale outflows or inflows have been detected."
-      : `${input.whaleEvents.length} large on-chain transfer${input.whaleEvents.length === 1 ? " has" : "s have"} been detected recently.`
-  );
-
-  if (input.governance !== null) {
-    const activeCount = input.governance.filter((event) => event.status === "active").length;
-    why.push(
-      activeCount > 0
-        ? `Governance is active, with ${activeCount} proposal${activeCount === 1 ? "" : "s"} currently open for voting.`
-        : "Governance activity is currently quiet, with no proposals open for voting."
-    );
-  }
-
-  const worstContributor = input.risk.contributors
-    .filter((c) => c.severity === "high" || c.severity === "moderate")
-    .sort((a) => (a.severity === "high" ? -1 : 1))[0];
-  if (worstContributor) {
-    why.push(`${worstContributor.label} is flagged as a watch area: ${worstContributor.detail}`);
-  }
-
-  why.push(`Overall project confidence is ${CONFIDENCE_LABEL[input.confidence.level].toLowerCase()}, based on ${Object.values(input.sources).filter((s) => s.status === "live").length} live data sources.`);
-
-  const whatToWatch: string[] = [];
-  if (input.governance !== null && input.governance.filter((event) => event.status === "active").length > 0) {
-    whatToWatch.push("Monitor the outcome of upcoming governance proposals.");
-  }
-  if (input.tvl.available && input.tvl.changePct7d !== null && Math.abs(input.tvl.changePct7d) >= 15) {
-    whatToWatch.push("Watch for continued TVL volatility.");
-  }
-  if (input.whaleEvents.length > 0) {
-    whatToWatch.push("Observe any follow-on large on-chain transactions.");
-  }
-  if (input.confidence.level === "low") {
-    whatToWatch.push("Data confidence is limited for this project — verify key metrics independently before acting on them.");
-  }
-  if (whatToWatch.length === 0) {
-    whatToWatch.push("No unusual signals are currently flagged — revisit if TVL, price, or governance activity shifts.");
-  }
-
-  const dataSources = (Object.keys(input.sources) as ProviderName[])
-    .filter((provider) => input.sources[provider].status === "live")
-    .map((provider) => PROVIDER_DISPLAY_NAME[provider]);
-
-  return {
-    outlook,
-    outlookTone,
-    why: why.slice(0, 6),
-    whatToWatch: whatToWatch.slice(0, 4),
-    confidenceLabel: CONFIDENCE_LABEL[input.confidence.level],
-    dataSources,
-  };
-}
