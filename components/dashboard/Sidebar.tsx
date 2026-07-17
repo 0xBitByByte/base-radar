@@ -11,6 +11,7 @@ import { SidebarItem } from "@/components/dashboard/SidebarItem";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { buildSocialNavLinks } from "@/lib/branding/socials";
+import { useUnreadAlertCount } from "@/lib/hooks/useUnreadAlertCount";
 import { useWatchlist } from "@/lib/hooks/useWatchlist";
 
 /** GitHub/X's neutral hover class is defined locally, not in the shared registry — Sidebar supports both themes while `Footer` is dark-only, so the two legitimately differ; only the brand-color hovers (Discord/Telegram/Linktree) are shared, via `buildSocialNavLinks`. */
@@ -35,6 +36,7 @@ type SidebarNavProps = {
 export function SidebarNav({ onNavigate, className }: SidebarNavProps) {
   const pathname = usePathname();
   const { count: watchlistCount } = useWatchlist();
+  const unreadAlertCount = useUnreadAlertCount();
 
   const isActive = (href: string) =>
     href === "/dashboard" ? pathname === href : pathname.startsWith(href);
@@ -63,7 +65,13 @@ export function SidebarNav({ onNavigate, className }: SidebarNavProps) {
                   icon={<item.icon className="size-[18px]" />}
                   active={isActive(item.href)}
                   onClick={onNavigate}
-                  badge={item.href === "/dashboard/watchlist" ? watchlistCount : undefined}
+                  badge={
+                    item.href === "/dashboard/watchlist"
+                      ? watchlistCount
+                      : item.href === "/dashboard/alerts"
+                        ? unreadAlertCount
+                        : undefined
+                  }
                 />
               ))}
             </div>
