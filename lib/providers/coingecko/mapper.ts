@@ -91,3 +91,9 @@ export function mapMarketChart(raw: RawMarketChartRange): SparklinePoint[] | nul
   if (!raw.prices || raw.prices.length === 0) return null;
   return raw.prices.map(([t, v]) => ({ t, v }));
 }
+
+/** Real historical volume series for the same period — PR13.7 Goal 9, reads the same `market_chart` response `mapMarketChart` already unwraps, no new request. `null` when CoinGecko returned no volume series for this coin. */
+export function mapMarketVolumeSeries(raw: RawMarketChartRange): SparklinePoint[] | null {
+  if (!raw.total_volumes || raw.total_volumes.length === 0) return null;
+  return raw.total_volumes.map(([t, v]) => ({ t, v }));
+}

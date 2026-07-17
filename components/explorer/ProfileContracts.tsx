@@ -1,14 +1,20 @@
+import { Suspense } from "react";
 import { Blocks } from "lucide-react";
 
 import { ContractsList } from "@/components/explorer/ContractsList";
+import { ProfileContractDetailsAsync } from "@/components/explorer/ProfileContractDetailsAsync";
 import { ProfileSectionCard } from "@/components/explorer/ProfileSectionCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { CHAIN_BRANDING } from "@/lib/branding/chains";
 import type { ChainInfo, Contracts } from "@/lib/intelligence/types";
+import type { ContractDetail } from "@/lib/providers/blockscout/service";
+import type { ProviderResult } from "@/lib/providers/common/types";
 
 type ProfileContractsProps = {
   contracts: Contracts;
   chain: ChainInfo;
+  /** PR13.7 Goal 10 — real per-address Blockscout verification detail for every contract in `contracts.items`, kicked off unawaited by `page.tsx`. */
+  contractDetailsPromise: Promise<Array<{ address: string; result: ProviderResult<ContractDetail> }>>;
 };
 
 /**
@@ -24,7 +30,7 @@ type ProfileContractsProps = {
  * candidate — Blockscout's address endpoint has the field, it just isn't
  * wired), so it's omitted rather than fabricated.
  */
-export function ProfileContracts({ contracts, chain }: ProfileContractsProps) {
+export function ProfileContracts({ contracts, chain, contractDetailsPromise }: ProfileContractsProps) {
   const explorerUrl = CHAIN_BRANDING[chain.primaryChain]?.explorerUrl;
 
   return (
@@ -47,7 +53,9 @@ export function ProfileContracts({ contracts, chain }: ProfileContractsProps) {
           }
         />
       ) : (
-        <ContractsList contracts={contracts} />
+        <Suspense fallback={<ContractsList contracts={contracts} />}>
+          <ProfileContractDetailsAsync contracts={contracts} detailsPromise={contractDetailsPromise} />
+        </Suspense>
       )}
     </ProfileSectionCard>
   );

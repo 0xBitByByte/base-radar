@@ -13,6 +13,7 @@ import type { GovernanceEvent } from "@/lib/governance/types";
 import type { WhaleEvent } from "@/lib/whale/types";
 import type { Signal } from "@/lib/data/types";
 import type { TokenTransfer } from "@/lib/providers/blockscout/service";
+import type { ReleaseSummary } from "@/lib/providers/github/service";
 
 export type TimelineEventKind =
   | "release"
@@ -51,12 +52,31 @@ export function buildProjectTimeline(input: {
   /** Real recent transfers for this project's token contract (Blockscout) — `null`/omitted when no token contract is configured. Only the 5 most recent are folded in, so a busy token doesn't drown out every other event kind. */
   tokenTransfers?: TokenTransfer[] | null;
   tokenSymbol?: string | null;
+  /**
+   * PR13.7 Goal 13 — up to 10 real recent releases (shared with the Health
+   * Scorecard's Developer evidence tile, one fetch for both), folded in as
+   * genuine version history instead of just the single latest tag.
+   * `null`/omitted falls back to the single `github.latestReleaseTag` event
+   * this function always produced before this goal.
+   */
+  releases?: ReleaseSummary[] | null;
   now?: string;
 }): TimelineEvent[] {
   const now = input.now ?? new Date().toISOString();
   const events: TimelineEvent[] = [];
 
-  if (input.github.available && input.github.latestReleaseTag && input.github.latestReleasePublishedAt) {
+  if (input.releases && input.releases.length > 0) {
+    for (const release of input.releases.slice(0, 5)) {
+      if (!release.publishedAt) continue;
+      events.push({
+        id: `release-${release.tag}`,
+        kind: "release",
+        title: `${release.tag} released`,
+        detail: input.github.fullName,
+        timestamp: release.publishedAt,
+      });
+    }
+  } else if (input.github.available && input.github.latestReleaseTag && input.github.latestReleasePublishedAt) {
     events.push({
       id: `release-${input.github.latestReleaseTag}`,
       kind: "release",

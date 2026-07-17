@@ -11,6 +11,8 @@ type SidebarItemProps = {
   active?: boolean;
   external?: boolean;
   onClick?: () => void;
+  /** A small trailing count pill — e.g. the live watchlist count (PR13.1). Omitted (not rendered as "0") when `undefined` or `0`. */
+  badge?: number;
 };
 
 export function SidebarItem({
@@ -20,6 +22,7 @@ export function SidebarItem({
   active = false,
   external = false,
   onClick,
+  badge,
 }: SidebarItemProps) {
   return (
     <Link
@@ -51,6 +54,18 @@ export function SidebarItem({
         {icon}
       </span>
       <span className="truncate">{label}</span>
+      {Boolean(badge) && (
+        <span
+          className={cn(
+            "ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10.5px] font-semibold tabular-nums",
+            active
+              ? "bg-radar-primary/15 text-radar-primary dark:bg-radar-accent/20 dark:text-radar-accent"
+              : "bg-radar-light-surface text-radar-light-muted dark:bg-white/10 dark:text-radar-muted"
+          )}
+        >
+          {badge}
+        </span>
+      )}
       {external && <ExternalLink className="ml-auto size-3.5 opacity-40" aria-hidden="true" />}
     </Link>
   );

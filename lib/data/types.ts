@@ -196,16 +196,6 @@ export type NarrativeHeatRow = {
   change24hPct: number;
 };
 
-export type WatchlistItemKind = "project" | "wallet" | "token" | "narrative";
-
-export type WatchlistItem = {
-  id: string;
-  kind: WatchlistItemKind;
-  label: string;
-  sublabel: string;
-  changePct24h?: number;
-};
-
 export type LiveTicker = {
   blockHeight: number;
   gasGwei: number;

@@ -22,6 +22,35 @@ const KIND_ICON: Record<TimelineEventKind, LucideIcon> = {
 };
 
 /**
+ * PR13.6 Goal 16 — a real, honest Category + Source label per event kind,
+ * so every row answers "what kind of thing is this and who reported it,"
+ * not just "what happened." Both are derived straight from `buildProjectTimeline`'s
+ * already-real `kind` (`lib/intelligence/timeline.ts`) — never a fabricated
+ * grouping beyond what this codebase's real event kinds actually are.
+ */
+const KIND_CATEGORY: Record<TimelineEventKind, string> = {
+  release: "GitHub",
+  "commit-activity": "GitHub",
+  governance: "Governance",
+  whale: "Treasury",
+  transfer: "Treasury",
+  "tvl-change": "Treasury",
+  "risk-alert": "Risk",
+  signal: "Signal",
+};
+
+const KIND_SOURCE: Record<TimelineEventKind, string> = {
+  release: "GitHub",
+  "commit-activity": "GitHub",
+  governance: "Snapshot",
+  whale: "Blockscout",
+  transfer: "Blockscout",
+  "tvl-change": "DefiLlama",
+  "risk-alert": "Base Radar",
+  signal: "Base Radar",
+};
+
+/**
  * Timeline — PR11 Part 9. Purely presentational; `buildProjectTimeline()`
  * (`lib/intelligence/timeline.ts`) already merged, de-duplicated, and
  * sorted the events newest-first — this component only renders the result.
@@ -56,10 +85,16 @@ export function ProfileTimeline({ events }: ProfileTimelineProps) {
                 <Icon className="size-3.5" aria-hidden="true" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-medium text-radar-light-text dark:text-radar-white">{event.title}</p>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <p className="truncate text-xs font-medium text-radar-light-text dark:text-radar-white">{event.title}</p>
+                  <span className="shrink-0 rounded-md bg-radar-light-border/60 px-1.5 py-0.5 text-[9.5px] font-medium tracking-wide text-radar-light-muted uppercase dark:bg-white/5 dark:text-radar-muted">
+                    {KIND_CATEGORY[event.kind]}
+                  </span>
+                </div>
                 {event.detail && (
                   <p className="truncate text-[11px] text-radar-light-muted dark:text-radar-muted">{event.detail}</p>
                 )}
+                <p className="text-[10px] text-radar-light-muted/70 dark:text-radar-muted/60">Source: {KIND_SOURCE[event.kind]}</p>
               </div>
               <span className="shrink-0 text-[11px] text-radar-light-muted dark:text-radar-muted">
                 {formatRelativeTime(event.timestamp)}

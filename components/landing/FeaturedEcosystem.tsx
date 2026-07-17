@@ -1,12 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 
-import { QuickViewDrawer } from "@/components/explorer/QuickViewDrawer";
 import { FeaturedProjectTile } from "@/components/landing/FeaturedProjectTile";
 import { FEATURED_PROJECTS } from "@/components/landing/featuredProjects";
-import type { ProjectIntelligence } from "@/lib/intelligence/types";
 
 /**
  * "Featured Base Ecosystem Projects" — a continuous horizontal auto-scroll
@@ -14,12 +12,13 @@ import type { ProjectIntelligence } from "@/lib/intelligence/types";
  * list renders twice back-to-back and loops exactly one half-width
  * (`br-marquee` in globals.css) so the seam is invisible; hovering any tile
  * pauses the whole strip (`group-hover:[animation-play-state:paused]`)
- * while that tile itself enlarges. Clicking a tile opens the real Quick
- * View drawer — the same component/data shape Explorer's own Quick View
- * uses, not a separate preview.
+ * while that tile itself enlarges. Clicking a tile opens the project's full
+ * Profile page directly (PR13.5 — the Profile page is now the single place
+ * to consume project intelligence; the Quick View drawer this used to open
+ * has been removed).
  */
 export function FeaturedEcosystem() {
-  const [selected, setSelected] = useState<ProjectIntelligence | null>(null);
+  const router = useRouter();
 
   return (
     <section id="projects" className="py-16 sm:py-24">
@@ -64,14 +63,12 @@ export function FeaturedEcosystem() {
               <FeaturedProjectTile
                 key={`${project.identity.id}-${index}`}
                 project={project}
-                onActivate={() => setSelected(project)}
+                onActivate={() => router.push(`/dashboard/projects/${project.identity.slug}`)}
               />
             ))}
           </div>
         </motion.div>
       </div>
-
-      <QuickViewDrawer project={selected} onClose={() => setSelected(null)} />
     </section>
   );
 }

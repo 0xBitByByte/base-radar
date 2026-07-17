@@ -1,11 +1,11 @@
-import { BookOpen, Briefcase, FileText, Globe, MessageCircle, MessagesSquare, Newspaper, PenLine, Send, Vote } from "lucide-react";
+import { BookOpen, Briefcase, Compass, FileText, Globe, Landmark, LineChart, MessageCircle, MessagesSquare, Newspaper, PenLine, Rss, Send, Video, Vote } from "lucide-react";
 
 import { DiscordMark, GithubMark, LinktreeMark, XMark } from "@/components/ui/BrandIcons";
 import { SITE } from "@/constants/site";
 import type { BrandIconComponent, SocialBrand, SocialPlatform } from "@/lib/branding/types";
 
 /**
- * Display metadata for every external link platform `SocialLink` supports.
+ * Display metadata for every external link platform this registry supports.
  * Real brand marks are used where this codebase already has one
  * (`BrandIcons`: GitHub, Discord, X, Linktree); everything else gets a
  * generic, representative icon rather than a fabricated logo — the same
@@ -25,6 +25,14 @@ import type { BrandIconComponent, SocialBrand, SocialPlatform } from "@/lib/bran
  * consumer's neutral hover treatment differs slightly by design (Sidebar
  * supports both themes, Footer is dark-only), so unifying them would force
  * an identical treatment onto two legitimately different contexts.
+ *
+ * `coingecko`/`defillama`/`explorer` (PR13.7 Goal 1) aren't social
+ * platforms — they're data-source/explorer links the Project Profile Hero
+ * renders in the same icon row. `reddit`/`youtube` have no `SocialLinks`
+ * schema field at all (no project in the registry has ever populated one)
+ * — both get a generic representative icon, same convention as Telegram's
+ * `Send`, and the Hero always renders them disabled ("Not available")
+ * rather than omitting them, per Goal 1's "never hide icons" rule.
  */
 export const SOCIAL_BRANDING: Record<SocialPlatform, SocialBrand> = {
   website: { label: "Website", Icon: Globe },
@@ -41,6 +49,11 @@ export const SOCIAL_BRANDING: Record<SocialPlatform, SocialBrand> = {
   forum: { label: "Forum", Icon: MessagesSquare },
   linkedin: { label: "LinkedIn", Icon: Briefcase, hoverClassName: "hover:bg-[#0A66C2]/10 hover:text-[#0A66C2]" },
   governance: { label: "Governance", Icon: Vote },
+  coingecko: { label: "CoinGecko", Icon: LineChart },
+  defillama: { label: "DefiLlama", Icon: Landmark },
+  explorer: { label: "BaseScan", Icon: Compass },
+  reddit: { label: "Reddit", Icon: Rss },
+  youtube: { label: "YouTube", Icon: Video },
 };
 
 export type SocialNavLink = {

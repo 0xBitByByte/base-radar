@@ -146,6 +146,7 @@ function buildFeaturedProject(spec: FeaturedProjectSpec): ProjectIntelligence {
       openIssues: null,
       latestReleaseTag: null,
       latestReleasePublishedAt: null,
+      latestReleaseNoteSummary: null,
       language: null,
       license: null,
       createdAt: null,

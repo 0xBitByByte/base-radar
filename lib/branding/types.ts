@@ -49,7 +49,12 @@ export type SocialPlatform =
   | "blog"
   | "forum"
   | "linkedin"
-  | "governance";
+  | "governance"
+  | "coingecko"
+  | "defillama"
+  | "explorer"
+  | "reddit"
+  | "youtube";
 
 export type SocialBrand = {
   label: string;

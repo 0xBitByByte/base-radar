@@ -1,11 +1,13 @@
 /** Public API for the Blockscout provider — cache- and rate-limit-guarded. */
 
-import { fetchChainStats, fetchRecentSmartContracts, fetchTokenTransfers } from "@/lib/providers/blockscout/client";
+import { fetchAddressInfo, fetchChainStats, fetchContractDetail, fetchRecentSmartContracts, fetchTokenTransfers } from "@/lib/providers/blockscout/client";
 import {
   mapChainStats,
+  mapContractDetail,
   mapRecentlyVerifiedContract,
   mapTokenTransfers,
   type ChainStats,
+  type ContractDetail,
   type TokenTransfer,
   type VerifiedContract,
 } from "@/lib/providers/blockscout/mapper";
@@ -54,4 +56,24 @@ export async function getTokenTransfers(tokenAddress: string): Promise<ProviderR
   );
 }
 
-export type { ChainStats, TokenTransfer, VerifiedContract };
+/**
+ * PR13.7 Goal 10 — real per-address contract verification metadata
+ * (compiler/optimization/license/proxy/implementation/creator/creation-tx),
+ * extended/Profile-page-only, only ever called for the small number of
+ * contracts actually in a project's registry `contracts` array (typically
+ * 0-3). Two real Blockscout endpoints, fetched in parallel, same 60s TTL as
+ * every other Blockscout call.
+ */
+export async function getContractDetail(address: string): Promise<ProviderResult<ContractDetail>> {
+  return toProviderResult(PROVIDER, () =>
+    getOrSet(`${PROVIDER}:contract-detail:${address}`, CACHE_TTL_MS, async () => {
+      // Two real HTTP requests below (contract-detail + address-info) — one `assertRateLimit` call per request, matching every other multi-fetch service function's convention (e.g. `base.getBaseNetworkStatus`).
+      assertRateLimit(PROVIDER, RATE_LIMIT);
+      assertRateLimit(PROVIDER, RATE_LIMIT);
+      const [contract, addressInfo] = await Promise.all([fetchContractDetail(address), fetchAddressInfo(address)]);
+      return mapContractDetail(contract, addressInfo);
+    })
+  );
+}
+
+export type { ChainStats, ContractDetail, TokenTransfer, VerifiedContract };

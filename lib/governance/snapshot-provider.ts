@@ -24,6 +24,7 @@ export class SnapshotGovernanceProvider implements GovernanceProvider {
       provider: "snapshot",
       proposalId: proposal.id,
       title: proposal.title,
+      description: proposal.description,
       status: proposal.status,
       start: proposal.start,
       end: proposal.end,

@@ -44,7 +44,6 @@ import {
   MOCK_PORTFOLIO,
   MOCK_PROJECT_SPOTLIGHT,
   MOCK_SIGNALS,
-  MOCK_WATCHLIST,
   MOCK_WELCOME_STATS,
   MOCK_WHALE_EVENTS,
 } from "@/lib/data/mock";
@@ -65,7 +64,6 @@ import type {
   ProjectSpotlight,
   Signal,
   Trend,
-  WatchlistItem,
   WelcomeStats,
   WhaleEvent,
   WithSource,
@@ -889,16 +887,6 @@ async function getNarrativeHeatmapImpl(): Promise<WithSource<NarrativeHeatRow[]>
   }
 }
 export const getNarrativeHeatmap = cache(getNarrativeHeatmapImpl);
-
-async function getWatchlistImpl(): Promise<WithSource<WatchlistItem[]>> {
-  // Pinned items are inherently user-specific and require accounts/wallet
-  // connect, neither of which exist in this shell yet.
-  return Object.assign(
-    MOCK_WATCHLIST.map((item) => ({ ...item })),
-    { source: "mock" as const }
-  );
-}
-export const getWatchlist = cache(getWatchlistImpl);
 
 async function getLiveTickerImpl(): Promise<WithSource<LiveTicker>> {
   const ticker: LiveTicker = { ...MOCK_LIVE_TICKER };

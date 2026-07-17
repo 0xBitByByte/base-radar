@@ -1,7 +1,9 @@
 /** Raw Blockscout responses → domain models. Pure functions, no I/O. */
 
 import type {
+  RawAddressInfo,
   RawChainStats,
+  RawContractDetail,
   RawSmartContractsResponse,
   RawTokenTransfersResponse,
 } from "@/lib/providers/blockscout/client";
@@ -57,6 +59,39 @@ export type TokenTransfer = {
    */
   amount: number;
 };
+
+export type ContractDetail = {
+  verified: boolean;
+  name: string | null;
+  compilerVersion: string | null;
+  optimizationEnabled: boolean | null;
+  licenseType: string | null;
+  language: string | null;
+  /** `null` when not a proxy — a real, positive signal (Blockscout's own `proxy_type` classification), not an absence-of-data null. */
+  proxyType: string | null;
+  implementationAddress: string | null;
+  implementationName: string | null;
+  creatorAddress: string | null;
+  creationTxHash: string | null;
+};
+
+/** PR13.7 Goal 10 — combines the two real Blockscout responses this evidence needs (contract-detail + address-info) into one domain model. Owner and creation date/block are deliberately absent — neither is a real field on either endpoint (confirmed via a live test fetch), never fabricated. */
+export function mapContractDetail(contract: RawContractDetail, address: RawAddressInfo): ContractDetail {
+  const implementation = contract.implementations[0] ?? null;
+  return {
+    verified: contract.is_verified,
+    name: contract.name,
+    compilerVersion: contract.compiler_version,
+    optimizationEnabled: contract.optimization_enabled,
+    licenseType: contract.license_type && contract.license_type !== "none" ? contract.license_type : null,
+    language: contract.language,
+    proxyType: contract.proxy_type,
+    implementationAddress: implementation?.address_hash ?? null,
+    implementationName: implementation?.name ?? null,
+    creatorAddress: address.creator_address_hash,
+    creationTxHash: address.creation_transaction_hash,
+  };
+}
 
 export function mapTokenTransfers(raw: RawTokenTransfersResponse): TokenTransfer[] {
   return raw.items

@@ -20,7 +20,7 @@ import type { ProjectIntelligence } from "@/lib/intelligence/types";
 
 type ProjectRowProps = {
   project: ProjectIntelligence;
-  /** Opens Quick View for this project — docs/explorer/06 §4 (PR6). */
+  /** Opens this project's full Profile page (PR13.5 — the Quick View drawer this used to open has been removed). */
   onActivate?: () => void;
 };
 
@@ -170,7 +170,7 @@ function ProjectRowComponent({ project, onActivate }: ProjectRowProps) {
       </Cell>
 
       <Cell align="center" className={ACTION_COLUMN_CLASS}>
-        <RowActions onActivate={onActivate} />
+        <RowActions projectId={identity.id} projectName={identity.name} onActivate={onActivate} />
       </Cell>
     </tr>
   );

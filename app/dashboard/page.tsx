@@ -9,9 +9,9 @@ import {
   getProjectSpotlight,
   getSignals,
   getTrendingNarratives,
-  getWatchlist,
   getWhaleEvents,
 } from "@/lib/data/aggregate";
+import { getAllProjectIntelligence } from "@/lib/intelligence/engine";
 import { WelcomeHeader } from "@/components/dashboard/WelcomeHeader";
 import { IntelligenceBrief } from "@/components/dashboard/IntelligenceBrief";
 import { KPIRow } from "@/components/dashboard/KPIRow";
@@ -55,7 +55,7 @@ export default async function DashboardPage() {
     heatmap,
     spotlight,
     activity,
-    watchlist,
+    allProjects,
   ] = await Promise.all([
     getIntelligenceBrief(),
     getKpis(),
@@ -68,7 +68,7 @@ export default async function DashboardPage() {
     getNarrativeHeatmap(),
     getProjectSpotlight(),
     getActivityFeed(),
-    getWatchlist(),
+    getAllProjectIntelligence(),
   ]);
 
   return (
@@ -90,7 +90,7 @@ export default async function DashboardPage() {
           <NarrativeHeatmap data={heatmap} lastUpdated={lastUpdated} />
           <ProjectSpotlight data={spotlight} lastUpdated={lastUpdated} />
           <ActivityFeed data={activity} lastUpdated={lastUpdated} />
-          <WatchlistWidget data={watchlist} lastUpdated={lastUpdated} />
+          <WatchlistWidget projects={allProjects} lastUpdated={lastUpdated} />
         </div>
       </div>
     </div>

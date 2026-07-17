@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { ExplorerHeader } from "@/components/explorer/ExplorerHeader";
 import { ExplorerSearch } from "@/components/explorer/ExplorerSearch";
@@ -8,7 +9,6 @@ import { ExplorerSort } from "@/components/explorer/ExplorerSort";
 import { ExplorerFilterBar } from "@/components/explorer/ExplorerFilterBar";
 import { ExplorerGrid } from "@/components/explorer/ExplorerGrid";
 import { ExplorerTable } from "@/components/explorer/ExplorerTable";
-import { QuickViewDrawer } from "@/components/explorer/QuickViewDrawer";
 import { ViewToggle, type ExplorerView } from "@/components/explorer/ViewToggle";
 import { normalizeSearch, searchProjects } from "@/components/explorer/search";
 import { sortProjects, DEFAULT_SORT, type SortState } from "@/components/explorer/sort";
@@ -29,13 +29,12 @@ type ExplorerPageClientProps = {
  * docs/explorer/05 §18's anti-patterns.
  */
 export function ExplorerPageClient({ projects, generatedAt }: ExplorerPageClientProps) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
   const [filters, setFilters] = useState<ExplorerFilters>(EMPTY_FILTERS);
   const [filterBarExpanded, setFilterBarExpanded] = useState(false);
   const [view, setView] = useState<ExplorerView>("grid");
-  /** `null` means the drawer is closed — the one piece of Quick View state this component owns (docs/explorer/05 §15); never a separate `drawerOpen` boolean that could drift out of sync with it. */
-  const [selectedProject, setSelectedProject] = useState<ProjectIntelligence | null>(null);
 
   const hasQuery = normalizeSearch(query).length > 0;
   const filtersActive = hasActiveFilters(filters);
@@ -59,8 +58,8 @@ export function ExplorerPageClient({ projects, generatedAt }: ExplorerPageClient
     setFilters(EMPTY_FILTERS);
   }
 
-  function closeDrawer() {
-    setSelectedProject(null);
+  function openProfile(project: ProjectIntelligence) {
+    router.push(`/dashboard/projects/${project.identity.slug}`);
   }
 
   return (
@@ -92,7 +91,7 @@ export function ExplorerPageClient({ projects, generatedAt }: ExplorerPageClient
           hasFilters={filtersActive}
           onClearSearch={clearSearch}
           onClearFilters={clearFilters}
-          onActivate={setSelectedProject}
+          onActivate={openProfile}
         />
       ) : (
         <ExplorerTable
@@ -103,11 +102,9 @@ export function ExplorerPageClient({ projects, generatedAt }: ExplorerPageClient
           onClearFilters={clearFilters}
           sort={sort}
           onSortChange={setSort}
-          onActivate={setSelectedProject}
+          onActivate={openProfile}
         />
       )}
-
-      <QuickViewDrawer project={selectedProject} onClose={closeDrawer} />
     </div>
   );
 }

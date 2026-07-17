@@ -5,6 +5,8 @@ import type { RawSnapshotProposal } from "@/lib/providers/snapshot/client";
 export type SnapshotProposal = {
   id: string;
   title: string;
+  /** Real proposal description (PR13.7 Goal 12) — `null` when Snapshot returned an empty body, never fabricated. */
+  description: string | null;
   status: "active" | "passed" | "failed" | "pending";
   start: string;
   end: string;
@@ -49,6 +51,7 @@ export function mapProposal(raw: RawSnapshotProposal): SnapshotProposal {
   return {
     id: raw.id,
     title: raw.title,
+    description: raw.body ? raw.body.trim() || null : null,
     status: mapStatus(raw),
     start: new Date(raw.start * 1000).toISOString(),
     end: new Date(raw.end * 1000).toISOString(),

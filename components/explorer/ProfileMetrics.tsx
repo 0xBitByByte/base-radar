@@ -14,14 +14,16 @@ import { GITHUB_STARS_INFO_TOOLTIP } from "@/components/explorer/metricTooltips"
 import { EmptyState } from "@/components/ui/EmptyState";
 import { WidgetSkeleton } from "@/components/dashboard/WidgetSkeleton";
 import { CHAIN_BRANDING } from "@/lib/branding/chains";
+import { getExplorerLink } from "@/lib/branding/explorerLink";
 import { formatCompactCurrency, formatCompactNumber, formatDate, formatNumber, formatPercent, formatRelativeTime } from "@/lib/data/format";
-import type { ChainInfo, Contracts, GithubIntel, Trading, Tvl } from "@/lib/intelligence/types";
+import type { ChainInfo, Contracts, GithubIntel, Identity, Trading, Tvl } from "@/lib/intelligence/types";
 import type { SparklinePoint } from "@/lib/data/types";
 import type { CommitActivity } from "@/lib/providers/github/service";
 import type { TokenTransfer } from "@/lib/providers/blockscout/service";
 import type { ProviderResult } from "@/lib/providers/common/types";
 
 type ProfileMetricsProps = {
+  identity: Identity;
   trading: Trading;
   tvl: Tvl;
   /** First-paint `GithubIntel` — real stars/forks/release fields; `commitsLast7d` is always `null` here (streamed separately via `commitActivityPromise`, never re-merged into this object). */
@@ -44,6 +46,8 @@ type ProfileMetricsProps = {
   /** Recent transfers for this project's token contract (PR12.1c Req 5.5), passed unresolved — Blockscout's transfer-history endpoint has been observed taking 5-6s and feeds nothing else on first paint. */
   transfersPromise: Promise<ProviderResult<TokenTransfer[]> | null>;
   tokenSymbol: string | null;
+  /** PR13.7 Goal 14 — real finality lag, already resolved by `page.tsx` (Base RPC is fast enough not to defer behind Suspense — see `base.getFinality`'s own doc comment). `null` when the fetch failed. */
+  finality: number | null;
 };
 
 /** One shared tile per related group of stats — same recipe `QuickViewMetrics` already uses, tightened further in PR11.2 Part 5 for a denser, less padded read. */
@@ -53,16 +57,15 @@ const METRIC_GROUP_CLASS =
 /**
  * Live Metrics — PR11 Part 3, tightened in PR11.1. Price/Token were pulled
  * into `ProfileTokenAndPrice` (PR12.1c Req 5.4); this component now covers
- * TVL & Liquidity, Network, and Engineering Health. Every field renders
- * through `MetricItem` with `emphasize` so values read as the dominant
- * element and labels stay subdued, gracefully "Unavailable" where no real
- * provider data exists — Holders and per-project Transaction *counts* have
- * no real data source anywhere in this codebase's provider set (confirmed:
- * Blockscout exposes neither), so they render unavailable rather than a
- * synthesized number; real individual token transfers, where a token
- * contract is configured, render via `RecentTransactions` instead. Section
- * ids (`tvl`/`network`/`developer`) are the `ProfileSectionNav` scroll
- * targets.
+ * TVL & Liquidity, Network, and Engineering Health. Section ids
+ * (`tvl`/`network`/`developer`) are the `ProfileSectionNav` scroll targets.
+ *
+ * PR13.6 (Goals 8-11) — individual metrics with genuinely no data source
+ * (DEX liquidity for a project with no tracked trading pairs, GitHub
+ * contributor counts no provider in this codebase exposes) are hidden
+ * gracefully instead of rendering an "Unavailable"/"—" placeholder; Network
+ * is a single equal-width row of four real, already-computed fields
+ * (Chain / Gas / Block Height / Est. TPS) instead of a denser wrapping grid.
  *
  * Streaming Architecture pass — the three genuinely slow provider calls
  * (DefiLlama's per-protocol TVL history, GitHub's commit-activity endpoint,
@@ -75,6 +78,7 @@ const METRIC_GROUP_CLASS =
  * comes from fast provider calls and renders synchronously, unaffected.
  */
 export function ProfileMetrics({
+  identity,
   trading,
   tvl,
   github,
@@ -85,9 +89,8 @@ export function ProfileMetrics({
   commitActivityPromise,
   transfersPromise,
   tokenSymbol,
+  finality,
 }: ProfileMetricsProps) {
-  const liquidityAvailable = trading.available && trading.liquidityUsd !== null;
-  const tvlAvailable = tvl.available && tvl.tvlUsd !== null;
   const starsAvailable = github.available && github.stars !== null;
   const forksAvailable = github.available && github.forks !== null;
   const issuesAvailable = github.available && github.openIssues !== null;
@@ -96,8 +99,49 @@ export function ProfileMetrics({
   const developerActivityAvailable = starsAvailable || forksAvailable || issuesAvailable || releaseAvailable;
   const networkAvailable = chain.network.available;
   const explorerUrl = CHAIN_BRANDING[chain.primaryChain]?.explorerUrl ?? null;
+  const chainLabel = CHAIN_BRANDING[chain.primaryChain]?.label ?? chain.primaryChain;
+
+  // Goal 3 — the Network section's source-attribution link only ever points
+  // at a real on-chain address view, never the bare explorer homepage.
+  const explorerLink = getExplorerLink(chain, contracts, identity);
+  const networkSourceLink =
+    explorerLink && (explorerLink.tier === "contract" || explorerLink.tier === "token") && explorerLink.serviceName
+      ? { href: explorerLink.href, label: explorerLink.serviceName }
+      : undefined;
 
   const tokenContract = contracts.items.find((item) => item.chain === chain.primaryChain && item.type === "token");
+
+  // Real per-pool liquidity share, sorted by size — Goal 9's "Pool
+  // Distribution," derived entirely from `trading.pools` (already fetched
+  // for the "Largest Pool" tile below, never a new provider call).
+  const totalPoolLiquidity = trading.pools.reduce((sum, pool) => sum + (pool.liquidityUsd ?? 0), 0);
+  const poolDistribution =
+    trading.available && trading.pools.length > 1 && totalPoolLiquidity > 0
+      ? trading.pools.slice(0, 5).map((pool) => ({
+          dexId: pool.dexId,
+          liquidityUsd: pool.liquidityUsd,
+          sharePct: pool.liquidityUsd !== null ? (pool.liquidityUsd / totalPoolLiquidity) * 100 : 0,
+        }))
+      : [];
+
+  // Goal 9 — "Exchange Distribution," 24h volume grouped by DEX (not by
+  // individual pool, unlike Pool Distribution above) — same `trading.pools`
+  // data, a different grouping. "Top DEX" is whichever DEX leads this by
+  // cumulative volume, which can differ from "Largest Pool" (a single pool's
+  // liquidity) when a DEX's volume is spread across several smaller pools.
+  const volumeByDex = new Map<string, number>();
+  for (const pool of trading.pools) {
+    volumeByDex.set(pool.dexId, (volumeByDex.get(pool.dexId) ?? 0) + (pool.volume24hUsd ?? 0));
+  }
+  const totalPoolVolume = [...volumeByDex.values()].reduce((sum, v) => sum + v, 0);
+  const exchangeDistribution =
+    trading.available && volumeByDex.size > 1 && totalPoolVolume > 0
+      ? [...volumeByDex.entries()]
+          .map(([dexId, volumeUsd]) => ({ dexId, volumeUsd, sharePct: (volumeUsd / totalPoolVolume) * 100 }))
+          .sort((a, b) => b.volumeUsd - a.volumeUsd)
+          .slice(0, 5)
+      : [];
+  const topDexId = exchangeDistribution[0]?.dexId ?? trading.largestPool?.dexId ?? null;
 
   return (
     <div className="flex flex-col gap-5">
@@ -107,31 +151,90 @@ export function ProfileMetrics({
         icon={Wallet}
         sourceLink={defillamaSlug ? { href: `https://defillama.com/protocol/${defillamaSlug}`, label: "DefiLlama" } : undefined}
       >
-        {tvlAvailable || trading.available ? (
+        {tvl.available || trading.available ? (
           <>
-            <div className={METRIC_GROUP_CLASS}>
-              <ProfileTvlLive defillamaSlug={defillamaSlug} tvlUsd={tvlAvailable ? (tvl.tvlUsd as number) : null} changePct24h={tvl.changePct24h} />
-              <Suspense fallback={<><MetricItemSkeleton emphasize /><MetricItemSkeleton emphasize /></>}>
-                <ProfileTvlChangeTilesAsync resultPromise={tvlHistoryPromise} />
-              </Suspense>
-              <MetricItem bare emphasize label="DEX Liquidity" value={liquidityAvailable ? formatCompactCurrency(trading.liquidityUsd as number) : undefined} unavailable={!liquidityAvailable} />
-              <MetricItem bare emphasize label="Tracked Pools" value={trading.available ? formatNumber(trading.pairCount) : undefined} unavailable={!trading.available} />
-              <MetricItem
-                bare
-                emphasize
-                label="Largest Pool"
-                value={trading.largestPool ? `${trading.largestPool.dexId} (${formatCompactCurrency(trading.largestPool.liquidityUsd ?? 0)})` : undefined}
-                unavailable={!trading.largestPool}
-              />
-            </div>
-            <Suspense fallback={<WidgetSkeleton className="h-[130px] rounded-xl" />}>
-              <ProfileTvlChartAsync resultPromise={tvlHistoryPromise} tvlAvailable={tvlAvailable} />
-            </Suspense>
-            {tvlAvailable && (
-              <p className="text-xs text-radar-light-muted dark:text-radar-muted">
-                Protocol revenue/fees aren&apos;t available from any connected provider yet.
+            {tvl.available && tvl.tvlUsd !== null && (
+              <div className={METRIC_GROUP_CLASS}>
+                <ProfileTvlLive defillamaSlug={defillamaSlug} tvlUsd={tvl.tvlUsd} changePct24h={tvl.changePct24h} />
+                <Suspense fallback={<><MetricItemSkeleton emphasize /><MetricItemSkeleton emphasize /></>}>
+                  <ProfileTvlChangeTilesAsync resultPromise={tvlHistoryPromise} />
+                </Suspense>
+              </div>
+            )}
+
+            {trading.available ? (
+              <div className={METRIC_GROUP_CLASS}>
+                <MetricItem
+                  bare
+                  emphasize
+                  label="DEX Liquidity"
+                  value={trading.liquidityUsd !== null ? formatCompactCurrency(trading.liquidityUsd) : undefined}
+                  unavailable={trading.liquidityUsd === null}
+                />
+                <MetricItem bare emphasize label="Tracked Pools" value={formatNumber(trading.pairCount)} />
+                <MetricItem
+                  bare
+                  emphasize
+                  label="Largest Pool"
+                  value={trading.largestPool ? `${trading.largestPool.dexId} (${formatCompactCurrency(trading.largestPool.liquidityUsd ?? 0)})` : undefined}
+                  unavailable={!trading.largestPool}
+                />
+                <MetricItem bare label="Top DEX" value={topDexId ?? undefined} unavailable={!topDexId} />
+                <MetricItem bare label="Liquidity Source" value="DexScreener" />
+              </div>
+            ) : (
+              <p className="rounded-xl border border-dashed border-radar-light-border p-3 text-xs text-radar-light-muted dark:border-white/10 dark:text-radar-muted">
+                <span className="font-semibold text-radar-light-text dark:text-radar-white">Not Tracked —</span> no
+                DexScreener trading pair is configured for this project in the Base Radar registry yet.
               </p>
             )}
+
+            {poolDistribution.length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[10.5px] font-semibold tracking-wide text-radar-light-muted uppercase dark:text-radar-muted">
+                  Pool Distribution
+                </span>
+                <ul className="flex flex-col gap-1.5">
+                  {poolDistribution.map((pool) => (
+                    <li key={pool.dexId} className="flex items-center gap-2 text-xs">
+                      <span className="w-20 shrink-0 truncate text-radar-light-text dark:text-radar-white">{pool.dexId}</span>
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-radar-light-border dark:bg-white/10">
+                        <div className="h-full rounded-full bg-radar-primary dark:bg-radar-accent" style={{ width: `${pool.sharePct}%` }} />
+                      </div>
+                      <span className="w-12 shrink-0 text-right tabular-nums text-radar-light-muted dark:text-radar-muted">
+                        {pool.sharePct.toFixed(0)}%
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Goal 9 — Exchange Distribution: 24h volume grouped by DEX, distinct from Pool Distribution's per-pool liquidity grouping above. */}
+            {exchangeDistribution.length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[10.5px] font-semibold tracking-wide text-radar-light-muted uppercase dark:text-radar-muted">
+                  Exchange Distribution
+                </span>
+                <ul className="flex flex-col gap-1.5">
+                  {exchangeDistribution.map((dex) => (
+                    <li key={dex.dexId} className="flex items-center gap-2 text-xs">
+                      <span className="w-20 shrink-0 truncate text-radar-light-text dark:text-radar-white">{dex.dexId}</span>
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-radar-light-border dark:bg-white/10">
+                        <div className="h-full rounded-full bg-radar-primary dark:bg-radar-accent" style={{ width: `${dex.sharePct}%` }} />
+                      </div>
+                      <span className="w-12 shrink-0 text-right tabular-nums text-radar-light-muted dark:text-radar-muted">
+                        {dex.sharePct.toFixed(0)}%
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <Suspense fallback={<WidgetSkeleton className="h-[130px] rounded-xl" />}>
+              <ProfileTvlChartAsync resultPromise={tvlHistoryPromise} tvlAvailable={tvl.available && tvl.tvlUsd !== null} />
+            </Suspense>
           </>
         ) : (
           <EmptyState
@@ -143,19 +246,20 @@ export function ProfileMetrics({
         )}
       </ProfileSectionCard>
 
-      <ProfileSectionCard
-        id="network"
-        title="Network"
-        icon={Globe}
-        sourceLink={explorerUrl ? { href: explorerUrl, label: CHAIN_BRANDING[chain.primaryChain].label } : undefined}
-      >
-        {/* Network figures read as informative, not urgent — deliberately not `emphasize` (the bold treatment Price/TVL/Engineering use), per PR12.1e Req 6. */}
-        <div className={METRIC_GROUP_CLASS}>
+      <ProfileSectionCard id="network" title="Network" icon={Globe} sourceLink={networkSourceLink}>
+        {/* PR13.7 Goal 14 — one equal-width, live-polling row of all six real fields (Network/Status/Block Height/Gas/TPS/Finality), instead of splitting TPS into a separate secondary row. */}
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
           <ProfileNetworkLive
+            chainLabel={chainLabel}
             gasGwei={networkAvailable ? chain.network.gasGwei : null}
             blockHeight={networkAvailable ? chain.network.blockHeight : null}
             estimatedTps={networkAvailable ? chain.network.estimatedTps : null}
+            finality={finality}
           />
+        </div>
+
+        {/* Secondary — Verified Contracts stays a real, supporting metric rather than forced into the primary row. */}
+        <div className={METRIC_GROUP_CLASS}>
           <MetricItem
             bare
             label="Verified Contracts"
@@ -163,6 +267,7 @@ export function ProfileMetrics({
             unavailable={verifiedPct === null}
           />
         </div>
+
         <Suspense fallback={<WidgetSkeleton className="h-16 rounded-xl" />}>
           <ProfileTransfersAsync
             resultPromise={transfersPromise}
@@ -172,10 +277,6 @@ export function ProfileMetrics({
             explorerUrl={explorerUrl}
           />
         </Suspense>
-        <p className="text-xs text-radar-light-muted dark:text-radar-muted">
-          Per-project transaction counts, wallet counts, and unique users aren&apos;t shown — Blockscout&apos;s public API only exposes
-          chain-wide totals, not per-contract figures, for any project in this registry.
-        </p>
       </ProfileSectionCard>
 
       <ProfileSectionCard
@@ -196,15 +297,16 @@ export function ProfileMetrics({
               </Suspense>
             </div>
 
-            {/* Secondary — real repo metadata, smaller supporting typography, never `emphasize`. */}
-            <div className="grid grid-cols-2 gap-2.5 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 dark:border-white/10 dark:bg-white/[0.02] sm:grid-cols-3 md:grid-cols-6">
-              <MetricItem bare label="Latest Release" value={releaseAvailable ? (github.latestReleaseTag as string) : undefined} unavailable={!releaseAvailable} />
-              <MetricItem bare label="Language" value={github.language ?? undefined} unavailable={!github.language} />
-              <MetricItem bare label="License" value={github.license ?? undefined} unavailable={!github.license} />
-              <MetricItem bare label="Repo Age" value={github.createdAt ? formatDate(github.createdAt) : undefined} unavailable={!github.createdAt} />
-              <MetricItem bare label="Last Push" value={github.pushedAt ? formatRelativeTime(github.pushedAt) : undefined} unavailable={!github.pushedAt} />
-              <MetricItem bare label="Contributors" unavailable infoTooltip="GitHub's contributor-count endpoint isn't wired yet — this codebase currently reads repo/release/commit-activity data only." />
-            </div>
+            {/* Secondary — real repo metadata, smaller supporting typography, never `emphasize`. Only rendered when at least one field is real, so this row never becomes an all-"Unavailable" wall (Goal 17). */}
+            {(releaseAvailable || github.language || github.license || github.createdAt || github.pushedAt) && (
+              <div className="grid grid-cols-2 gap-2.5 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 dark:border-white/10 dark:bg-white/[0.02] sm:grid-cols-3">
+                {releaseAvailable && <MetricItem bare label="Latest Release" value={github.latestReleaseTag as string} />}
+                {github.language && <MetricItem bare label="Language" value={github.language} />}
+                {github.license && <MetricItem bare label="License" value={github.license} />}
+                {github.createdAt && <MetricItem bare label="Repo Age" value={formatDate(github.createdAt)} />}
+                {github.pushedAt && <MetricItem bare label="Last Push" value={formatRelativeTime(github.pushedAt)} />}
+              </div>
+            )}
           </>
         ) : (
           <EmptyState

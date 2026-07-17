@@ -22,3 +22,8 @@ export function mapNetworkStatus(gasPriceHex: string, block: RawRpcBlock, chainI
 
   return { gasGwei, blockHeight, txCountLatestBlock, estimatedTps, chainId };
 }
+
+/** PR13.7 Goal 14 — real finality lag: how many blocks behind the chain's own "safe" tag the latest block currently sits. Both are real, already-fetched block numbers; this is a subtraction, not an estimate. */
+export function mapFinality(latestBlockHex: string, safeBlockHex: string): number {
+  return hexToNumber(latestBlockHex) - hexToNumber(safeBlockHex);
+}

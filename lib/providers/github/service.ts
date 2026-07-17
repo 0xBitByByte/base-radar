@@ -1,7 +1,16 @@
 /** Public API for the GitHub provider — cache- and rate-limit-guarded. */
 
-import { fetchCommitActivity, fetchLatestRelease, fetchRepo, type RawRelease } from "@/lib/providers/github/client";
-import { mapCommitActivity, mapRepoStats, type CommitActivity, type RepoStats } from "@/lib/providers/github/mapper";
+import { fetchCommitActivity, fetchContributors, fetchLatestRelease, fetchReleases, fetchRepo, type RawRelease } from "@/lib/providers/github/client";
+import {
+  mapCommitActivity,
+  mapContributorCount,
+  mapReleases,
+  mapRepoStats,
+  type CommitActivity,
+  type ContributorCount,
+  type ReleaseSummary,
+  type RepoStats,
+} from "@/lib/providers/github/mapper";
 import { getOrSet } from "@/lib/providers/common/cache";
 import { assertRateLimit, type RateLimitConfig } from "@/lib/providers/common/rate-limit";
 import type { ProviderResult } from "@/lib/providers/common/types";
@@ -48,4 +57,26 @@ export async function getCommitActivity(fullName: string): Promise<ProviderResul
   );
 }
 
-export type { CommitActivity, RepoStats };
+/** Real contributor count (page-1, up to 100) — PR13.7 Goal 2/6, extended/Profile-page-only, same cache/rate-limit budget as every other GitHub call. */
+export async function getContributorCount(fullName: string): Promise<ProviderResult<ContributorCount>> {
+  return toProviderResult(PROVIDER, () =>
+    getOrSet(`${PROVIDER}:contributors:${fullName}`, CACHE_TTL_MS, async () => {
+      assertRateLimit(PROVIDER, RATE_LIMIT);
+      const raw = await fetchContributors(fullName);
+      return mapContributorCount(raw);
+    })
+  );
+}
+
+/** Up to 10 most recent releases — real version history for the Timeline (Goal 13) and release-count evidence for the Scorecard's Developer tile (Goal 6). Both reuse this one call, never fetched twice. */
+export async function getReleases(fullName: string): Promise<ProviderResult<ReleaseSummary[]>> {
+  return toProviderResult(PROVIDER, () =>
+    getOrSet(`${PROVIDER}:releases:${fullName}`, CACHE_TTL_MS, async () => {
+      assertRateLimit(PROVIDER, RATE_LIMIT);
+      const raw = await fetchReleases(fullName);
+      return mapReleases(raw);
+    })
+  );
+}
+
+export type { CommitActivity, ContributorCount, ReleaseSummary, RepoStats };

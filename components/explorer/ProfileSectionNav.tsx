@@ -8,13 +8,13 @@ import { cn } from "@/lib/utils";
 
 const SECTIONS = [
   { id: "overview", label: "Overview" },
+  { id: "community", label: "Community" },
   { id: "price", label: "Price" },
   { id: "tvl", label: "TVL" },
   { id: "network", label: "Network" },
   { id: "developer", label: "Engineering" },
   { id: "contracts", label: "Contracts" },
   { id: "governance", label: "Governance" },
-  { id: "community", label: "Community" },
   { id: "timeline", label: "Timeline" },
 ] as const;
 

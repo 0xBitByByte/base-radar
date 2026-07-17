@@ -5,8 +5,8 @@ import { cn } from "@/lib/utils";
 export const TABLE_HEADER_CELL_CLASS =
   "px-3 py-2.5 text-left text-[10.5px] font-medium whitespace-nowrap uppercase tracking-wide text-radar-light-muted dark:text-radar-muted";
 
-/** Shared, explicit width for the Actions column's header (`<th>`) and every row's action cell (`<td>`) — a table cell's width is only reliably fixed when both share the same class, since `table-layout: auto` otherwise resolves it from content. Sized for the "View" button (49px) plus even breathing room on each side. */
-export const ACTION_COLUMN_CLASS = "w-20";
+/** Shared, explicit width for the Actions column's header (`<th>`) and every row's action cell (`<td>`) — a table cell's width is only reliably fixed when both share the same class, since `table-layout: auto` otherwise resolves it from content. Sized for the Watch star plus the "View" button (PR13.1) side by side, with even breathing room on each side. */
+export const ACTION_COLUMN_CLASS = "w-28";
 
 type ColumnHeaderProps = {
   label: string;
