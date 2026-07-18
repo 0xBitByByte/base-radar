@@ -84,6 +84,23 @@ dedicated `/dashboard/brief` page. Deterministic template prose — no
 external AI API. See [ARCHITECTURE.md](ARCHITECTURE.md#daily-brief) for the
 pipeline and [API.md](API.md#daily-brief-api) for the function reference.
 
+## Portfolio Intelligence
+
+**Status**: ✅ Shipped
+
+A searchable, filterable per-Watchlist read, one level above Daily Brief:
+where a Daily Brief summarizes the day's Intelligence Alerts market-wide,
+Portfolio Intelligence scopes that same output to the current Watchlist —
+overall health, top performers, projects needing attention, security
+risks, governance watch, development momentum, dominant narratives, and
+recommendations. Built entirely from `getWatchlist()`, `getIntelligenceAlerts()`,
+and `getDailyBrief()` — no new scoring or narrative logic, no provider
+calls. Surfaced as a compact Dashboard widget and a dedicated
+`/dashboard/portfolio` page. Deterministic template prose — no external AI
+API. See [ARCHITECTURE.md](ARCHITECTURE.md#portfolio-intelligence) for the
+pipeline and [API.md](API.md#portfolio-intelligence-api) for the function
+reference.
+
 ## Milestone 5 — Provider Layer
 
 **Status**: 📋 Planned

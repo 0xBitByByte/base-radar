@@ -15,6 +15,7 @@
 - Alerts (Alert Engine + Notification Center)
 - AI Intelligence (deterministic, rule-based alert scoring & narratives)
 - AI Daily Intelligence Brief (searchable/filterable executive summary + Dashboard widget)
+- Portfolio Intelligence (searchable/filterable per-Watchlist read + Dashboard widget)
 
 ---
 

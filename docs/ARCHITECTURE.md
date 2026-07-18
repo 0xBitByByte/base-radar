@@ -474,6 +474,80 @@ is assembled from the brief's own fields).
 (headline, summary, 3 metrics, top opportunity, generated time) — never the
 full section list, which lives at `/dashboard/brief` only.
 
+## Portfolio Intelligence
+
+`lib/portfolio/` (PR17) is a third executive-summary layer, one level above
+Daily Brief — where a `DailyBrief` summarizes the day's Intelligence Alerts
+market-wide, a `PortfolioIntelligence` summarizes them scoped to the
+current Watchlist. It consumes exactly three existing services —
+`getWatchlist()`, `getIntelligenceAlerts()`, `getDailyBrief()` — and calls
+no provider directly.
+
+```
+lib/portfolio/
+  types.ts      PortfolioIntelligence model + PortfolioHealth
+  sections.ts   computePortfolioStats + 6 section builders
+  summary.ts    Deterministic headline/executive-summary/health-label prose
+  engine.ts     buildPortfolioIntelligence(): the pure pipeline entry point
+  storage.ts    cachedPortfolioIntelligence (pure runtime cache) + getPortfolioIntelligence()
+```
+
+```mermaid
+flowchart TD
+    Watchlist["getWatchlist()<br/>lib/watchlist/service.ts"] --> Storage["getPortfolioIntelligence()<br/>lib/portfolio/storage.ts"]
+    Brief["getDailyBrief()<br/>lib/brief/storage.ts"] --> Storage
+    Alerts["getIntelligenceAlerts()<br/>lib/alerts/service.ts"] --> Storage
+    Storage -->|"same Watchlist and Daily Brief references as last call?"| Cache{"Reuse cached read?"}
+    Cache -->|yes| Cached["cachedPortfolioIntelligence"]
+    Cache -->|no| Engine["buildPortfolioIntelligence()<br/>lib/portfolio/engine.ts"]
+    Engine --> Sections["Section builders<br/>lib/portfolio/sections.ts"]
+    Sections --> Summary["Headline/summary/health prose<br/>lib/portfolio/summary.ts"]
+    Summary --> Cached
+    Cached --> UI["Dashboard PortfolioWidget · /dashboard/portfolio page"]
+```
+
+**Relationship with Daily Brief**: four of Portfolio Intelligence's six
+sections (Top Performers, Security Risks, Governance Watch, Development
+Momentum) are `DailyBrief`'s own already-computed sections, selected
+unchanged — never re-filtered from `IntelligenceAlert[]` a second time.
+Dominant Narratives is `DailyBrief.emergingNarratives`, capped to the top 3.
+Only "Projects Needing Attention" is a genuinely new derivation — real
+`"decline"`-narrative alerts, the one signal Daily Brief's own sections
+never surface on their own. `projectCount` is deliberately the TRUE
+Watchlist size (`getWatchlist().items.length`), not `DailyBrief.projectCount`
+(which only counts watched projects that currently have a real Intelligence
+Alert) — the gap between the two honestly reflects how much of the
+Watchlist is currently silent.
+
+**Caching**: `storage.ts` rebuilds only when `getWatchlist()` or
+`getDailyBrief()` returns a new reference — both already guarantee stable
+references between real changes, and Daily Brief's own reference already
+changes whenever Intelligence Alerts do, so tracking it alone is sufficient
+(no separate alerts-reference check needed).
+
+**UI components** (`components/portfolio/`): `PortfolioOverview` (the
+page-level orchestrator, `/dashboard/portfolio`), `PortfolioCard`
+(headline/health/summary/stats hero), `PortfolioSection` (shared
+icon+heading+content wrapper), `PortfolioMetric`, `PortfolioWidget` (compact
+Dashboard preview), `PortfolioHealthBadge`, `NarrativeDistribution`,
+`RecommendationCard`. Search and the section filter live in
+`components/portfolio/filters.ts`, which re-exports
+`components/brief/filters.ts`'s generic query helpers directly rather than
+reimplementing them — Portfolio's reused sections are typed as the exact
+same `BriefOpportunity[]`/`BriefHighlight[]`/`BriefNarrativeTrend[]` shapes.
+
+**Hooks** (`lib/hooks/`): `usePortfolioIntelligence` (a
+`useSyncExternalStore` binding to `getPortfolioIntelligence()`, subscribed
+to BOTH `lib/alerts/service.ts`'s and `lib/watchlist/service.ts`'s listener
+sets — the two real sources Portfolio Intelligence can change from) and
+`usePortfolioMetrics` (the one place the small metric-tile list is
+assembled from the portfolio's own fields).
+
+**Dashboard integration**: `PortfolioWidget` renders only the top-level
+summary (health badge, headline, summary, 3 metrics, top performer,
+generated time) — never the full section list, which lives at
+`/dashboard/portfolio` only.
+
 ## Theming
 
 Theming is handled by `next-themes` at the root layout, using the standard

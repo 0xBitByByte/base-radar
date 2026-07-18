@@ -325,6 +325,47 @@ Pure, presentation-layer search/filter/sort helpers over an already-built
 | `filterOpportunities(opportunities, query)` / `filterHighlights(highlights, query)` / `filterTextLines(lines, query)` / `filterNarrativeTrends(trends, query)` | Case-insensitive substring filters, each scoped to one section's item shape. |
 | `sortOpportunities(opportunities, order)` | `BriefOpportunity[]` — `"score"` (default) / `"confidence"` / `"alphabetical"` / `"newest"`. |
 
+## Portfolio Intelligence API
+
+Internal function reference for `lib/portfolio/`. See
+[ARCHITECTURE.md](ARCHITECTURE.md#portfolio-intelligence) for the pipeline
+— it only ever reads `getWatchlist()`, `getIntelligenceAlerts()`, and
+`getDailyBrief()`, never a provider directly, and never recomputes scoring
+or narrative detection.
+
+### Engine — `lib/portfolio/engine.ts` / `sections.ts` / `summary.ts`
+
+| Function | Module | Returns |
+| --- | --- | --- |
+| `buildPortfolioIntelligence(watchlist, alerts, dailyBrief, generatedAt)` | `engine.ts` | `PortfolioIntelligence` — the full pipeline (stats → sections → summary/health prose). Pure. |
+| `computePortfolioStats(watchlist, dailyBrief, alerts)` | `sections.ts` | `PortfolioStats` — `projectCount` (true Watchlist size), `averageConfidence` (reused from `DailyBrief`), `averageScore` (the one new aggregate). |
+| `buildTopPerformers` / `buildSecurityRisks` / `buildGovernanceWatch` / `buildDevelopmentMomentum` / `buildNarratives` | `sections.ts` | Thin selectors over `DailyBrief`'s own already-computed sections — never re-filter `IntelligenceAlert[]`. |
+| `buildProjectsNeedingAttention(alerts)` | `sections.ts` | `BriefHighlight[]` — the one genuinely new derivation: real `"decline"`-narrative alerts, highest-scored first. |
+| `buildRecommendations(stats, topPerformers, projectsNeedingAttention, securityRisks)` | `sections.ts` | `string[]` — deterministic, threshold-gated, referencing real Watchlist project names. |
+| `buildPortfolioHeadline()` / `buildPortfolioSummary(stats, topPerformers)` / `buildOverallHealth(stats, securityRisks, projectsNeedingAttention)` | `summary.ts` | `string` / `string` / `PortfolioHealth` — template prose and a three-tier health read, no AI API. |
+
+### Service — `lib/portfolio/storage.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `getPortfolioIntelligence()` | `PortfolioIntelligence` | The one public entry point. Rebuilds only when `getWatchlist()` or `getDailyBrief()` returns a new reference; otherwise returns the cached read. Pure runtime cache — no `localStorage`, no backend. |
+
+### Hooks — `lib/hooks/`
+
+| Hook | Backed by | Notes |
+| --- | --- | --- |
+| `usePortfolioIntelligence()` | `lib/portfolio/storage.ts`'s `getPortfolioIntelligence()` | `useSyncExternalStore` binding, subscribed to BOTH `lib/alerts/service.ts`'s and `lib/watchlist/service.ts`'s listener sets. |
+| `usePortfolioMetrics()` | `usePortfolioIntelligence()` | Formats the portfolio's own fields into the small metric-tile list `PortfolioMetric`/`PortfolioCard`/`PortfolioWidget` render — memoized on the portfolio reference. |
+
+### UI query layer — `components/portfolio/filters.ts`
+
+Re-exports `components/brief/filters.ts`'s generic query helpers directly
+(as `filterPerformers`/`sortPerformers`/etc.) rather than reimplementing
+them — Portfolio's reused sections share the exact same
+`BriefOpportunity`/`BriefHighlight`/`BriefNarrativeTrend` shapes. Only the
+section-filter vocabulary (`SECTION_FILTERS`/`SECTION_FILTER_LABEL`,
+naming Portfolio's own sections) is new.
+
 ## Future Provider Interfaces
 
 These are internal interfaces the codebase is already shaped for but does
