@@ -15,6 +15,7 @@ import { getAllProjectIntelligence } from "@/lib/intelligence/engine";
 import { AIIntelligenceWidget } from "@/components/dashboard/AIIntelligenceWidget";
 import { BriefWidget } from "@/components/brief/BriefWidget";
 import { PortfolioWidget as PortfolioIntelligenceWidget } from "@/components/portfolio/PortfolioWidget";
+import { TimelineWidget } from "@/components/timeline/TimelineWidget";
 import { WelcomeHeader } from "@/components/dashboard/WelcomeHeader";
 import { IntelligenceBrief } from "@/components/dashboard/IntelligenceBrief";
 import { KPIRow } from "@/components/dashboard/KPIRow";
@@ -97,6 +98,7 @@ export default async function DashboardPage() {
           <AIIntelligenceWidget />
           <BriefWidget />
           <PortfolioIntelligenceWidget />
+          <TimelineWidget />
         </div>
       </div>
     </div>

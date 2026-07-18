@@ -366,6 +366,50 @@ them — Portfolio's reused sections share the exact same
 section-filter vocabulary (`SECTION_FILTERS`/`SECTION_FILTER_LABEL`,
 naming Portfolio's own sections) is new.
 
+## Intelligence Timeline API
+
+Internal function reference for `lib/timeline/`. See
+[ARCHITECTURE.md](ARCHITECTURE.md#intelligence-timeline) for the pipeline —
+it only ever reads `getIntelligenceAlerts()`, `getDailyBrief()`, and
+`getPortfolioIntelligence()`, never a provider directly, and computes no
+new scoring or narrative logic of its own.
+
+### Engine — `lib/timeline/engine.ts` / `sections.ts` / `summary.ts`
+
+| Function | Module | Returns |
+| --- | --- | --- |
+| `buildTimeline(alerts, dailyBrief, portfolio, generatedAt)` | `engine.ts` | `Timeline` — the full pipeline (10 event builders → dedupe → sort → stats → headline/summary). Pure. |
+| `buildAlertEvents` / `buildOpportunityEvents` / `buildSecurityEvents` / `buildGovernanceEvents` / `buildDevelopmentEvents` / `buildTVLEvents` | `sections.ts` | `TimelineEvent[]` — the 6 project-scoped builders. Each joins back to the source `IntelligenceAlert` by `projectId` to recover `severity`/`confidence`/`score`/`narrative`/`timestamp`; an item with no matching alert is skipped, never fabricated. |
+| `buildNarrativeEvents` / `buildRecommendationEvents` / `buildPortfolioEvents` / `buildDailyBriefEvents` | `sections.ts` | `TimelineEvent[]` — the 4 aggregate-level builders; `projectId`/`projectName`/`severity`/`confidence`/`score`/`narrative`/`category` are all `null` on these events by design. |
+| `sortEventsByTimestampDescending(events)` / `dedupeEventsById(events)` | `sections.ts` | `TimelineEvent[]` — assembly-time ordering and de-duplication, applied once inside `buildTimeline`. |
+| `computeTimelineStats(events)` | `sections.ts` | `TimelineStats` — `totalEvents`, `highestSeverity` (via the AI Intelligence Engine's own exported `SEVERITY_RANK`), `averageConfidence`, `averageScore`, `eventCounts`. |
+| `buildTimelineHeadline()` / `buildTimelineSummary(stats)` / `capitalize(value)` | `summary.ts` | `string` — static headline, template summary prose, and a shared capitalization helper reused by the UI layer so "Highest Severity" formats identically everywhere. |
+
+### Service — `lib/timeline/storage.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `getTimeline()` | `Timeline` | The one public entry point. Rebuilds only when `getIntelligenceAlerts()`, `getDailyBrief()`, or `getPortfolioIntelligence()` returns a new reference; otherwise returns the cached read. Pure runtime cache — no `localStorage`, no backend. |
+
+### Hooks — `lib/hooks/`
+
+| Hook | Backed by | Notes |
+| --- | --- | --- |
+| `useTimeline()` | `lib/timeline/storage.ts`'s `getTimeline()` | `useSyncExternalStore` binding, subscribed to BOTH `lib/alerts/service.ts`'s and `lib/watchlist/service.ts`'s listener sets. |
+| `useTimelineMetrics()` | `useTimeline()` | Formats the timeline's own fields into the small metric-tile list `TimelineMetric`/`Timeline`/`TimelineWidget` render — memoized on the timeline reference. |
+
+### UI query layer — `components/timeline/filters.ts` / `grouping.ts`
+
+Pure functions operating only on an already-built `TimelineEvent[]` —
+colocated with the components (not under `lib/timeline/`) so they're never
+mistaken for engine logic.
+
+| Function | Returns |
+| --- | --- |
+| `filterTimelineEvents(events, normalizedQuery)` | `TimelineEvent[]` — case-insensitive substring match across project name, title, summary, narrative, event type, and source. |
+| `sortTimelineEvents(events, order)` | `TimelineEvent[]` — `"newest"` (default) / `"oldest"` / `"severity"` / `"confidence"`. Events with no real `severity`/`confidence` sort last, via an internal ordering-only sentinel never shown as a real value. |
+| `groupTimelineEvents(events)` | `Record<TimelineGroupKey, TimelineEvent[]>` — buckets into `"today"` / `"yesterday"` / `"earlier"` using the current wall-clock time (a legitimate presentation-layer read, distinct from the backend engine's no-`Date.now()` rule). |
+
 ## Future Provider Interfaces
 
 These are internal interfaces the codebase is already shaped for but does

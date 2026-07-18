@@ -101,6 +101,27 @@ API. See [ARCHITECTURE.md](ARCHITECTURE.md#portfolio-intelligence) for the
 pipeline and [API.md](API.md#portfolio-intelligence-api) for the function
 reference.
 
+## Intelligence Timeline
+
+**Status**: ✅ Shipped
+
+A searchable, filterable, chronological activity feed — a merge point, not
+another intelligence engine — combining Intelligence Alerts, Daily Brief,
+and Portfolio Intelligence output into one time-ordered feed grouped into
+Today/Yesterday/Earlier. Ten event types (Alerts, Opportunities, Security,
+Governance, Development, TVL, Narratives, Recommendations, Portfolio,
+Daily Brief), each rendered with real severity/confidence/score where a
+project-scoped event genuinely has one, and honestly `null` for the
+aggregate-level events that don't. Built entirely from
+`getIntelligenceAlerts()`, `getDailyBrief()`, and
+`getPortfolioIntelligence()` — no new scoring or narrative logic, no
+provider calls. Surfaced as a compact Dashboard "Recent Activity" widget
+and a dedicated `/dashboard/timeline` page with search, event-type
+filtering, and sorting (Newest/Oldest/Highest Severity/Highest Confidence).
+See [ARCHITECTURE.md](ARCHITECTURE.md#intelligence-timeline) for the
+pipeline and [API.md](API.md#intelligence-timeline-api) for the function
+reference.
+
 ## Milestone 5 — Provider Layer
 
 **Status**: 📋 Planned
