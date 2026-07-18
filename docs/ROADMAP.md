@@ -70,6 +70,20 @@ See [ARCHITECTURE.md](ARCHITECTURE.md#alert-engine--ai-intelligence) for the
 pipeline and [API.md](API.md#alert-engine--ai-intelligence-api) for the
 function reference.
 
+## AI Daily Intelligence Brief
+
+**Status**: ✅ Shipped
+
+A searchable, filterable executive summary built entirely on top of the AI
+Intelligence Engine's own output (`getIntelligenceAlerts()`) — never a
+second data source. One headline and executive summary, plus Market
+Summary, Top Opportunities, Security/Governance/Development/TVL
+Highlights, Emerging Narratives, and Recommendations sections, each shown
+only when it has real data. Surfaced as a compact Dashboard widget and a
+dedicated `/dashboard/brief` page. Deterministic template prose — no
+external AI API. See [ARCHITECTURE.md](ARCHITECTURE.md#daily-brief) for the
+pipeline and [API.md](API.md#daily-brief-api) for the function reference.
+
 ## Milestone 5 — Provider Layer
 
 **Status**: 📋 Planned
