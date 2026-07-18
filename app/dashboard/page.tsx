@@ -13,6 +13,7 @@ import {
 } from "@/lib/data/aggregate";
 import { getAllProjectIntelligence } from "@/lib/intelligence/engine";
 import { AIIntelligenceWidget } from "@/components/dashboard/AIIntelligenceWidget";
+import { BriefWidget } from "@/components/brief/BriefWidget";
 import { WelcomeHeader } from "@/components/dashboard/WelcomeHeader";
 import { IntelligenceBrief } from "@/components/dashboard/IntelligenceBrief";
 import { KPIRow } from "@/components/dashboard/KPIRow";
@@ -93,6 +94,7 @@ export default async function DashboardPage() {
           <ActivityFeed data={activity} lastUpdated={lastUpdated} />
           <WatchlistWidget projects={allProjects} lastUpdated={lastUpdated} />
           <AIIntelligenceWidget />
+          <BriefWidget />
         </div>
       </div>
     </div>

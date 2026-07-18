@@ -282,6 +282,49 @@ below.
 | `useIntelligenceAlerts()` | `service.getIntelligenceAlerts()` | `useSyncExternalStore` binding, same pattern as `useAlerts`/`useVisibleAlerts`. |
 | `useExecutiveSummary()` | `useIntelligenceAlerts()` | Aggregates narrative counts, average confidence, and highest score — the one place these stats are computed; components only format the result. |
 
+## Daily Brief API
+
+Internal function reference for `lib/brief/`. See
+[ARCHITECTURE.md](ARCHITECTURE.md#daily-brief) for the pipeline this sits
+behind — it only ever reads `lib/alerts/service.ts`'s
+`getIntelligenceAlerts()`, never raw provider alerts, and never recomputes
+anything the AI Intelligence Engine already produced.
+
+### Engine — `lib/brief/engine.ts` / `sections.ts` / `summary.ts`
+
+| Function | Module | Returns |
+| --- | --- | --- |
+| `buildDailyBrief(alerts, generatedAt)` | `engine.ts` | `DailyBrief` — the full pipeline (stats → sections → summary prose). Pure — same inputs always produce the same output, including `id`. |
+| `computeMarketStats(alerts)` | `sections.ts` | `MarketStats` — narrative counts, average confidence, highest score, project count. |
+| `buildTopOpportunities` / `buildSecurityHighlights` / `buildGovernanceHighlights` / `buildDevelopmentHighlights` / `buildTvlHighlights` | `sections.ts` | `BriefOpportunity[]` / `BriefHighlight[]` — one builder per section, each a `.filter().sort().slice().map()` over the same `IntelligenceAlert[]`. |
+| `buildEmergingNarratives(alerts)` | `sections.ts` | `BriefNarrativeTrend[]` — one row per narrative type actually present, sorted by count then average score. |
+| `buildRecommendations(stats, securityHighlights, governanceHighlights)` | `sections.ts` | `string[]` — deterministic, threshold-gated recommendation sentences. |
+| `buildBriefHeadline()` / `buildBriefSummary(stats, topOpportunities)` | `summary.ts` | `string` — template prose, no AI API. |
+
+### Service — `lib/brief/storage.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `getDailyBrief()` | `DailyBrief` | The one public entry point. Rebuilds only when `getIntelligenceAlerts()` returns a new array reference; otherwise returns the cached brief. Pure runtime cache — no `localStorage`, no backend. |
+
+### Hooks — `lib/hooks/`
+
+| Hook | Backed by | Notes |
+| --- | --- | --- |
+| `useDailyBrief()` | `lib/brief/storage.ts`'s `getDailyBrief()` | `useSyncExternalStore` binding, subscribed to the same listener set `lib/alerts/service.ts` exposes (a brief only changes when Intelligence Alerts do). |
+| `useBriefMetrics()` | `useDailyBrief()` | Formats the brief's own fields into the small metric-tile list `BriefMetric`/`BriefCard`/`BriefWidget` render — memoized on the brief reference. |
+
+### UI query layer — `components/brief/filters.ts`
+
+Pure, presentation-layer search/filter/sort helpers over an already-built
+`DailyBrief`'s arrays — colocated with the components (not under
+`lib/brief/`) specifically so they're never mistaken for engine logic.
+
+| Function | Returns |
+| --- | --- |
+| `filterOpportunities(opportunities, query)` / `filterHighlights(highlights, query)` / `filterTextLines(lines, query)` / `filterNarrativeTrends(trends, query)` | Case-insensitive substring filters, each scoped to one section's item shape. |
+| `sortOpportunities(opportunities, order)` | `BriefOpportunity[]` — `"score"` (default) / `"confidence"` / `"alphabetical"` / `"newest"`. |
+
 ## Future Provider Interfaces
 
 These are internal interfaces the codebase is already shaped for but does

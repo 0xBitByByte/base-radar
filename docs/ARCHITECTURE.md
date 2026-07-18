@@ -412,6 +412,68 @@ alert's own real `severity` field, relabeled for the filter dropdown
 ("Critical"/"High"/"Medium"/"Low") rather than computing a second, hidden
 tier.
 
+## Daily Brief
+
+`lib/brief/` (PR16) is a second, thinner executive-summary layer sitting
+directly on top of the Alert Engine's own `getIntelligenceAlerts()` — never
+on raw provider alerts, and never re-deriving anything the AI Intelligence
+Engine already computed. Where an `IntelligenceAlert` summarizes ONE
+project, a `DailyBrief` summarizes the whole current batch: one headline,
+one executive summary, and a handful of sections (Market Summary, Top
+Opportunities, Security/Governance/Development/TVL Highlights, Emerging
+Narratives, Recommendations).
+
+```
+lib/brief/
+  types.ts      DailyBrief model + BriefOpportunity/BriefHighlight/BriefNarrativeTrend
+  sections.ts   One pure builder function per section, plus computeMarketStats
+  summary.ts    Deterministic headline/executive-summary template prose
+  engine.ts     buildDailyBrief(): the pure pipeline entry point
+  storage.ts    cachedDailyBrief (pure runtime cache) + getDailyBrief()
+```
+
+```mermaid
+flowchart TD
+    Alerts["getIntelligenceAlerts()<br/>lib/alerts/service.ts"] --> Storage["getDailyBrief()<br/>lib/brief/storage.ts"]
+    Storage -->|"same array reference as last call?"| Cache{"Reuse cached brief?"}
+    Cache -->|yes| Cached["cachedDailyBrief"]
+    Cache -->|no| Engine["buildDailyBrief()<br/>lib/brief/engine.ts"]
+    Engine --> Sections["Section builders<br/>lib/brief/sections.ts"]
+    Sections --> Summary["Headline/summary prose<br/>lib/brief/summary.ts"]
+    Summary --> Cached
+    Cached --> UI["Dashboard BriefWidget · /dashboard/brief page"]
+```
+
+**Caching**: `storage.ts` keeps two module-level variables — the
+`IntelligenceAlert[]` reference the brief was last built from, and the
+resulting `DailyBrief`. `getDailyBrief()` rebuilds only when
+`getIntelligenceAlerts()` returns a genuinely new array reference (that
+service's own cached-snapshot contract already guarantees the reference
+only changes on a real recompute), so repeated calls between real changes
+are O(1). No `localStorage`, no backend — a pure in-memory cache that
+resets on reload, by design.
+
+**UI components** (`components/brief/`): `DailyBrief` (the page-level
+orchestrator, `/dashboard/brief`), `BriefCard` (headline/summary/stats
+hero), `BriefSection` (the shared icon+heading+content wrapper every
+section reuses), `BriefMetric` (one label/value tile), `BriefWidget` (the
+compact Dashboard preview), `RecommendationCard`, `NarrativeTrend`. Search
+and the section filter live in `components/brief/filters.ts` — pure
+functions over an already-built `DailyBrief`'s arrays, colocated with the
+components rather than under `lib/brief/` specifically so they're never
+mistaken for engine logic.
+
+**Hooks** (`lib/hooks/`): `useDailyBrief` (a `useSyncExternalStore` binding
+to `getDailyBrief()`, subscribed to the same listener set
+`lib/alerts/service.ts` already exposes — there's no separate Brief
+subscribe/notify pair, since a brief only ever changes when Intelligence
+Alerts do) and `useBriefMetrics` (the one place the small metric-tile list
+is assembled from the brief's own fields).
+
+**Dashboard integration**: `BriefWidget` renders only the top-level summary
+(headline, summary, 3 metrics, top opportunity, generated time) — never the
+full section list, which lives at `/dashboard/brief` only.
+
 ## Theming
 
 Theming is handled by `next-themes` at the root layout, using the standard
