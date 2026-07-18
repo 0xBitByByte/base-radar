@@ -6,10 +6,22 @@ import { AlertFeed } from "@/components/alerts/AlertFeed";
 import { AlertFilters } from "@/components/alerts/AlertFilters";
 import { AlertHeader } from "@/components/alerts/AlertHeader";
 import { EmptyAlerts } from "@/components/alerts/EmptyAlerts";
-import { filterAlerts, sortAlerts } from "@/lib/alerts/service";
+import { ExecutiveSummary } from "@/components/alerts/ExecutiveSummary";
+import { IntelligenceBadge } from "@/components/alerts/IntelligenceBadge";
+import { IntelligenceFilters } from "@/components/alerts/IntelligenceFilters";
+import { IntelligenceList } from "@/components/alerts/IntelligenceList";
+import {
+  filterAlerts,
+  filterIntelligenceAlerts,
+  sortAlerts,
+  sortIntelligenceAlerts,
+  type IntelligenceSortOrder,
+} from "@/lib/alerts/service";
+import { useIntelligenceAlerts } from "@/lib/hooks/useIntelligenceAlerts";
 import { useVisibleAlerts } from "@/lib/hooks/useVisibleAlerts";
 import { useWatchedProjectsWithAlerts } from "@/lib/hooks/useWatchedProjectsWithAlerts";
 import { useWatchlist } from "@/lib/hooks/useWatchlist";
+import type { NarrativeType } from "@/lib/alerts/intelligence/types";
 import type { AlertCategory, AlertSeverity, AlertSortOrder, AlertStatusFilter } from "@/lib/alerts/types";
 
 const DEFAULT_STATUS: AlertStatusFilter = "all";
@@ -17,6 +29,12 @@ const DEFAULT_SEVERITY: AlertSeverity | "all" = "all";
 const DEFAULT_CATEGORY: AlertCategory | "all" = "all";
 const DEFAULT_PROJECT_ID = "all";
 const DEFAULT_SORT: AlertSortOrder = "newest";
+
+const DEFAULT_INTELLIGENCE_SEARCH = "";
+const DEFAULT_INTELLIGENCE_SEVERITY_TIER: AlertSeverity | "all" = "all";
+const DEFAULT_INTELLIGENCE_NARRATIVE: NarrativeType | "all" = "all";
+const DEFAULT_INTELLIGENCE_PROJECT_ID = "all";
+const DEFAULT_INTELLIGENCE_SORT: IntelligenceSortOrder = "score";
 
 /**
  * The Alerts screen's client shell — everything here is derived from
@@ -38,12 +56,23 @@ export function AlertsPageClient() {
   const { alerts, markRead, markAllRead, togglePin } = useVisibleAlerts();
   const { count: watchlistCount } = useWatchlist();
   const watchedProjects = useWatchedProjectsWithAlerts();
+  const intelligenceAlerts = useIntelligenceAlerts();
 
   const [status, setStatus] = useState<AlertStatusFilter>(DEFAULT_STATUS);
   const [severity, setSeverity] = useState<AlertSeverity | "all">(DEFAULT_SEVERITY);
   const [category, setCategory] = useState<AlertCategory | "all">(DEFAULT_CATEGORY);
   const [projectId, setProjectId] = useState<string>(DEFAULT_PROJECT_ID);
   const [sort, setSort] = useState<AlertSortOrder>(DEFAULT_SORT);
+
+  const [intelligenceSearch, setIntelligenceSearch] = useState(DEFAULT_INTELLIGENCE_SEARCH);
+  const [intelligenceSeverityTier, setIntelligenceSeverityTier] = useState<AlertSeverity | "all">(
+    DEFAULT_INTELLIGENCE_SEVERITY_TIER
+  );
+  const [intelligenceNarrative, setIntelligenceNarrative] = useState<NarrativeType | "all">(
+    DEFAULT_INTELLIGENCE_NARRATIVE
+  );
+  const [intelligenceProjectId, setIntelligenceProjectId] = useState(DEFAULT_INTELLIGENCE_PROJECT_ID);
+  const [intelligenceSort, setIntelligenceSort] = useState<IntelligenceSortOrder>(DEFAULT_INTELLIGENCE_SORT);
 
   const unreadCount = useMemo(() => alerts.filter((alert) => !alert.read).length, [alerts]);
   const pinnedCount = useMemo(() => alerts.filter((alert) => alert.pinned).length, [alerts]);
@@ -70,9 +99,74 @@ export function AlertsPageClient() {
     setProjectId(DEFAULT_PROJECT_ID);
   }
 
+  // The Intelligence project filter only ever lists projects that CURRENTLY
+  // have an Intelligence Alert — not every watched project (`projectOptions`
+  // above serves the raw-alerts filter and intentionally differs) — so a
+  // project with no scoreable signals never appears as a selectable, always
+  // empty option.
+  const intelligenceProjectOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const alert of intelligenceAlerts) seen.set(alert.projectId, alert.projectName);
+    return Array.from(seen, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [intelligenceAlerts]);
+
+  const displayedIntelligenceAlerts = useMemo(() => {
+    const filtered = filterIntelligenceAlerts(intelligenceAlerts, {
+      severityTier: intelligenceSeverityTier,
+      narrative: intelligenceNarrative,
+      projectId: intelligenceProjectId,
+      search: intelligenceSearch,
+    });
+    return sortIntelligenceAlerts(filtered, intelligenceSort);
+  }, [intelligenceAlerts, intelligenceSeverityTier, intelligenceNarrative, intelligenceProjectId, intelligenceSearch, intelligenceSort]);
+
+  const intelligenceSearchActive = intelligenceSearch.trim() !== "";
+
+  const intelligenceEmptyMessage =
+    intelligenceAlerts.length > 0 && displayedIntelligenceAlerts.length === 0
+      ? intelligenceSearchActive
+        ? "No intelligence matches your search."
+        : "No intelligence matches the selected filters."
+      : undefined;
+
   return (
     <div className="flex flex-col gap-5">
       <AlertHeader unreadCount={unreadCount} onMarkAllRead={markAllRead} />
+
+      {watchlistCount > 0 && (
+        <section aria-labelledby="intelligence-heading" className="flex flex-col gap-3">
+          <div className="flex items-center gap-1.5">
+            <IntelligenceBadge variant="icon" />
+            <h2
+              id="intelligence-heading"
+              className="text-sm font-semibold text-radar-light-text dark:text-radar-white"
+            >
+              AI Intelligence
+            </h2>
+          </div>
+          <ExecutiveSummary />
+          {intelligenceAlerts.length > 0 && (
+            <IntelligenceFilters
+              search={intelligenceSearch}
+              onSearchChange={setIntelligenceSearch}
+              severityTier={intelligenceSeverityTier}
+              onSeverityTierChange={setIntelligenceSeverityTier}
+              narrative={intelligenceNarrative}
+              onNarrativeChange={setIntelligenceNarrative}
+              projectId={intelligenceProjectId}
+              onProjectIdChange={setIntelligenceProjectId}
+              projectOptions={intelligenceProjectOptions}
+              sort={intelligenceSort}
+              onSortChange={setIntelligenceSort}
+            />
+          )}
+          <IntelligenceList
+            alerts={displayedIntelligenceAlerts}
+            emptyMessage={intelligenceEmptyMessage}
+            preserveOrder
+          />
+        </section>
+      )}
 
       {watchlistCount > 0 && alerts.length > 0 && (
         <AlertFilters

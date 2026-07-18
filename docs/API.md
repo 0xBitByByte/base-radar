@@ -237,6 +237,51 @@ strategy discussion.
   (raising the limit to 5,000 requests/hour) is a natural future change,
   but is not required today at current traffic levels.
 
+## Alert Engine & AI Intelligence API
+
+Internal function reference for `lib/alerts/`. See
+[ARCHITECTURE.md](ARCHITECTURE.md#alert-engine--ai-intelligence) for how
+these fit together as a pipeline.
+
+### Service — `lib/alerts/service.ts`
+
+Stateful (module-level cache + `subscribe`/`notify`), unlike the stateless
+Services API above — this is what backs `useSyncExternalStore` in the hooks
+below.
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `refreshAlerts()` | `Promise<void>` | Runs all five alert providers via `Promise.allSettled` and replaces the live alert content. Called once automatically on first client load; safe to call again manually. |
+| `getAlerts()` | `Alert[]` | Every current alert, unfiltered by Watchlist membership. |
+| `getVisibleAlerts()` | `Alert[]` | Watched AND not muted — what the Alerts page, Sidebar badge, and Topbar bell read from. |
+| `getAlertsForWatchlist()` | `Alert[]` | Watched, ignoring each project's mute toggle. |
+| `getIntelligenceAlerts()` | `IntelligenceAlert[]` | One rolled-up AI Intelligence read per watched project, built from `getVisibleAlerts()`. Same array reference until the next real recomputation. |
+| `getWatchlistProjectsWithAlerts()` | `WatchlistProjectAlertInfo[]` | One row per watched project — name, alert preference, alert count. |
+| `isAlertEnabled(projectId)` / `toggleProjectAlerts(projectId)` | `boolean` / `void` | Per-project alert mute preference. |
+| `markRead` / `markUnread` / `markAllRead` / `pin` / `unpin` / `togglePin` / `dismiss` | `void` | Per-alert user state, persisted to `localStorage`. |
+| `filterAlerts(alerts, options)` / `sortAlerts(alerts, order)` | `Alert[]` | Pure — filter/sort raw alerts without touching the cache. |
+| `filterIntelligenceAlerts(alerts, options)` / `sortIntelligenceAlerts(alerts, order)` | `IntelligenceAlert[]` | Pure — filter/sort an already-built `IntelligenceAlert[]`. Never calls `buildIntelligenceAlerts` again. |
+| `subscribe(listener)` | `() => void` | Registers a listener for the next mutation/refresh/Watchlist change; returns an unsubscribe function. |
+
+### AI Intelligence Engine — `lib/alerts/intelligence/`
+
+| Function | Module | Returns |
+| --- | --- | --- |
+| `buildIntelligenceAlerts(alerts)` | `engine.ts` | `IntelligenceAlert[]` — the full pipeline (group → score → detect narrative → summarize), sorted by score. Pure. |
+| `scoreAlert(alert)` | `scoring.ts` | `IntelligenceSignal \| null` — runs every category scorer, returns whichever applies. |
+| `computeScore(signals)` / `computeConfidence(signals)` / `computeNetSentiment(signals)` | `scoring.ts` | `number` — magnitude, category-diversity confidence, and signed sentiment respectively. |
+| `classifyDirection(alert)` | `scoring.ts` | `-1 \| 0 \| 1` — reads the alert's own title for a real direction keyword. |
+| `groupAlertsByProject(alerts)` | `grouping.ts` | `ProjectAlertGroup[]` |
+| `detectNarrative(signals)` | `narratives.ts` | `NarrativeType` — one of `growth`, `decline`, `governance-active`, `security-risk`, `accumulation`, `development-active`, `stable`. |
+| `buildHeadline` / `buildSummary` / `buildReasoning` | `summary.ts` | `string` — deterministic template prose, no AI API. |
+
+### Hooks — `lib/hooks/`
+
+| Hook | Backed by | Notes |
+| --- | --- | --- |
+| `useIntelligenceAlerts()` | `service.getIntelligenceAlerts()` | `useSyncExternalStore` binding, same pattern as `useAlerts`/`useVisibleAlerts`. |
+| `useExecutiveSummary()` | `useIntelligenceAlerts()` | Aggregates narrative counts, average confidence, and highest score — the one place these stats are computed; components only format the result. |
+
 ## Future Provider Interfaces
 
 These are internal interfaces the codebase is already shaped for but does

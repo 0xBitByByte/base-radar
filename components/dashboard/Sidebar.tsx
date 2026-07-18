@@ -11,6 +11,7 @@ import { SidebarItem } from "@/components/dashboard/SidebarItem";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { buildSocialNavLinks } from "@/lib/branding/socials";
+import { useIntelligenceAlerts } from "@/lib/hooks/useIntelligenceAlerts";
 import { useUnreadAlertCount } from "@/lib/hooks/useUnreadAlertCount";
 import { useWatchlist } from "@/lib/hooks/useWatchlist";
 
@@ -37,6 +38,7 @@ export function SidebarNav({ onNavigate, className }: SidebarNavProps) {
   const pathname = usePathname();
   const { count: watchlistCount } = useWatchlist();
   const unreadAlertCount = useUnreadAlertCount();
+  const hasIntelligenceAlerts = useIntelligenceAlerts().length > 0;
 
   const isActive = (href: string) =>
     href === "/dashboard" ? pathname === href : pathname.startsWith(href);
@@ -72,6 +74,7 @@ export function SidebarNav({ onNavigate, className }: SidebarNavProps) {
                         ? unreadAlertCount
                         : undefined
                   }
+                  sparkle={item.href === "/dashboard/alerts" && hasIntelligenceAlerts}
                 />
               ))}
             </div>

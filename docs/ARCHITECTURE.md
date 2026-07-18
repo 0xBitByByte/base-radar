@@ -314,6 +314,104 @@ each widget's data shape and content are unrelated. The layout also reserves
 future desktop-only content, without requiring another layout change when
 that ships.
 
+## Alert Engine & AI Intelligence
+
+The Alert Engine and its AI Intelligence layer are a self-contained
+subsystem under `lib/alerts/` — additive to everything above, not a
+replacement for the Services/Providers layers. It reuses the existing
+Providers Layer (CoinGecko, DefiLlama, Blockscout, GitHub) plus the
+Governance provider (Snapshot) exclusively; no new external integration was
+added to build it, and there is no polling, no websocket, no cron, and no
+backend/API route involved anywhere in it.
+
+```
+lib/alerts/
+  types.ts, constants.ts, storage.ts   Alert model, versioning, SSR-safe localStorage overlay
+  providers/                            One AlertProvider per source (github, snapshot, coingecko, defillama, blockscout) + aggregator
+  service.ts                            Stateful service layer — the one place every cached, derived view lives
+  intelligence/
+    types.ts                            IntelligenceSignal / NarrativeType / IntelligenceAlert models
+    scoring.ts                          One modular scorer per alert category → IntelligenceSignal
+    grouping.ts                         Groups an Alert[] by project
+    narratives.ts                       Fixed-priority rules: signals → one NarrativeType
+    summary.ts                          Deterministic template prose (headline/summary/reasoning)
+    engine.ts                           buildIntelligenceAlerts(): the pure pipeline entry point
+```
+
+```mermaid
+flowchart TD
+    Prov["Alert Providers<br/>lib/alerts/providers/*<br/>(GitHub, Snapshot, CoinGecko, DefiLlama, Blockscout)"] --> Fetch["fetchAllProviderAlerts()<br/>Promise.allSettled — one failing source never blocks the rest"]
+    Fetch --> Refresh["refreshAlerts()<br/>lib/alerts/service.ts"]
+    Refresh --> Visible["getVisibleAlerts()<br/>Watchlist-filtered, not-muted"]
+    Visible --> Engine["AI Intelligence Engine<br/>lib/alerts/intelligence/engine.ts"]
+    Engine --> Group["Group by project"]
+    Group --> Score["Score signals<br/>(scoring.ts)"]
+    Score --> Narrative["Detect narrative<br/>(narratives.ts)"]
+    Narrative --> Summary["Generate prose<br/>(summary.ts)"]
+    Summary --> Cache["getIntelligenceAlerts()<br/>cached IntelligenceAlert[]"]
+    Cache --> UI["Alerts page · Dashboard widget · Sidebar sparkle"]
+```
+
+**Pipeline** (`engine.ts`'s `buildIntelligenceAlerts`, a pure function — same
+input always produces the same output, no randomness, no network call):
+
+1. **Collect** — the caller passes in an already-fetched `Alert[]`
+   (`getVisibleAlerts()`'s current Watchlist-filtered feed, not the
+   unfiltered set — the point is fewer, smarter signals for what the user
+   actually watches).
+2. **Group by project** (`grouping.ts`).
+3. **Score** (`scoring.ts`) — one small, independent scorer per alert
+   category (TVL, governance, GitHub activity, contract/security event,
+   whale transfer, price movement). Each reads the alert's real `severity`
+   for magnitude and its real title text for direction (keywords the
+   providers themselves already write, e.g. "Increased"/"Decreased"/
+   "Passed"/"Failed" — never invented sentiment). An alert whose category no
+   scorer recognizes yet contributes no signal, honestly, rather than a
+   guessed one.
+4. **Detect narrative** (`narratives.ts`) — a fixed-priority rule chain over
+   the real signal categories present (a security signal always wins; a
+   "growth"/"decline" read requires at least two independent corroborating
+   categories; a single-category read maps to a narrower narrative like
+   "accumulation" or "development-active"; no rule match falls back to
+   "stable" rather than a forced guess).
+5. **Generate an executive summary** (`summary.ts`) — deterministic template
+   prose built only from real, already-computed values (the project name,
+   the real signal labels, real counts). This is what makes the output
+   *read* like an AI wrote it without an AI API being involved anywhere.
+6. **Expose** — one `IntelligenceAlert` per project, sorted by score
+   (highest-signal projects first).
+
+**Severity vs. direction**: this codebase's `AlertSeverity` is not a pure
+sentiment axis (a large *upward* price move and a large *downward* one can
+both be `critical`), so `scoring.ts` keeps two axes separate — severity
+scales a signal's magnitude only; a small keyword classifier reads the
+alert's own title for direction. **Confidence** scales with the number of
+*distinct* signal categories corroborating a read, not raw alert count —
+three alerts about the same TVL swing is one real signal, not three
+independent confirmations.
+
+**UI components** (`components/alerts/`): `IntelligenceCard`,
+`IntelligenceList`, `IntelligenceFilters`, `IntelligenceBadge`,
+`ConfidenceBar`, `SignalPills`, `NarrativeBadge`, `ExecutiveSummary` — all
+presentational, reading from hooks rather than computing anything
+themselves. Surfaced on the Alerts page (above the raw alert feed),
+a compact Dashboard widget (`AIIntelligenceWidget`, top 3 by score), and an
+additive sparkle indicator on the Sidebar's Alerts nav item.
+
+**Hooks** (`lib/hooks/`): `useIntelligenceAlerts` (a `useSyncExternalStore`
+binding to `service.getIntelligenceAlerts()`, the same pattern
+`useAlerts`/`useVisibleAlerts` already use) and `useExecutiveSummary` (the
+one place narrative counts, average confidence, and highest score are
+aggregated — components only format that output, never recompute it).
+
+**Filtering/search/sorting** (also `lib/alerts/service.ts`):
+`filterIntelligenceAlerts`/`sortIntelligenceAlerts` are pure functions over
+an already-built `IntelligenceAlert[]` — they never call
+`buildIntelligenceAlerts` again. Filtering by severity in the UI reuses each
+alert's own real `severity` field, relabeled for the filter dropdown
+("Critical"/"High"/"Medium"/"Low") rather than computing a second, hidden
+tier.
+
 ## Theming
 
 Theming is handled by `next-themes` at the root layout, using the standard
@@ -373,6 +471,13 @@ without restructuring what already exists:
   already shaped to accept in place of their current mock data.
 
 ## Future Intelligence Engine
+
+> **Note**: a first, narrower "AI Intelligence" layer has since shipped,
+> scoped specifically to the Alert Engine — see
+> [Alert Engine & AI Intelligence](#alert-engine--ai-intelligence) above.
+> It reads only `lib/alerts/`'s own alert feed, not the wider Providers
+> Layer/Project Registry join this section describes; the general,
+> cross-cutting synthesis engine outlined below is still unbuilt.
 
 [docs/ROADMAP.md](ROADMAP.md) names an "Intelligence Engine" milestone
 sitting between the current per-widget Services Layer and the future

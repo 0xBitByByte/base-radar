@@ -56,6 +56,8 @@
 import { getProject } from "@/data/projects/helpers";
 import { fetchAllProviderAlerts } from "@/lib/alerts/providers";
 import { ALERTS_VERSION } from "@/lib/alerts/constants";
+import { buildIntelligenceAlerts, SEVERITY_RANK } from "@/lib/alerts/intelligence/engine";
+import type { IntelligenceAlert, NarrativeType } from "@/lib/alerts/intelligence/types";
 import { readAlertsState, writeAlertsState } from "@/lib/alerts/storage";
 import type {
   Alert,
@@ -133,6 +135,16 @@ let cachedWatchlistProjectsWithAlerts: WatchlistProjectAlertInfo[] = computeWatc
   overlayState,
   cachedAlertsForWatchlist
 );
+/**
+ * PR15.3 Part 1 — AI Alert Intelligence. Built from `cachedVisibleAlerts`
+ * (Watchlist-visible, not-muted alerts), never the unfiltered set: the
+ * whole point is fewer, smarter signals for what the user actually
+ * watches, not a summary of alerts they'd never see anyway. Purely
+ * derived — `lib/alerts/intelligence/engine.ts`'s `buildIntelligenceAlerts`
+ * is a pure function, so this is just another cached view recomputed
+ * alongside the other four in `recomputeDerived()`.
+ */
+let cachedIntelligenceAlerts: IntelligenceAlert[] = buildIntelligenceAlerts(cachedVisibleAlerts);
 
 const listeners = new Set<() => void>();
 
@@ -146,6 +158,7 @@ function recomputeDerived(): void {
   cachedAlertsForWatchlist = computeAlertsForWatchlist(liveAlertContent, overlayState);
   cachedVisibleAlerts = computeVisibleAlerts(overlayState, cachedAlertsForWatchlist);
   cachedWatchlistProjectsWithAlerts = computeWatchlistProjectsWithAlerts(overlayState, cachedAlertsForWatchlist);
+  cachedIntelligenceAlerts = buildIntelligenceAlerts(cachedVisibleAlerts);
 }
 
 function persist(next: AlertsState): void {
@@ -234,6 +247,17 @@ export function getWatchlistProjectsWithAlerts(): WatchlistProjectAlertInfo[] {
   return cachedWatchlistProjectsWithAlerts;
 }
 
+/**
+ * PR15.3 — one rolled-up, deterministic executive summary per watched
+ * project, built from `getVisibleAlerts()`'s current alert set. Same array
+ * reference until the next relevant recomputation. Read by
+ * `lib/hooks/useIntelligenceAlerts.ts` (Part 2's UI layer) and, in turn, by
+ * the Alerts page, Dashboard widget, and Sidebar sparkle indicator.
+ */
+export function getIntelligenceAlerts(): IntelligenceAlert[] {
+  return cachedIntelligenceAlerts;
+}
+
 export function markRead(id: string): void {
   setOverlay(id, { read: true });
 }
@@ -309,4 +333,72 @@ export function sortAlerts(alerts: Alert[], order: AlertSortOrder): Alert[] {
     return order === "newest" ? -diff : diff;
   });
   return byTimestamp.sort((a, b) => (a.pinned === b.pinned ? 0 : a.pinned ? -1 : 1));
+}
+
+/**
+ * PR15.3 Part 3 — the filter/search layer for the Alerts page's Intelligence
+ * section. Both `filterIntelligenceAlerts` and `sortIntelligenceAlerts`
+ * mirror `filterAlerts`/`sortAlerts` above exactly: pure functions over an
+ * already-built `IntelligenceAlert[]`, never touching
+ * `buildIntelligenceAlerts`/`cachedIntelligenceAlerts` — filtering an
+ * already-scored list is not the same operation as rescoring one, and this
+ * module keeps them separate on purpose.
+ *
+ * `severityTier` reuses each alert's own real `severity` field (the exact
+ * value its `SeverityBadge` already renders) rather than inventing a
+ * separate numeric threshold — filtering by a value the user can already
+ * see on the card is more honest than filtering by a hidden derived tier
+ * that doesn't visibly correspond to anything. The UI layer
+ * (`components/alerts/meta.ts`'s `SEVERITY_FILTER_LABEL`) is the only place
+ * that relabels `warning`/`success`/`info` as "High"/"Medium"/"Low" for
+ * display; the underlying value never changes.
+ */
+export type IntelligenceFilterOptions = {
+  severityTier?: AlertSeverity | "all";
+  narrative?: NarrativeType | "all";
+  projectId?: string | "all";
+  /** Case-insensitive substring match against project name, headline, summary, and narrative label. Empty/undefined matches everything. */
+  search?: string;
+};
+
+function matchesIntelligenceSearch(alert: IntelligenceAlert, normalizedQuery: string): boolean {
+  if (!normalizedQuery) return true;
+  const haystack = `${alert.projectName} ${alert.headline} ${alert.summary} ${alert.narrative}`.toLowerCase();
+  return haystack.includes(normalizedQuery);
+}
+
+/** Pure — never mutates, never reorders beyond removing non-matching entries. */
+export function filterIntelligenceAlerts(
+  alerts: IntelligenceAlert[],
+  options: IntelligenceFilterOptions
+): IntelligenceAlert[] {
+  const normalizedQuery = options.search?.trim().toLowerCase() ?? "";
+
+  return alerts.filter((alert) => {
+    if (options.severityTier && options.severityTier !== "all" && alert.severity !== options.severityTier) {
+      return false;
+    }
+    if (options.narrative && options.narrative !== "all" && alert.narrative !== options.narrative) return false;
+    if (options.projectId && options.projectId !== "all" && alert.projectId !== options.projectId) return false;
+    if (!matchesIntelligenceSearch(alert, normalizedQuery)) return false;
+    return true;
+  });
+}
+
+export type IntelligenceSortOrder = "newest" | "confidence" | "score" | "severity";
+
+/** Pure — `buildIntelligenceAlerts` already sorts by score, so `"score"` here is a no-op re-sort for the common case; kept explicit rather than assumed so the other three orders have a real counterpart to reset to. */
+export function sortIntelligenceAlerts(alerts: IntelligenceAlert[], order: IntelligenceSortOrder): IntelligenceAlert[] {
+  const sorted = [...alerts];
+  switch (order) {
+    case "newest":
+      return sorted.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    case "confidence":
+      return sorted.sort((a, b) => b.confidence - a.confidence);
+    case "severity":
+      return sorted.sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity]);
+    case "score":
+    default:
+      return sorted.sort((a, b) => b.score - a.score);
+  }
 }
