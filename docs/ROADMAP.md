@@ -44,10 +44,31 @@ flowchart LR
 
 ## In Progress
 
-Nothing is currently in progress. Milestone 4 (Project Registry &
-Documentation) is the most recently completed work; Milestone 5 has not yet
-started. This section will list active work once a milestone below moves
-from Planned to In Progress.
+Nothing is currently in progress.
+
+> **Note on drift**: the milestone numbering below (M5–M11) predates a large
+> amount of work that has since shipped outside this numbering — including a
+> Project Explorer, Project Profile pages, a Watchlist, and the Alert Engine
+> / AI Intelligence feature described below. This document has not been
+> renumbered to reflect that; treat the ✅ Completed table above and this
+> section as the two sources of truth for what's actually shipped, and the
+> M5–M11 milestones below as directional planning from an earlier point in
+> the project rather than a current, accurate backlog.
+
+## Alert Engine & AI Intelligence
+
+**Status**: ✅ Shipped
+
+A real-time-feeling (but not polling) alert feed for Watchlist projects,
+sourced from the existing Provider Layer (GitHub, Snapshot, CoinGecko,
+DefiLlama, Blockscout — no new providers), plus a deterministic, rule-based
+"AI Intelligence" layer on top that groups a project's alerts into one
+scored, narrative-classified read instead of a wall of disconnected
+notifications. No external AI API is used — narratives and summaries are
+generated from fixed rules and templates over real, already-fetched data.
+See [ARCHITECTURE.md](ARCHITECTURE.md#alert-engine--ai-intelligence) for the
+pipeline and [API.md](API.md#alert-engine--ai-intelligence-api) for the
+function reference.
 
 ## Milestone 5 — Provider Layer
 

@@ -12,6 +12,7 @@ import {
   getWhaleEvents,
 } from "@/lib/data/aggregate";
 import { getAllProjectIntelligence } from "@/lib/intelligence/engine";
+import { AIIntelligenceWidget } from "@/components/dashboard/AIIntelligenceWidget";
 import { WelcomeHeader } from "@/components/dashboard/WelcomeHeader";
 import { IntelligenceBrief } from "@/components/dashboard/IntelligenceBrief";
 import { KPIRow } from "@/components/dashboard/KPIRow";
@@ -91,6 +92,7 @@ export default async function DashboardPage() {
           <ProjectSpotlight data={spotlight} lastUpdated={lastUpdated} />
           <ActivityFeed data={activity} lastUpdated={lastUpdated} />
           <WatchlistWidget projects={allProjects} lastUpdated={lastUpdated} />
+          <AIIntelligenceWidget />
         </div>
       </div>
     </div>

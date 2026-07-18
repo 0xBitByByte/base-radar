@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { IntelligenceBadge } from "@/components/alerts/IntelligenceBadge";
 import { cn } from "@/lib/utils";
 
 type SidebarItemProps = {
@@ -13,6 +14,8 @@ type SidebarItemProps = {
   onClick?: () => void;
   /** A small trailing count pill — e.g. the live watchlist count (PR13.1). Omitted (not rendered as "0") when `undefined` or `0`. */
   badge?: number;
+  /** PR15.3 Part 2 — additive AI Intelligence indicator, shown alongside (never instead of) `badge`, when at least one `IntelligenceAlert` currently exists. */
+  sparkle?: boolean;
 };
 
 export function SidebarItem({
@@ -23,6 +26,7 @@ export function SidebarItem({
   external = false,
   onClick,
   badge,
+  sparkle = false,
 }: SidebarItemProps) {
   return (
     <Link
@@ -54,6 +58,7 @@ export function SidebarItem({
         {icon}
       </span>
       <span className="truncate">{label}</span>
+      {sparkle && <IntelligenceBadge variant="icon" />}
       {Boolean(badge) && (
         <span
           className={cn(

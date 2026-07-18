@@ -10,12 +10,10 @@
 - Quick View Drawer
 - Explorer Polish
 - Quick View Polish
-
----
-
-## 🚧 Current
-
 - Project Profile
+- Watchlist
+- Alerts (Alert Engine + Notification Center)
+- AI Intelligence (deterministic, rule-based alert scoring & narratives)
 
 ---
 
@@ -31,9 +29,7 @@
 
 ## 🔮 Future
 
-- Watchlist
 - Portfolio
-- Alerts
 - Wallet
 - Mobile App
 - AI Copilot
