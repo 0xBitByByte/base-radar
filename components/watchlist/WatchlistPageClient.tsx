@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Eye } from "lucide-react";
 import Link from "next/link";
 
+import { AlertToggle } from "@/components/alerts/AlertToggle";
 import { ExplorerGridLayout } from "@/components/explorer/ExplorerGridLayout";
 import { ProjectCard } from "@/components/explorer/ProjectCard";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -23,6 +24,12 @@ type WatchlistPageClientProps = {
  * reuse for a lighter preview). Live: the grid updates the instant a
  * project is un-starred from anywhere in the app, including this page's
  * own cards.
+ *
+ * PR15.1 — extends (never redesigns) each card with one additional row:
+ * `AlertToggle`, the on/off switch for that project's alerts. `ProjectCard`
+ * itself is untouched (it's shared with Explorer, which has no concept of
+ * alert preferences) — the toggle lives in this page's own wrapper `<div>`
+ * around each card instead.
  */
 export function WatchlistPageClient({ projects }: WatchlistPageClientProps) {
   const router = useRouter();
@@ -50,11 +57,13 @@ export function WatchlistPageClient({ projects }: WatchlistPageClientProps) {
   return (
     <ExplorerGridLayout>
       {watched.map((project) => (
-        <ProjectCard
-          key={project.identity.id}
-          project={project}
-          onActivate={() => router.push(`/dashboard/projects/${project.identity.slug}`)}
-        />
+        <div key={project.identity.id} className="flex flex-col gap-2">
+          <ProjectCard
+            project={project}
+            onActivate={() => router.push(`/dashboard/projects/${project.identity.slug}`)}
+          />
+          <AlertToggle projectId={project.identity.id} projectName={project.identity.name} />
+        </div>
       ))}
     </ExplorerGridLayout>
   );

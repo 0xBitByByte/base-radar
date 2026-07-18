@@ -64,10 +64,28 @@ export type AlertOverlay = {
 };
 
 export type AlertsState = {
-  version: 1;
+  /** Bumped from `1` (PR15.0) to `2` (PR15.1) — old persisted blobs lack `alertEnabledByProject` and are discarded by `storage.ts` rather than silently treated as "everything enabled," which would be a guess, not a recovery. */
+  version: 2;
   /** Keyed by `Alert.id`. Sparse — an alert with no entry here has never been touched by the user and renders with its mock defaults. */
   overlay: Record<string, AlertOverlay>;
+  /**
+   * Per-project alert preference (PR15.1) — keyed by `projectId`. Sparse:
+   * a project with no entry here is enabled by default (`isAlertEnabled`
+   * treats "absent" and "true" identically; only an explicit `false`
+   * hides that project's alerts). Independent of Watchlist membership —
+   * this only ever matters for a project that's also watched.
+   */
+  alertEnabledByProject: Record<string, boolean>;
 };
 
 export type AlertStatusFilter = "all" | "unread" | "pinned";
 export type AlertSortOrder = "newest" | "oldest";
+
+/** One watched project's alert-preference summary — what the Watchlist page's `AlertToggle` and the Alerts page's project filter both need, without either re-deriving it themselves. */
+export type WatchlistProjectAlertInfo = {
+  projectId: string;
+  projectName: string;
+  alertsEnabled: boolean;
+  /** Count of non-dismissed mock alerts for this project, regardless of `alertsEnabled` — lets the Watchlist page show "3 alerts" even while toggled off. */
+  alertCount: number;
+};
