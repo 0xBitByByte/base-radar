@@ -4,12 +4,19 @@
  * in-memory cache/business logic and never touches `window.localStorage`
  * itself, so a future PR swapping this for a real per-user store (a
  * server-backed read-state sync) only has to change this one file.
+ *
+ * PR15.1 — added `alertEnabledByProject` (per-project alert on/off,
+ * `lib/hooks/useProjectAlertPreference.ts`) to the same persisted blob and
+ * bumped `ALERTS_VERSION` to `2`; a v1 blob missing that field simply
+ * fails `isValidState` and falls back to `EMPTY_STATE`, the same discard-
+ * on-shape-mismatch behavior this file already had for any other corrupt
+ * value.
  */
 
 import { ALERTS_STORAGE_KEY, ALERTS_VERSION } from "@/lib/alerts/constants";
 import type { AlertOverlay, AlertsState } from "@/lib/alerts/types";
 
-const EMPTY_STATE: AlertsState = { version: ALERTS_VERSION, overlay: {} };
+const EMPTY_STATE: AlertsState = { version: ALERTS_VERSION, overlay: {}, alertEnabledByProject: {} };
 
 function isValidOverlay(value: unknown): value is AlertOverlay {
   if (typeof value !== "object" || value === null) return false;
@@ -21,6 +28,11 @@ function isValidOverlay(value: unknown): value is AlertOverlay {
   );
 }
 
+function isValidAlertEnabledMap(value: unknown): value is Record<string, boolean> {
+  if (typeof value !== "object" || value === null) return false;
+  return Object.values(value as Record<string, unknown>).every((entry) => typeof entry === "boolean");
+}
+
 function isValidState(value: unknown): value is AlertsState {
   if (typeof value !== "object" || value === null) return false;
   const candidate = value as Partial<AlertsState>;
@@ -28,7 +40,8 @@ function isValidState(value: unknown): value is AlertsState {
     candidate.version === ALERTS_VERSION &&
     typeof candidate.overlay === "object" &&
     candidate.overlay !== null &&
-    Object.values(candidate.overlay).every(isValidOverlay)
+    Object.values(candidate.overlay).every(isValidOverlay) &&
+    isValidAlertEnabledMap(candidate.alertEnabledByProject)
   );
 }
 
