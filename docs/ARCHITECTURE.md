@@ -548,6 +548,86 @@ summary (health badge, headline, summary, 3 metrics, top performer,
 generated time) — never the full section list, which lives at
 `/dashboard/portfolio` only.
 
+## Intelligence Timeline
+
+`lib/timeline/` (PR18) is a chronological aggregation layer, not another
+intelligence engine — it consumes exactly three existing services
+(`getIntelligenceAlerts()`, `getDailyBrief()`, `getPortfolioIntelligence()`)
+and merges their output into one time-ordered `TimelineEvent[]` feed. It
+computes no new scores, confidences, or narratives of its own.
+
+```
+lib/timeline/
+  types.ts      TimelineEvent + Timeline models, 10 TimelineEventTypes
+  sections.ts   10 event builders (1 per event type) + dedupe/sort/stats helpers
+  summary.ts    Deterministic headline/summary prose
+  engine.ts     buildTimeline(): the pure pipeline entry point
+  storage.ts    cachedTimeline (pure runtime cache) + getTimeline()
+```
+
+```mermaid
+flowchart TD
+    Alerts["getIntelligenceAlerts()<br/>lib/alerts/service.ts"] --> Storage["getTimeline()<br/>lib/timeline/storage.ts"]
+    Brief["getDailyBrief()<br/>lib/brief/storage.ts"] --> Storage
+    Portfolio["getPortfolioIntelligence()<br/>lib/portfolio/storage.ts"] --> Storage
+    Storage -->|"same Watchlist, Daily Brief, Portfolio Intelligence references as last call?"| Cache{"Reuse cached read?"}
+    Cache -->|yes| Cached["cachedTimeline"]
+    Cache -->|no| Engine["buildTimeline()<br/>lib/timeline/engine.ts"]
+    Engine --> Sections["10 event builders<br/>lib/timeline/sections.ts"]
+    Sections --> Dedupe["dedupeEventsById + sortEventsByTimestampDescending"]
+    Dedupe --> Summary["Headline/summary prose<br/>lib/timeline/summary.ts"]
+    Summary --> Cached
+    Cached --> UI["Dashboard TimelineWidget · /dashboard/timeline page"]
+```
+
+**Event model**: `TimelineEvent` carries `projectId`/`projectName`/
+`severity`/`confidence`/`score`/`narrative`/`category`, all nullable —
+`null` (never a fabricated placeholder) for the 4 aggregate-level event
+types (`narrative`, `recommendation`, `portfolio`, `daily-brief`) that
+genuinely aren't about a single project. The 6 project-scoped event types
+(`alert`, `opportunity`, `security`, `governance`, `development`, `tvl`)
+join back to the source `IntelligenceAlert` by `projectId` to recover the
+richer fields `BriefOpportunity`/`BriefHighlight` don't carry themselves —
+this is the layer's one real piece of logic, and it's aggregation (reading
+already-computed facts back out by a shared key), not a second scoring
+pass. If no matching alert is found for a project-scoped item, that event
+is skipped rather than emitted with fabricated values.
+
+**Caching**: `storage.ts` rebuilds only when `getIntelligenceAlerts()`,
+`getDailyBrief()`, or `getPortfolioIntelligence()` returns a new reference.
+Daily Brief's and Portfolio Intelligence's own references already change
+whenever Intelligence Alerts or the Watchlist do, so no separate raw-alerts
+check is needed beyond tracking all three.
+
+**UI components** (`components/timeline/`): `Timeline` (the page-level
+orchestrator, `/dashboard/timeline`), `TimelineItem` (one event row),
+`TimelineGroup` (a Today/Yesterday/Earlier date bucket — grouping logic
+lives in `components/timeline/grouping.ts`), `TimelineSection`,
+`TimelineMetric`, `TimelineWidget` (compact Dashboard preview),
+`TimelineEventBadge` (per-event-type icon/color/label). Search, the
+event-type filter, and sorting (Newest/Oldest/Highest Severity/Highest
+Confidence) live in `components/timeline/filters.ts` — pure functions
+operating only on an already-built `TimelineEvent[]`, never rebuilding or
+re-fetching the Timeline itself.
+
+**Hooks** (`lib/hooks/`): `useTimeline` (a `useSyncExternalStore` binding to
+`getTimeline()`, subscribed to both `lib/alerts/service.ts`'s and
+`lib/watchlist/service.ts`'s listener sets, mirroring Portfolio
+Intelligence's hook — Timeline can change from either trigger) and
+`useTimelineMetrics` (the one place the small metric-tile list is assembled
+from the timeline's own fields).
+
+**Dashboard integration**: `TimelineWidget` renders only the top-level
+summary (headline, summary, 2 metrics, the single latest event) — never
+the full grouped feed, which lives at `/dashboard/timeline` only.
+
+**Relationship with upstream layers**: Timeline is the topmost layer in the
+reuse chain — AI Intelligence Engine (PR15.3) → Daily Brief (PR16) →
+Portfolio Intelligence (PR17) → Intelligence Timeline (PR18). It reads from
+all three of the layers beneath it but adds no new scoring, narrative, or
+health logic of its own; its only real contribution is chronological
+aggregation and presentation.
+
 ## Theming
 
 Theming is handled by `next-themes` at the root layout, using the standard
