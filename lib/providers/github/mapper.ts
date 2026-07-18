@@ -15,6 +15,8 @@ export type RepoStats = {
   license: string | null;
   createdAt: string;
   pushedAt: string;
+  /** PR15.2 — real, current archived status, for the Alert Engine's GitHub provider. */
+  archived: boolean;
 };
 
 export function mapRepoStats(fullName: string, repo: RawRepo, release: RawRelease | null): RepoStats {
@@ -30,6 +32,7 @@ export function mapRepoStats(fullName: string, repo: RawRepo, release: RawReleas
     license: repo.license?.name ?? null,
     createdAt: repo.created_at,
     pushedAt: repo.pushed_at,
+    archived: repo.archived,
   };
 }
 

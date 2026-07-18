@@ -13,6 +13,8 @@ export type RawRepo = {
   license: { name: string } | null;
   created_at: string;
   pushed_at: string;
+  /** PR15.2 — real, already-present on this same `fetchRepo` response; read for the Alert Engine's "Repository Archived" alert. Zero new request. */
+  archived: boolean;
 };
 
 export type RawRelease = {
