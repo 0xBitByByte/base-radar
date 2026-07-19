@@ -122,6 +122,26 @@ See [ARCHITECTURE.md](ARCHITECTURE.md#intelligence-timeline) for the
 pipeline and [API.md](API.md#intelligence-timeline-api) for the function
 reference.
 
+## Notification System
+
+**Status**: ✅ Shipped
+
+A GitHub/Linear/Slack-style unified notification system — a Topbar bell +
+dropdown drawer, a compact Dashboard widget, and a dedicated
+`/dashboard/notifications` page — built entirely from the Intelligence
+Timeline's own output (`getTimeline()`), reshaped into presentation-ready
+notifications with a priority (Critical/High/Medium/Low), an icon, and a
+read/unread state. Read state and per-type notification preferences both
+persist locally (`localStorage`) and survive a refresh; no remote
+persistence, no browser/push/email notifications. Search, read-state and
+type filters, and sorting (Newest/Oldest/Highest Priority) live on the
+Notification page; a `/dashboard/settings/notifications` page lets you
+toggle any of the 10 notification types on or off, and clear your read
+history. No new scoring or narrative logic, no provider calls — every
+notification is a direct reshape of one Timeline event. See
+[ARCHITECTURE.md](ARCHITECTURE.md#notification-system) for the pipeline
+and [API.md](API.md#notification-system-api) for the function reference.
+
 ## Milestone 5 — Provider Layer
 
 **Status**: 📋 Planned

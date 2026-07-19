@@ -628,6 +628,116 @@ all three of the layers beneath it but adds no new scoring, narrative, or
 health logic of its own; its only real contribution is chronological
 aggregation and presentation.
 
+## Notification System
+
+`lib/notifications/` (PR19) is a presentation-ready reshape of the
+Intelligence Timeline, not a sixth intelligence engine — it consumes
+exactly one existing service, `getTimeline()`, and turns each
+`TimelineEvent` into a `Notification` the UI can render directly (a
+priority, an icon, a read/unread state) without any further
+interpretation. It computes no new scores, confidences, or narratives.
+
+```
+lib/notifications/
+  types.ts        Notification model, NotificationType (= TimelineEventType), NotificationPriority
+  engine.ts        buildNotifications(): the pure pipeline entry point
+  storage.ts       cachedRawNotifications (pure runtime cache) + getNotifications() + the read-state overlay
+  preferences.ts   NotificationPreferences model + localStorage-backed getters/setters
+```
+
+```mermaid
+flowchart TD
+    Timeline["getTimeline()<br/>lib/timeline/storage.ts"] --> Storage["getNotifications()<br/>lib/notifications/storage.ts"]
+    Storage -->|"same Timeline reference as last call?"| Cache{"Reuse cached read?"}
+    Cache -->|yes| Raw["cachedRawNotifications"]
+    Cache -->|no| Engine["buildNotifications()<br/>lib/notifications/engine.ts"]
+    Engine --> Raw
+    Raw --> Overlay["Read-state overlay<br/>(localStorage-backed)"]
+    Overlay --> Overlaid["cachedOverlaidNotifications"]
+    Overlaid --> Hook["useNotifications()<br/>lib/hooks/useNotifications.ts"]
+    Prefs["NotificationPreferences<br/>(localStorage-backed)"] --> Hook
+    Hook --> UI["Dashboard NotificationWidget · Topbar NotificationDrawer · /dashboard/notifications page"]
+```
+
+**Notification model**: `NotificationType` is a type alias of
+`TimelineEventType` (not a parallel enum, so the two vocabularies can never
+drift). Every `Notification` is a direct reshape of one `TimelineEvent` —
+`projectId`/`projectName`/`severity` stay `null` for the same 4
+aggregate-level types Timeline already leaves `null` for; `link` is carried
+over unchanged (never reconstructed, so an aggregate notification can never
+produce a broken route); `priority` (`critical`/`high`/`medium`/`low`) and
+`icon` are both centralized lookups keyed by type
+(`NOTIFICATION_PRIORITY_BY_TYPE`, and `NOTIFICATION_ICON_BY_TYPE` — which
+reuses `TIMELINE_EVENT_ICON` from `components/timeline/TimelineEventBadge.tsx`
+directly rather than a second icon map).
+
+**Read-state persistence**: `storage.ts` layers a `readOverlay: Map<id,
+readAt>` on top of the pure `buildNotifications()` output — the same
+overlay-over-content pattern `lib/alerts/service.ts` already uses for its
+own per-alert `read`/`pinned` state. The overlay is backed by
+`localStorage` (key `base-radar:notification-read-state`, version-guarded
+exactly like `lib/watchlist/storage.ts`'s own read/write pair) so read
+state survives a refresh; hydration happens lazily, once, the first time
+anything actually needs the overlay. `markNotificationRead`,
+`markNotificationUnread`, `markAllNotificationsRead`, and
+`clearAllReadState` are the four mutations; each persists immediately and
+notifies subscribers.
+
+**Preferences**: `NotificationPreferences` is `Record<NotificationType,
+boolean>`, defaulting to everything enabled. Backed by `localStorage` (key
+`base-radar:notification-preferences`) with the same version-guard/fallback
+shape. `filterNotificationsByPreferences` is applied inside
+`useNotifications()` itself — muting a type is a UI-layer filter on top of
+`getNotifications()`'s output, not a second data source, so every consumer
+(Dashboard widget, Topbar drawer, Notification page) automatically respects
+it.
+
+**UI components** (`components/notifications/`): `NotificationCenter` (the
+page-level orchestrator, `/dashboard/notifications`), `NotificationItem`
+(one row — reuses `TimelineEventBadge` directly for the type badge),
+`NotificationGroup` (a Today/Yesterday/Earlier date bucket — grouping logic
+lives in `components/notifications/grouping.ts`), `NotificationBadge`
+(priority chip), `NotificationMetric`, `NotificationEmpty` (the three
+distinct empty states — no data / no search results / no filter results),
+`NotificationWidget` (compact Dashboard preview — renders only the latest
+notification), `NotificationDrawer` (the Topbar bell + dropdown, built on
+`@base-ui/react/menu`'s `Menu.Root`/`Menu.Trigger`/`Menu.Popup` — the same
+primitive `UserMenu`/`WidgetCard`'s own action menu already use), and
+`NotificationPreferencesPage` (`/dashboard/settings/notifications`). Search,
+read-state/type filters, and sorting (Newest/Oldest/Highest Priority) live
+in `components/notifications/filters.ts` — pure functions operating only on
+an already-built `Notification[]`.
+
+**Hooks** (`lib/hooks/`): `useNotifications` (a `useSyncExternalStore`
+binding to `getNotifications()`, subscribed to
+`lib/alerts/service.ts`/`lib/watchlist/service.ts`/the Notification
+storage's own read-state listeners, plus a second independent binding to
+`getNotificationPreferences()` — returns `{ notifications, markRead,
+markUnread, markAllRead, clearReadState }`), `useNotificationMetrics` (the
+5-tile metric list), and `useNotificationPreferences` (the Preferences
+page's binding, returning `{ preferences, setEnabled }`).
+
+**Dashboard integration**: `NotificationWidget` renders only the top-level
+summary (unread/total counts, the single latest notification) — never the
+full grouped feed, which lives at `/dashboard/notifications` only.
+`NotificationDrawer` replaces the Topbar's previous plain
+`Link`-to-`/dashboard/alerts` bell — a deliberate PR19 Part 2 decision: the
+Notification Engine aggregates Alerts/Daily Brief/Portfolio
+Intelligence/Timeline into one feed, so one unified bell (matching
+GitHub/Linear/Slack's own single-inbox convention) replaces what used to
+point at the raw Alert feed. `/dashboard/alerts` itself, and its own
+Sidebar nav entry/badge, are untouched.
+
+**Relationship with Timeline, Daily Brief, and Portfolio Intelligence**:
+Notifications is the topmost layer in the reuse chain — AI Intelligence
+Engine (PR15.3) → Daily Brief (PR16) → Portfolio Intelligence (PR17) →
+Intelligence Timeline (PR18) → Notification System (PR19). It reads only
+from Timeline (never from Daily Brief, Portfolio Intelligence, the AI
+Intelligence Engine, the Alert Engine, or the Provider Layer directly) and
+adds no new scoring, narrative, or aggregation logic of its own — its only
+real contribution is reshaping already-aggregated events into a
+presentation-ready, read-state-aware notification feed.
+
 ## Theming
 
 Theming is handled by `next-themes` at the root layout, using the standard

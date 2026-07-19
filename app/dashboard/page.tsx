@@ -16,6 +16,7 @@ import { AIIntelligenceWidget } from "@/components/dashboard/AIIntelligenceWidge
 import { BriefWidget } from "@/components/brief/BriefWidget";
 import { PortfolioWidget as PortfolioIntelligenceWidget } from "@/components/portfolio/PortfolioWidget";
 import { TimelineWidget } from "@/components/timeline/TimelineWidget";
+import { NotificationWidget } from "@/components/notifications/NotificationWidget";
 import { WelcomeHeader } from "@/components/dashboard/WelcomeHeader";
 import { IntelligenceBrief } from "@/components/dashboard/IntelligenceBrief";
 import { KPIRow } from "@/components/dashboard/KPIRow";
@@ -99,6 +100,7 @@ export default async function DashboardPage() {
           <BriefWidget />
           <PortfolioIntelligenceWidget />
           <TimelineWidget />
+          <NotificationWidget />
         </div>
       </div>
     </div>

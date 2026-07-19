@@ -1,14 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronRight, Menu, Sparkles, Bell, GitCompare, Wallet } from "lucide-react";
+import { ChevronRight, Menu, Sparkles, GitCompare, Wallet } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useLiveNetworkStatus } from "@/lib/hooks/useLiveNetworkStatus";
-import { useUnreadAlertCount } from "@/lib/hooks/useUnreadAlertCount";
 import { formatGwei } from "@/lib/data/format";
 import { ChainBadge } from "@/components/branding/ChainBadge";
+import { NotificationDrawer } from "@/components/notifications/NotificationDrawer";
 import { SearchBar } from "@/components/dashboard/SearchBar";
 import { UserMenu } from "@/components/dashboard/UserMenu";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
@@ -60,8 +59,6 @@ function NetworkBadge() {
 
 export function Topbar({ onOpenMobileNav }: TopbarProps) {
   const breadcrumb = useBreadcrumb();
-  const unreadAlertCount = useUnreadAlertCount();
-  const unreadAlertLabel = unreadAlertCount > 9 ? "9+" : String(unreadAlertCount);
 
   return (
     <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b border-radar-light-border bg-radar-light-card/80 px-4 backdrop-blur-xl sm:px-6 lg:px-10 dark:border-white/10 dark:bg-radar-bg/60">
@@ -131,25 +128,7 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
           </button>
         </Tooltip>
 
-        <Tooltip content="Alerts">
-          <Link
-            href="/dashboard/alerts"
-            aria-label={
-              unreadAlertCount > 0 ? `View alerts, ${unreadAlertCount} unread` : "View alerts"
-            }
-            className="relative flex size-9 shrink-0 items-center justify-center rounded-lg text-radar-light-muted outline-none transition-colors hover:bg-radar-light-surface focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:text-radar-muted dark:hover:bg-white/5"
-          >
-            <Bell className="size-[18px]" aria-hidden="true" />
-            {unreadAlertCount > 0 && (
-              <span
-                aria-hidden="true"
-                className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-radar-danger px-1 text-[9.5px] font-semibold tabular-nums text-white"
-              >
-                {unreadAlertLabel}
-              </span>
-            )}
-          </Link>
-        </Tooltip>
+        <NotificationDrawer />
 
         <Tooltip content="Connect wallet">
           <button
