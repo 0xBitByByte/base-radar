@@ -410,6 +410,63 @@ mistaken for engine logic.
 | `sortTimelineEvents(events, order)` | `TimelineEvent[]` — `"newest"` (default) / `"oldest"` / `"severity"` / `"confidence"`. Events with no real `severity`/`confidence` sort last, via an internal ordering-only sentinel never shown as a real value. |
 | `groupTimelineEvents(events)` | `Record<TimelineGroupKey, TimelineEvent[]>` — buckets into `"today"` / `"yesterday"` / `"earlier"` using the current wall-clock time (a legitimate presentation-layer read, distinct from the backend engine's no-`Date.now()` rule). |
 
+## Notification System API
+
+Internal function reference for `lib/notifications/`. See
+[ARCHITECTURE.md](ARCHITECTURE.md#notification-system) for the pipeline —
+it only ever reads `getTimeline()`, never Daily Brief, Portfolio
+Intelligence, the AI Intelligence Engine, the Alert Engine, or a provider
+directly, and computes no new scoring or narrative logic of its own.
+
+### Engine — `lib/notifications/engine.ts`
+
+| Function | Returns |
+| --- | --- |
+| `buildNotifications(timeline)` | `Notification[]` — the full pipeline (map every `TimelineEvent` to a `Notification` → dedupe by id → stable sort newest-first). Pure. |
+| `NOTIFICATION_PRIORITY_BY_TYPE` | `Record<NotificationType, NotificationPriority>` — the centralized type → priority mapping (Security → critical; Alert/Opportunity → high; Governance/Development/TVL → medium; the 4 aggregate roll-up types → low). |
+| `NOTIFICATION_ICON_BY_TYPE` | `Record<NotificationType, LucideIcon>` — reuses `TIMELINE_EVENT_ICON` (`components/timeline/TimelineEventBadge.tsx`) directly rather than a second icon map. |
+
+### Storage — `lib/notifications/storage.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `getNotifications()` | `Notification[]` | The one public entry point. Rebuilds only when `getTimeline()` returns a new reference or the read-state overlay changes; otherwise returns the cached read. |
+| `markNotificationRead(id)` / `markNotificationUnread(id)` | `void` | Adds/removes `id` from the read-state overlay; persists to `localStorage` immediately. |
+| `markAllNotificationsRead()` | `void` | Marks every currently-built notification read — Notifications carry no Watchlist-mute concept, so "all" genuinely means all. |
+| `clearAllReadState()` | `void` | Forgets every read marker — every notification reverts to unread. Exposed on the Preferences page. |
+| `subscribe(listener)` | `() => void` | Registers a listener for read-state mutations; returns the unsubscribe function. |
+
+### Preferences — `lib/notifications/preferences.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `getNotificationPreferences()` | `NotificationPreferences` | `Record<NotificationType, boolean>`, `localStorage`-backed (key `base-radar:notification-preferences`), defaults to every type enabled. |
+| `setNotificationTypeEnabled(type, enabled)` | `void` | Persists immediately and notifies subscribers. |
+| `subscribeToNotificationPreferences(listener)` | `() => void` | Registers a listener for preference changes. |
+| `isNotificationTypeEnabled(preferences, type)` / `filterNotificationsByPreferences(notifications, preferences)` | `boolean` / `Notification[]` | Pure helpers — the latter is applied inside `useNotifications()` itself so every consumer respects preferences automatically. |
+
+### Hooks — `lib/hooks/`
+
+| Hook | Backed by | Notes |
+| --- | --- | --- |
+| `useNotifications()` | `lib/notifications/storage.ts`'s `getNotifications()` + `lib/notifications/preferences.ts`'s `getNotificationPreferences()` | Two independent `useSyncExternalStore` bindings; returns `{ notifications, markRead, markUnread, markAllRead, clearReadState }`. The alerts/watchlist/notification-storage listener sets are all subscribed to. |
+| `useNotificationMetrics()` | `useNotifications()` | Formats the notification array into the 5-tile metric list (`Total Notifications`/`Unread`/`Critical`/`High Priority`/`Projects Affected`) — memoized on the notifications reference. |
+| `useNotificationPreferences()` | `lib/notifications/preferences.ts` | Returns `{ preferences, setEnabled }` for the Preferences page. |
+
+### UI query layer — `components/notifications/filters.ts` / `grouping.ts`
+
+Pure functions operating only on an already-built `Notification[]` —
+colocated with the components (not under `lib/notifications/`) so they're
+never mistaken for engine logic.
+
+| Function | Returns |
+| --- | --- |
+| `filterNotificationsByQuery(notifications, normalizedQuery)` | `Notification[]` — case-insensitive substring match across project name, title, summary, type, and source. |
+| `filterNotificationsByReadState(notifications, state)` | `Notification[]` — `"all"` / `"unread"` / `"read"`. |
+| `filterNotificationsByType(notifications, type)` | `Notification[]` — `"all"` or one of the 10 notification types. |
+| `sortNotifications(notifications, order)` | `Notification[]` — `"newest"` (default) / `"oldest"` / `"priority"`. Stable (`Array.prototype.sort` is stable since ES2019). |
+| `groupNotifications(notifications)` | `Record<NotificationGroupKey, Notification[]>` — buckets into `"today"` / `"yesterday"` / `"earlier"`, mirroring `groupTimelineEvents`'s exact logic. |
+
 ## Future Provider Interfaces
 
 These are internal interfaces the codebase is already shaped for but does
