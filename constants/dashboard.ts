@@ -12,7 +12,6 @@ import {
   Bell,
   Zap,
   Settings,
-  FileCode,
 } from "lucide-react";
 
 export type NavItem = {
@@ -65,29 +64,3 @@ export const DASHBOARD_SETTINGS_ITEM: NavItem = {
 };
 
 export const APP_VERSION = "v0.1.0";
-
-export const RECENT_SEARCHES: string[] = ["Aerodrome", "cbBTC", "0x7a3f…9c21"];
-
-export const TRENDING_SEARCHES: string[] = [
-  "AI Agents",
-  "Base gas tracker",
-  "NeuroBase AI",
-  "Whale wallets",
-];
-
-export type QuickAction = {
-  label: string;
-  href: string;
-  icon: LucideIcon;
-};
-
-export const QUICK_ACTIONS: QuickAction[] = [
-  { label: "Open Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Browse Projects", href: "/dashboard/projects", icon: FolderKanban },
-  { label: "Open Wallet", href: "/dashboard/wallet", icon: Wallet },
-  { label: "View Contracts", href: "/dashboard/projects", icon: FileCode },
-  { label: "Browse Narratives", href: "/dashboard/narratives", icon: TrendingUp },
-  { label: "View Signals", href: "/dashboard/signals", icon: Radio },
-  { label: "AI Research", href: "/dashboard/ai-research", icon: BrainCircuit },
-  { label: "Settings", href: "/dashboard/settings", icon: Settings },
-];
