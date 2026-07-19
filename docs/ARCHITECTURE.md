@@ -785,6 +785,103 @@ flowchart TD
 
 **Relationship with the Notification Engine**: Automation is the topmost layer in the reuse chain — AI Intelligence Engine (PR15.3) → Daily Brief (PR16) → Portfolio Intelligence (PR17) → Intelligence Timeline (PR18) → Notification System (PR19) → Automation System (PR20). It reads only from Notifications (never from Timeline, Portfolio Intelligence, Daily Brief, the AI Intelligence Engine, the Alert Engine, or the Provider Layer directly) and adds no new scoring, narrative, or notification-generation logic of its own — its only real contribution is evaluating already-built notifications against user-configurable rules.
 
+## Global Search & Command Palette
+
+`lib/command/` + `lib/search/` (PR21) is a pure UI/navigation layer sitting
+above every engine — not an eighth intelligence engine, and it never calls a
+provider or recomputes anything. It searches BOTH a static command registry
+and existing application data, then routes to an existing page. Nothing
+here introduces new business logic; every result is a reshape of a value
+some other hook/helper already produced.
+
+```
+lib/command/
+  commands.ts       COMMANDS registry (11 static destinations) + Command/CommandGroup types
+lib/search/
+  types.ts          SearchableItem — the one common shape every result normalizes into
+  globalSearch.ts   7 normalizers + scoreItem() + globalSearch() + groupSearchResults()
+  preferences.ts    SearchPreferences (localStorage-backed) — Recent Searches on/off, max size, history on/off, keyboard shortcut on/off
+  storage.ts        Recent Searches list (query strings only, localStorage-backed)
+```
+
+```mermaid
+flowchart TD
+    Commands["COMMANDS<br/>lib/command/commands.ts"] --> Search["useGlobalSearch()<br/>lib/hooks/useGlobalSearch.ts"]
+    Projects["getProjects()<br/>data/projects/helpers.ts"] --> Search
+    Timeline["useTimeline()"] --> Search
+    Notifications["useNotifications()"] --> Search
+    Automation["useAutomation()"] --> Search
+    Portfolio["usePortfolioIntelligence()"] --> Search
+    Brief["useDailyBrief()"] --> Search
+    Search -->|"normalize → SearchableItem[]"| Score["globalSearch()<br/>score + sort, best match wins"]
+    Score --> Palette["useCommandPalette()<br/>lib/hooks/useCommandPalette.ts"]
+    RecentPrefs["SearchPreferences<br/>(localStorage-backed)"] -.->|"gates ⌘K/Ctrl+K + Recent Searches display"| Palette
+    RecentStorage["Recent Searches<br/>(localStorage-backed)"] -.-> Palette
+    Palette --> UI["CommandPalette.tsx<br/>Topbar trigger + Dialog"]
+```
+
+**Search architecture**: every source normalizes into one `SearchableItem`
+(`id`/`title`/`description`/`group`/`type`/`icon`/`route`/`keywords`/
+`metadata`/`source`). Commands tagged `"Settings"` (Notification/Automation/
+Search Preferences) keep their own `Settings` group; every other static
+command folds into a generic `Commands` group, so dynamic per-item results —
+not static shortcuts — own the `Projects`/`Timeline`/`Notifications`/
+`Automation`/`Portfolio`/`Daily Brief` groups. Routes always point at a real,
+existing page: Projects get a genuine per-project deep link
+(`/dashboard/projects/{slug}`); Timeline/Notifications/Automation/Portfolio/
+Daily Brief each route to their own section's page, never a fabricated
+per-item URL.
+
+**Scoring**: `globalSearch()` uses simple weighted substring/keyword/
+description/metadata matching — no fuzzy-match library — and sorts by score
+alone (not group-first), so a strongly-matching Project or Notification
+outranks a weakly-matching Command. `groupSearchResults()` then partitions
+that already-sorted list into sections in first-appearance order, so the
+section containing the single best match always renders first and empty
+groups never render, without ever reshuffling the underlying rank.
+
+**Preferences & Recent Searches** (PR21 Part 3): `SearchPreferences`
+(`enableRecentSearches`, `maxRecentSearches` default 10 clamped to
+`[1, 50]`, `enableSearchHistory`, `enableKeyboardShortcut`) is
+`localStorage`-backed with the same version-guard/graceful-fallback shape
+as every other preferences module in this app. Recent Searches
+(`lib/search/storage.ts`) persists only query strings — never search
+results, never provider data — newest first, de-duplicated
+case-insensitively, capped to `maxRecentSearches`. `recordSearch()` checks
+`enableSearchHistory` at the storage layer itself (a real kill switch, same
+pattern as Automation's master toggle) and is only ever called after a real
+selection was made from a non-empty query, so "only store queries that
+produced results" holds by construction. The Command Palette shows a Recent
+Searches section only when `enableRecentSearches` is on, history is
+non-empty, and the query is empty — it disappears the moment the user types
+a character. The `enableKeyboardShortcut` preference is read fresh on every
+keypress inside the global ⌘K/Ctrl+K listener: when off, the shortcut is a
+no-op, but the Topbar's mouse trigger is completely unaffected.
+
+**UI components** (`components/command/`): `CommandPalette` (the Topbar
+trigger + Base UI `Dialog`, focus trap and return-focus-to-trigger provided
+for free), `CommandSearch` (the combobox input row), `CommandResults`
+(`role="listbox"`, renders `groupSearchResults()`'s output), `CommandGroup`
+(one labeled section), `CommandItem` (`role="option"`, one row), and
+`CommandEmpty` ("No results found." / "Try another keyword."). The Settings
+page (`components/search/SearchPreferencesPage.tsx`,
+`/dashboard/settings/search`) reuses the same card/section chrome as
+Notification/Automation preferences.
+
+**Hooks** (`lib/hooks/`): `useGlobalSearch` (aggregates + scores, no routing,
+no provider access), `useCommandPalette` (open/close/toggle/selection/query
+state, the global keyboard listener, and — as of Part 3 — `recentSearches`/
+`showRecentSearches`/`recordSearch`/`selectRecentSearch`), and
+`useSearchPreferences` (load/save/reset only — performs no searching
+itself).
+
+**Relationship with every engine below it**: Global Search reads Timeline,
+Notifications, Automation, Portfolio Intelligence, and Daily Brief each
+through their own existing hook — never a provider, never an engine
+recomputation, never a new scoring or narrative rule. It is the one layer
+in this app whose entire job is aggregation and presentation of what every
+other layer already computed.
+
 ## Theming
 
 Theming is handled by `next-themes` at the root layout, using the standard

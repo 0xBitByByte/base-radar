@@ -8,7 +8,7 @@ import { useLiveNetworkStatus } from "@/lib/hooks/useLiveNetworkStatus";
 import { formatGwei } from "@/lib/data/format";
 import { ChainBadge } from "@/components/branding/ChainBadge";
 import { NotificationDrawer } from "@/components/notifications/NotificationDrawer";
-import { SearchBar } from "@/components/dashboard/SearchBar";
+import { CommandPalette } from "@/components/command/CommandPalette";
 import { UserMenu } from "@/components/dashboard/UserMenu";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -103,7 +103,7 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
           label again but tightened), and "desktop" (1440+, full comfort) —
           `xl`/`min-[1440px]` are arbitrary variants scoped to this file
           only, not a change to the app's shared breakpoint tokens. */}
-      <SearchBar className="hidden min-w-0 max-w-[220px] flex-1 sm:flex xl:max-w-xs min-[1440px]:max-w-sm" />
+      <CommandPalette className="hidden min-w-0 max-w-[220px] flex-1 sm:flex xl:max-w-xs min-[1440px]:max-w-sm" />
 
       <div className="ml-auto flex items-center gap-1 sm:gap-1.5 xl:gap-1 min-[1440px]:gap-2">
         <Tooltip content="Compare projects">

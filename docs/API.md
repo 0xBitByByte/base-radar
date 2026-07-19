@@ -529,6 +529,71 @@ never mistaken for engine logic.
 | `groupAutomationResults(results)` | `Record<AutomationGroupKey, AutomationResult[]>` — buckets into `"today"` / `"yesterday"` / `"earlier"`, mirroring `groupNotifications`'s exact logic. |
 | `getResultTrigger(result)` / `getResultActions(result)` | `AutomationTriggerType \| null` / `AutomationAction[]` | Safely narrow `AutomationResult.metadata`'s `trigger`/`actions` fields for display. |
 
+## Global Search & Command Palette API
+
+Internal function reference for `lib/command/` + `lib/search/`. See
+[ARCHITECTURE.md](ARCHITECTURE.md#global-search--command-palette) for the
+pipeline — a pure UI/navigation layer that only ever reads existing
+hooks/helpers, never a provider, and introduces no new scoring or
+notification-generation logic of its own.
+
+### Registry — `lib/command/commands.ts`
+
+| Export | Type | Notes |
+| --- | --- | --- |
+| `COMMANDS` | `Command[]` | 11 static, real destinations — every `route` resolves to an existing page. |
+| `Command` / `CommandGroup` | types | `{ id, title, description, group, icon, route, keywords }`. |
+
+### Search types — `lib/search/types.ts`
+
+| Export | Type | Notes |
+| --- | --- | --- |
+| `SearchableItem` | type | The one common shape every result normalizes into — `{ id, title, description, group, type, icon, route, keywords, metadata, source }`. |
+| `SearchGroup` / `SearchResultType` | types | `SearchGroup`: `Commands \| Projects \| Timeline \| Notifications \| Automation \| Portfolio \| "Daily Brief" \| Settings`. |
+
+### Aggregation & scoring — `lib/search/globalSearch.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `normalizeCommand/Project/TimelineEvent/Notification/AutomationResult/Portfolio/DailyBrief(...)` | `SearchableItem` | 7 pure reshapers, one per source. |
+| `globalSearch(query, items)` | `SearchableItem[]` | Case-insensitive weighted scoring (title/keyword/description/group/metadata); sorted by score alone, not group-first — "best match wins" regardless of `type`. Empty query matches every item (browsable). |
+| `groupSearchResults(items)` | `{ group, items }[]` | Partitions an already-scored list into sections in first-appearance order — hides empty groups by construction, keeps section order in sync with rank. |
+
+### Preferences — `lib/search/preferences.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `getSearchPreferences()` | `SearchPreferences` | `{ enableRecentSearches, maxRecentSearches, enableSearchHistory, enableKeyboardShortcut }`, `localStorage`-backed (key `base-radar:search-preferences`), defaults `{ true, 10, true, true }`. |
+| `setSearchPreferences(patch)` | `void` | Merges `patch`, clamps `maxRecentSearches` to `[1, 50]`, persists, notifies. |
+| `resetSearchPreferences()` | `void` | Reverts to `DEFAULT_SEARCH_PREFERENCES`. |
+| `subscribeToSearchPreferences(listener)` | `() => void` | Registers a listener for preference changes. |
+
+### Recent Searches storage — `lib/search/storage.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `getRecentSearches()` | `string[]` | Query strings only — never search results, never provider data. |
+| `recordSearch(query)` | `void` | No-ops if `query` is blank or `enableSearchHistory` is off (checked here, not the UI). Newest-first, case-insensitive dedupe, capped to `maxRecentSearches`. |
+| `clearSearchHistory()` | `void` | Empties the list, persists, notifies. |
+| `subscribeToRecentSearches(listener)` | `() => void` | Registers a listener for history mutations. |
+
+### Hooks — `lib/hooks/`
+
+| Hook | Backed by | Notes |
+| --- | --- | --- |
+| `useGlobalSearch(query)` | all 7 sources | Aggregates once (memoized on the 5 reactive hook values), scores separately (memoized on `[query, items]`). No routing. |
+| `useCommandPalette()` | `useGlobalSearch` + `lib/search/preferences.ts` + `lib/search/storage.ts` | Returns `{ open, query, setQuery, results, selectedIndex, selectNext, selectPrevious, openPalette, closePalette, togglePalette, recentSearches, showRecentSearches, recordSearch, selectRecentSearch }`. The global ⌘K/Ctrl+K listener checks `enableKeyboardShortcut` fresh on every keypress. |
+| `useSearchPreferences()` | `lib/search/preferences.ts` | Returns `{ preferences, setPreferences, resetPreferences }` — load/save/reset only, performs no searching. |
+
+### UI query layer — `components/command/`
+
+| Component | Notes |
+| --- | --- |
+| `CommandPalette` | Topbar trigger + Base UI `Dialog`; renders the Recent Searches section (when enabled, non-empty, and query is blank) above `CommandResults`. |
+| `CommandResults` / `CommandGroup` / `CommandItem` | Render `groupSearchResults()`'s output — `role="listbox"`/`role="group"`/`role="option"`. |
+| `CommandSearch` | The combobox input row — `aria-activedescendant`/`aria-controls`. |
+| `CommandEmpty` | "No results found." / "Try another keyword." |
+
 ## Future Provider Interfaces
 
 These are internal interfaces the codebase is already shaped for but does

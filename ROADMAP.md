@@ -19,6 +19,7 @@
 - Intelligence Timeline (searchable/filterable chronological activity feed + Dashboard widget)
 - Notification System (Topbar bell + drawer, Dashboard widget, notification page, preferences, persisted read state)
 - Automation System (rule-based automation, Dashboard widget, automation page, preferences, persisted rule state)
+- Global Search & Command Palette (⌘K/Ctrl+K, searches commands + Projects/Timeline/Notifications/Automation/Portfolio/Daily Brief, Recent Searches, preferences)
 
 ---
 

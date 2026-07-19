@@ -164,6 +164,31 @@ result is a reshape of one real rule-notification match. See
 [ARCHITECTURE.md](ARCHITECTURE.md#automation-system) for the pipeline and
 [API.md](API.md#automation-system-api) for the function reference.
 
+## Global Search & Command Palette
+
+**Status**: ✅ Shipped
+
+A GitHub/Linear/Spotlight-style global search — a Topbar trigger (⌘K /
+Ctrl+K) plus a Dialog searching both a static command registry and every
+existing data source: Projects, the Intelligence Timeline, Notifications,
+Automation, Portfolio Intelligence, and the Daily Brief. Every result
+normalizes into one common shape and scores by weighted title/keyword/
+description/metadata matching — sorted by score alone, not by source, so a
+strongly-matching Project or Notification outranks a weakly-matching
+command. Selecting a result always routes to a real, existing page (a
+genuine per-project deep link for Projects; each other source's own section
+page). A `/dashboard/settings/search` page lets you toggle Recent Searches,
+Search History, and the ⌘K/Ctrl+K shortcut, set a maximum Recent Searches
+count (default 10), and clear your search history — all persisted locally
+(`localStorage`) and surviving a refresh. Recent Searches (query strings
+only, never results) appear in the palette only when enabled, non-empty,
+and the query is blank, disappearing the instant you start typing. No new
+scoring or narrative logic, no provider calls — every result is a reshape
+of what an existing hook already computed. See
+[ARCHITECTURE.md](ARCHITECTURE.md#global-search--command-palette) for the
+pipeline and [API.md](API.md#global-search--command-palette-api) for the
+function reference.
+
 ## Milestone 5 — Provider Layer
 
 **Status**: 📋 Planned
