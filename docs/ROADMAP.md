@@ -142,6 +142,28 @@ notification is a direct reshape of one Timeline event. See
 [ARCHITECTURE.md](ARCHITECTURE.md#notification-system) for the pipeline
 and [API.md](API.md#notification-system-api) for the function reference.
 
+## Automation System
+
+**Status**: ✅ Shipped
+
+A GitHub Actions/Linear Workflow-style automation layer built entirely
+from the Notification System's own output (`getNotifications()`) — rules
+are evaluated against real notifications to produce `AutomationResult`s
+naming which rule fired, why, which notification triggered it, and which
+action it implies (Flag Dashboard/Create Notification Entry/Queue Daily
+Digest/Queue Weekly Digest/Mark Important). Actions are data only in this
+PR — no email, no push, no webhooks, no execution layer. Five default
+rules ship enabled; a `/dashboard/settings/automation` page lets you
+toggle any rule on or off, reset all rules to their defaults, and turn the
+whole Automation System on or off with one master switch — all three
+persist locally (`localStorage`) and survive a refresh. Search and
+priority/action filters live on the Automation page
+(`/dashboard/automation`, plus a compact Dashboard widget and a Sidebar
+nav entry). No new scoring or narrative logic, no provider calls — every
+result is a reshape of one real rule-notification match. See
+[ARCHITECTURE.md](ARCHITECTURE.md#automation-system) for the pipeline and
+[API.md](API.md#automation-system-api) for the function reference.
+
 ## Milestone 5 — Provider Layer
 
 **Status**: 📋 Planned

@@ -467,6 +467,68 @@ never mistaken for engine logic.
 | `sortNotifications(notifications, order)` | `Notification[]` — `"newest"` (default) / `"oldest"` / `"priority"`. Stable (`Array.prototype.sort` is stable since ES2019). |
 | `groupNotifications(notifications)` | `Record<NotificationGroupKey, Notification[]>` — buckets into `"today"` / `"yesterday"` / `"earlier"`, mirroring `groupTimelineEvents`'s exact logic. |
 
+## Automation System API
+
+Internal function reference for `lib/automation/`. See
+[ARCHITECTURE.md](ARCHITECTURE.md#automation-system) for the pipeline — it
+only ever reads `getNotifications()`, never Timeline, Portfolio
+Intelligence, Daily Brief, the AI Intelligence Engine, the Alert Engine,
+or a provider directly, and generates no notification or new scoring
+logic of its own.
+
+### Engine — `lib/automation/engine.ts`
+
+| Function | Returns |
+| --- | --- |
+| `buildAutomationResults(notifications, rules)` | `AutomationResult[]` — the full pipeline (for every rule, check every notification via `matchesRule` → reshape each real match → dedupe by id → stable sort newest-first by `triggeredAt`). Pure. |
+
+### Rules — `lib/automation/rules.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `matchesRule(notification, rule)` | `boolean` | The one centralized evaluation entry point — enabled check, trigger check, then every condition must hold. Never duplicated elsewhere. |
+| `DEFAULT_AUTOMATION_RULES` | `AutomationRule[]` | The 5 static default rules (rule *logic* never changes at runtime). |
+| `getAutomationRules()` | `AutomationRule[]` | The merged view — `DEFAULT_AUTOMATION_RULES` with any persisted `enabled` overrides applied. Same reference until a real enable/disable/reset happens. |
+| `setRuleEnabled(ruleId, enabled)` / `resetAutomationRules()` | `void` | Persists to `localStorage` (key `base-radar:automation-rule-state`) immediately and notifies subscribers. `resetAutomationRules` clears the overlay entirely, not force-enables every rule. |
+| `subscribeToAutomationRules(listener)` | `() => void` | Registers a listener for rule-state mutations. |
+
+### Preferences — `lib/automation/preferences.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `getAutomationPreferences()` | `AutomationPreferences` | `{ enabled: boolean }`, `localStorage`-backed (key `base-radar:automation-preferences`), defaults to `enabled: true`. |
+| `setAutomationEnabled(enabled)` | `void` | Persists immediately and notifies subscribers. |
+| `subscribeToAutomationPreferences(listener)` | `() => void` | Registers a listener for preference changes. |
+
+### Storage — `lib/automation/storage.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `getAutomationResults()` | `AutomationResult[]` | The one public entry point. Returns `[]` immediately if `AutomationPreferences.enabled` is `false` (no rule is evaluated); otherwise rebuilds only when `getNotifications()` or `getAutomationRules()` returns a new reference. |
+
+### Hooks — `lib/hooks/`
+
+| Hook | Backed by | Notes |
+| --- | --- | --- |
+| `useAutomation()` | `lib/automation/storage.ts`'s `getAutomationResults()` + `lib/automation/preferences.ts`'s `getAutomationPreferences()` | Two independent `useSyncExternalStore` bindings; returns `{ results, enabled }`. |
+| `useAutomationMetrics()` | `useAutomation()` | Formats the result array into the 5-tile metric list (`Total Automations`/`Critical`/`High Priority`/`Rules Triggered`/`Projects Affected`) — memoized on the results reference. |
+| `useAutomationRules()` | `lib/automation/rules.ts` | Returns `{ rules, setEnabled, reset }` for the Preferences page. |
+| `useAutomationPreferences()` | `lib/automation/preferences.ts` | Returns `{ preferences, setEnabled }` for the Preferences page's master toggle. |
+
+### UI query layer — `components/automation/filters.ts` / `grouping.ts`
+
+Pure functions operating only on an already-built `AutomationResult[]` —
+colocated with the components (not under `lib/automation/`) so they're
+never mistaken for engine logic.
+
+| Function | Returns |
+| --- | --- |
+| `filterAutomationResultsByQuery(results, normalizedQuery)` | `AutomationResult[]` — case-insensitive substring match across rule name, summary (which already carries the triggering notification's own title), and project name. |
+| `filterAutomationResultsByPriority(results, priority)` | `AutomationResult[]` — `"all"` or one of the 4 priorities. |
+| `filterAutomationResultsByAction(results, action)` | `AutomationResult[]` — `"all"` or one of the 5 automation actions. |
+| `groupAutomationResults(results)` | `Record<AutomationGroupKey, AutomationResult[]>` — buckets into `"today"` / `"yesterday"` / `"earlier"`, mirroring `groupNotifications`'s exact logic. |
+| `getResultTrigger(result)` / `getResultActions(result)` | `AutomationTriggerType \| null` / `AutomationAction[]` | Safely narrow `AutomationResult.metadata`'s `trigger`/`actions` fields for display. |
+
 ## Future Provider Interfaces
 
 These are internal interfaces the codebase is already shaped for but does
