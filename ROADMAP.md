@@ -18,6 +18,7 @@
 - Portfolio Intelligence (searchable/filterable per-Watchlist read + Dashboard widget)
 - Intelligence Timeline (searchable/filterable chronological activity feed + Dashboard widget)
 - Notification System (Topbar bell + drawer, Dashboard widget, notification page, preferences, persisted read state)
+- Automation System (rule-based automation, Dashboard widget, automation page, preferences, persisted rule state)
 
 ---
 

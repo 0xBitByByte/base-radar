@@ -738,6 +738,53 @@ adds no new scoring, narrative, or aggregation logic of its own — its only
 real contribution is reshaping already-aggregated events into a
 presentation-ready, read-state-aware notification feed.
 
+## Automation System
+
+`lib/automation/` (PR20) evaluates already-built Notifications against
+user-defined rules — not a seventh intelligence engine. It consumes
+exactly one existing service, `getNotifications()`, and produces
+`AutomationResult`s: real matches between a real `Notification` and a
+real, enabled `AutomationRule`. It generates no notification, calls no
+provider, and never reads Timeline/Portfolio Intelligence/Daily
+Brief/the AI Intelligence Engine/the Alert Engine directly.
+
+```
+lib/automation/
+  types.ts        AutomationRule + AutomationResult models, trigger/condition/action unions
+  engine.ts       buildAutomationResults(): the pure pipeline entry point
+  rules.ts        matchesRule() (centralized evaluation) + DEFAULT_AUTOMATION_RULES + localStorage-backed enabled overlay
+  storage.ts      cachedAutomationResults (pure runtime cache) + getAutomationResults()
+  preferences.ts  AutomationPreferences (master enabled switch) + localStorage-backed getters/setters
+```
+
+```mermaid
+flowchart TD
+    Notifications["getNotifications()<br/>lib/notifications/storage.ts"] --> Storage["getAutomationResults()<br/>lib/automation/storage.ts"]
+    Prefs["AutomationPreferences.enabled<br/>(localStorage-backed)"] -->|"false → return [] immediately"| Storage
+    Rules["getAutomationRules()<br/>lib/automation/rules.ts<br/>(enabled overlay, localStorage-backed)"] --> Storage
+    Storage -->|"same Notifications AND Rules references as last call?"| Cache{"Reuse cached read?"}
+    Cache -->|yes| Cached["cachedAutomationResults"]
+    Cache -->|no| Engine["buildAutomationResults()<br/>lib/automation/engine.ts"]
+    Engine -->|"matchesRule() per rule × notification"| Rules
+    Engine --> Cached
+    Cached --> Hook["useAutomation()<br/>lib/hooks/useAutomation.ts"]
+    Hook --> UI["Dashboard AutomationWidget · /dashboard/automation page · /dashboard/settings/automation"]
+```
+
+**Automation model**: `AutomationTriggerType` is `NotificationType | "unread-notification" | "high-priority-notification" | "critical-notification"` — the 10 real notification types reused directly, plus 3 meta-triggers that qualify by a notification's own already-computed field rather than its type. `AutomationCondition` is a small closed set (`priority`/`isRead`/`type` equality checks) layered on top of `trigger`, deliberately not a general query DSL. Every `AutomationResult` carries `projectId`/`projectName`/`link` straight from the matched notification (never reconstructed, never fabricated for aggregate-level matches) and a single honest `status: "triggered"` — richer lifecycle states (`queued`/`completed`) are deferred until a real execution layer exists, which this PR explicitly does not build (actions are data only: no email, no push, no webhooks).
+
+**Rule persistence**: `rules.ts` layers an `enabledByRuleId` overlay (a `Map<ruleId, boolean>`) on top of the static `DEFAULT_AUTOMATION_RULES` array — the exact same overlay-over-content pattern `lib/notifications/storage.ts`'s read-state overlay already uses. Rule *logic* (trigger, conditions, actions) is fixed; only `enabled` is ever overridden, so "Do NOT allow editing rule logic" holds structurally, not just by convention. Backed by `localStorage` (key `base-radar:automation-rule-state`, version-guarded exactly like every other overlay in this codebase) so enable/disable state survives a refresh. `setRuleEnabled` and `resetAutomationRules` are the two mutations; `resetAutomationRules` clears the overlay entirely rather than forcing every rule to `true`, so a rule already at its own default just has nothing to revert.
+
+**Preferences**: `AutomationPreferences` is `{ enabled: boolean }` — a single master switch, defaulting to `true`. Backed by `localStorage` (key `base-radar:automation-preferences`) with the same version-guard/fallback shape as every other preferences module. Checked at the very top of `getAutomationResults()`: when `false`, it returns an empty array immediately without evaluating a single rule — a real kill switch, not a UI-level filter, which keeps "never evaluate rules in the UI" true in the strongest sense available.
+
+**UI components** (`components/automation/`): `AutomationCenter` (the page-level orchestrator, `/dashboard/automation`), `AutomationItem` (one row — reuses `NotificationBadge` directly for the priority chip, since `AutomationResult.priority` is the exact same `NotificationPriority` union), `AutomationGroup` (a Today/Yesterday/Earlier date bucket), `AutomationBadge` (exports both `AutomationTriggerBadge` and `AutomationActionBadge`), `AutomationMetric`, `AutomationEmpty` (four distinct empty states — no data / no search results / no filter results / automation disabled), `AutomationWidget` (compact Dashboard preview — renders only the latest result), and `AutomationPreferencesPage` (`/dashboard/settings/automation`). Search and priority/action filters live in `components/automation/filters.ts` — pure functions operating only on an already-built `AutomationResult[]`.
+
+**Hooks** (`lib/hooks/`): `useAutomation` (a `useSyncExternalStore` binding to `getAutomationResults()`, subscribed to `lib/alerts/service.ts`/`lib/watchlist/service.ts`/the Notification storage's read-state listeners/the Automation rule and preference listeners, plus a second independent binding to `getAutomationPreferences()` — returns `{ results, enabled }`), `useAutomationMetrics` (the 5-tile metric list), `useAutomationRules` (the Preferences page's rule-list binding, returning `{ rules, setEnabled, reset }`), and `useAutomationPreferences` (the master-toggle binding, returning `{ preferences, setEnabled }`).
+
+**Dashboard integration**: `AutomationWidget` renders only the top-level summary (triggered/high-priority counts, the single latest result) — never the full grouped feed, which lives at `/dashboard/automation` only. Reached via the Sidebar's "Automation" nav item (under Portfolio, alongside Watchlist/Alerts) and via each notification's own deep link, per the PR brief's own "Dashboard widget, Sidebar, Notification deep links" access pattern — no Topbar icon was added.
+
+**Relationship with the Notification Engine**: Automation is the topmost layer in the reuse chain — AI Intelligence Engine (PR15.3) → Daily Brief (PR16) → Portfolio Intelligence (PR17) → Intelligence Timeline (PR18) → Notification System (PR19) → Automation System (PR20). It reads only from Notifications (never from Timeline, Portfolio Intelligence, Daily Brief, the AI Intelligence Engine, the Alert Engine, or the Provider Layer directly) and adds no new scoring, narrative, or notification-generation logic of its own — its only real contribution is evaluating already-built notifications against user-configurable rules.
+
 ## Theming
 
 Theming is handled by `next-themes` at the root layout, using the standard
