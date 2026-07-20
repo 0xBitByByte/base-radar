@@ -1019,6 +1019,431 @@ provider, never an engine recomputation, never a new scoring or narrative
 rule. Like Global Search, its entire job is presentation-layer scoping of
 what every other layer already computed.
 
+## Account Layer
+
+`lib/account/` (PR23 Part 1) sits directly above Personalization and below
+the Dashboard — a local-only account/profile foundation, never an
+authentication provider. It has no backend, no OAuth, no API calls, and no
+network request anywhere in it; every read and write is `localStorage`.
+Nothing in Personalization, Global Search, or any of the eight intelligence
+engines depends on it — the whole app works identically whether the current
+account is the default Guest or a locally-renamed profile.
+
+```
+lib/account/
+  types.ts       Account, ProfileInput, ProfileValidationError
+  storage.ts      the only file touching localStorage — buildGuestAccount(),
+                   sanitizeAccount() (field-by-field recovery), readAccount(),
+                   writeAccount(); versioned, SSR-safe, try/catch
+  migration.ts    versioned upgrade runner (PR23 Part 3) — honestly empty
+                   migration list today (there has only ever been one
+                   Account schema version), wired into storage.ts's
+                   readAccount() as a real, active no-op pass-through
+  validation.ts    diagnostic validation (PR23 Part 3) — validateAccountRecord()
+                   reports (rather than silently recovers) missing fields,
+                   corrupted timestamps, and invalid types; validateAccountImport()
+                   is the future-ready "Import Account" validator, unwired to
+                   any UI yet
+  service.ts      framework-agnostic public API — cached singleton + listeners,
+                   getAccount(), validateProfileInput(), updateAccount(),
+                   createAccount(), signOut(), deleteAccount(), exportAccount(),
+                   validateAccountImport(), subscribe()
+```
+
+```mermaid
+flowchart TD
+    Storage["lib/account/storage.ts<br/>Account (versioned, localStorage)"] --> Service["lib/account/service.ts<br/>cached singleton + listeners"]
+    Service --> UseAccount["useAccount()"]
+    UseAccount --> AccountMenu["components/account/AccountMenu.tsx<br/>Topbar entry point"]
+    UseAccount --> ProfileDialog["components/account/AccountProfileDialog.tsx"]
+    AccountMenu -->|"Sign Out"| Service
+    ProfileDialog -->|"validateProfileInput → updateAccount"| Service
+```
+
+**Account model**: `{ id, name, username, email, avatar, createdAt,
+updatedAt, lastActiveAt, isGuest }`. On first launch, `storage.ts` creates a
+"Guest User" default account (`isGuest: true`) — every other layer of the
+app continues functioning exactly as it did before this PR, since nothing
+gates behavior on whether an account is a guest.
+
+**Storage** (`lib/account/storage.ts`, key `base-radar:account`, version
+1): the same field-by-field recovery Personalization's preferences
+established — `sanitizeAccount()` starts from a fallback (a fresh Guest)
+and overwrites only the fields that individually validate on the persisted
+blob, so a record from an older schema version or with one corrupted field
+still recovers everything else rather than the whole record being
+discarded. Never touches Personalization's, the flat Watchlist's, or any
+other layer's storage key — `signOut()` and `deleteAccount()` only ever
+replace the account record itself.
+
+**Profile editing** (`components/account/AccountProfileDialog.tsx`):
+Display Name, Username, Avatar URL, and an optional Email, validated by
+`lib/account/service.ts`'s `validateProfileInput()` — empty name, empty or
+malformed username, invalid email format, and a duplicate-username check
+that is real but currently always-false (there is only ever one local
+account per browser today; `isDuplicateUsername()` compares against an
+empty `knownAccounts` array as a genuine hook point for a future
+multi-account backend, not a stubbed-out placeholder). The dialog's
+`<form>` sets `noValidate` so this app's own validation messages are always
+what the user sees, never the browser's native constraint-validation UI.
+
+**Foundation seams for a future backend**: `createAccount()`, `updateAccount()`,
+`deleteAccount()`, and `exportAccount()` are already `async` and already
+shaped the way a real network-backed implementation would need — a future
+PR can replace `storage.ts`'s local reads/writes with real API calls
+without changing `service.ts`'s public signatures or any consumer, the same
+forward-looking shape `lib/watchlist/service.ts` established. The
+Topbar's Cloud Sync menu item is a disabled placeholder with a "Soon"
+badge and an explanatory tooltip — there is no cloud sync, no sync engine,
+and no server in this PR.
+
+**Hooks** (`lib/hooks/useAccount.ts`): `useSyncExternalStore`-backed,
+returns `{ account, isGuest, updateProfile, validateProfile, signOut,
+exportAccount }`. No provider access, no polling.
+
+**UI components** (`components/account/`): `AccountMenu` (replaces the
+previous placeholder `UserMenu` in the Topbar — Profile, Preferences,
+Personalization, a disabled Cloud Sync item, and Sign Out, which returns to
+a **fresh** Guest account, never reusing the signed-out account's id),
+`AccountAvatar` (image or initials fallback, shared by the menu trigger and
+the profile dialog), `AccountProfileDialog` (the same outer/inner
+remount-on-`open` dialog pattern `WatchlistEditor.tsx` established, so
+every field initializes from the current account with no effect resetting
+state on prop change).
+
+**Migration & validation** (PR23 Part 3): `migration.ts` is the single
+source of truth for `base-radar:account`'s current schema version
+(`storage.ts` imports it rather than redefining the number) and runs
+`readAccount()`'s parsed blob through `migrateAccountRecord()` before
+`sanitizeAccount()` ever sees it — honestly a no-op today, since
+`ACCOUNT_MIGRATIONS` is empty, but a real, active call site ready for a
+future schema break. `validation.ts` is a separate, *reporting* concern
+from `sanitizeAccount()`'s silent recovery: `validateAccountRecord()`
+returns every structural issue found (missing id/name/username, invalid
+email/avatar type, corrupted timestamps, wrong `isGuest` type) instead of
+quietly defaulting them, which is what powers the Sync Layer's Diagnostics
+dialog reporting on Account storage health.
+
+## Sync Adapter Layer
+
+`lib/sync/adapters/` sits between Account and the Sync Queue in the
+pipeline — the Sync Queue and Sync Engine only ever handle a generic
+`SyncOperation`; they never import `Account`, `PersonalWatchlist`, or
+`PersonalizationPreferences` directly. Each entity owns its own adapter,
+conforming to one shared contract:
+
+```
+lib/sync/adapters/
+  account.ts       accountSyncAdapter — Account ↔ SyncOperation
+  watchlists.ts     watchlistSyncAdapter — PersonalWatchlist ↔ SyncOperation
+  preferences.ts    preferencesSyncAdapter — PersonalizationPreferences ↔
+                     SyncOperation (a singleton entity — no per-record id,
+                     so every operation addresses the fixed
+                     PREFERENCES_ENTITY_ID constant)
+```
+
+```mermaid
+flowchart TD
+    Account["lib/account/ (Account)"] -.->|"serialize via"| AccountAdapter["accountSyncAdapter"]
+    Watchlist["lib/personalization/ (PersonalWatchlist)"] -.->|"serialize via"| WatchlistAdapter["watchlistSyncAdapter"]
+    Preferences["lib/personalization/preferences.ts"] -.->|"serialize via"| PreferencesAdapter["preferencesSyncAdapter"]
+    AccountAdapter --> Queue["lib/sync/queue.ts<br/>generic SyncOperation only"]
+    WatchlistAdapter --> Queue
+    PreferencesAdapter --> Queue
+    Queue --> Engine["lib/sync/engine.ts"]
+```
+
+Each adapter implements `SyncAdapter<TData>` (`lib/sync/types.ts`):
+`version()` (the adapter's own payload-schema version, distinct from any
+per-record `updatedAt`), `validate()` (a type guard), `serialize()`/
+`deserialize()` (JSON in/out of `SyncOperation.payload`, opaque to the
+queue), `createOperation()` (the *only* place a `SyncOperation` gets
+built — via `lib/sync/queue.ts`'s `buildOperation()`), and `merge()` (a
+real, honest strategy — last-write-wins by `updatedAt` for Account and
+Watchlist; remote-wins-by-convention for Preferences, which carries no
+per-record timestamp to compare). Every `merge()` is genuinely callable
+but never called automatically today: there is no remote version of any
+entity to merge against without a backend.
+
+## Sync Layer
+
+`lib/sync/` (PR23 Part 2) sits directly above Account and below the
+Dashboard — an offline-first synchronization foundation, not a real cloud
+sync. It has no backend, no OAuth, no API, and no network request anywhere
+in it; every read/write is `localStorage`, and the only "network"
+awareness it has is the browser's own `navigator.onLine` + `online`/
+`offline` events, never a request of its own. Account, Personalization,
+Watchlists, and Global Search are all untouched by this layer and never
+import from it — synchronization is a deliberately separate concern.
+
+```
+lib/sync/
+  types.ts        SyncOperation, ConflictRecord, SyncState, SyncStatus,
+                   SyncAdapter<TData>
+  queue.ts         the only file touching localStorage for the operation
+                    queue — raw read/write + buildOperation()
+  operations.ts    queue semantics on top of queue.ts — enqueue, dequeue,
+                    peek, clear, retry
+  conflicts.ts      the only file touching localStorage for conflict
+                    records — read/write + addConflict()/resolveConflict()
+  status.ts         persisted lastSyncAt + navigator.onLine detection +
+                    deriveState() (the one place priority among offline/
+                    conflict/syncing/error/success/pending/idle is decided)
+  migration.ts      versioned upgrade runner for all three storage keys
+                    (PR23 Part 3) — the single source of truth for each
+                    key's current version, imported by queue.ts/status.ts/
+                    conflicts.ts rather than redefined; every migration
+                    list is honestly empty today, wired in as a real,
+                    active (if currently no-op) pass-through
+  validation.ts     diagnostic validation (PR23 Part 3) — validateQueueRecords()/
+                    validateConflictRecords() report duplicate ids, corrupted
+                    timestamps, unknown operation/entity types, and broken
+                    references against each key's *raw* (pre-sanitize) value,
+                    distinct from queue.ts/conflicts.ts's own silent
+                    filter-and-drop recovery
+  diagnostics.ts    read-only aggregator (PR23 Part 3) — combines queue,
+                    conflict, status, migration, and validation state
+                    (plus lib/account/validation.ts's Account check) into
+                    one memoized SyncDiagnostics snapshot; introduces no
+                    new sync logic
+  engine.ts         runSyncAttempt() decides one attempt's honest outcome
+                    by delegating to whichever connector is currently
+                    active (see "Connector Layer" below) — never touches
+                    storage or a network client itself
+  service.ts        the public API — combines every file above into one
+                    cached snapshot + listeners, exposes performSync()/
+                    retrySync()/enqueueOperation()/resolveConflict()/
+                    exportQueue()/subscribe()
+  adapters/         see "Sync Adapter Layer" above
+  connectors/       see "Connector Layer" below
+```
+
+```mermaid
+flowchart TD
+    Queue["lib/sync/queue.ts<br/>raw operation storage"] --> Operations["lib/sync/operations.ts<br/>enqueue/dequeue/peek/clear/retry"]
+    Conflicts["lib/sync/conflicts.ts<br/>ConflictRecord storage"] --> Service
+    Status["lib/sync/status.ts<br/>lastSyncAt + navigator.onLine"] --> Service
+    Operations --> Service["lib/sync/service.ts<br/>cached SyncStatus + listeners"]
+    Engine["lib/sync/engine.ts<br/>runSyncAttempt()"] -.->|"called by performSync()"| Service
+    Engine --> Connector["Connector Layer<br/>active SyncConnector"]
+    Service --> UseSyncStatus["useSyncStatus()"]
+    UseSyncStatus --> Indicator["Topbar Sync Status Indicator"]
+    UseSyncStatus --> StatusCard["components/sync/SyncStatusCard.tsx"]
+    StatusCard --> QueueDialog["SyncQueueDialog.tsx<br/>retrySync() / clearQueue()"]
+    StatusCard --> ConflictDialog["SyncConflictDialog.tsx<br/>read-only"]
+```
+
+**Sync model**: `SyncOperation = { id, type, entity, entityId, createdAt,
+updatedAt, status, retryCount }`. `entity` is one of the three entities
+this PR only *prepares contracts* for — `"watchlist" | "preferences" |
+"account"` — nothing in this codebase actually enqueues a real operation
+for any of them yet; that wiring is explicitly out of scope for this PR.
+`ConflictRecord = { entity, entityId, localVersion, remoteVersion,
+resolved }` — a real, working store with no automatic producer, since
+detecting a genuine conflict requires a remote version to compare against,
+which doesn't exist without a backend.
+
+**Status derivation** (`lib/sync/status.ts`'s `deriveState()`): priority
+order is offline (nothing can be attempted while offline) → conflict
+(needs attention) → the current attempt's own in-flight/just-finished
+phase (syncing/error/success) → the plain queue-derived pending/idle
+split. `"syncing"`, `"error"`, and `"success"` only ever occur as the
+direct, honest outcome of a real `performSync()` call — never fabricated
+ahead of time.
+
+**The engine's honesty** (`lib/sync/engine.ts`): `runSyncAttempt()`
+delegates the actual push to whichever connector is active in the
+Connector Layer (today, always `LocalConnector` — there is still no real
+backend registered). It can never report a fabricated success for work
+actually sent anywhere: an attempt against an empty queue honestly
+resolves `"success"` (there was nothing to fail at); an attempt against
+any pending operation honestly resolves `"error"`, with every operation's
+retry count bumped — an honest record that an attempt was made and could
+not complete without a real backend, never a silent, fabricated success or
+a queue quietly cleared as if it had synced.
+
+**Offline detection** (`lib/sync/status.ts` + `service.ts`): real
+`navigator.onLine` plus `window.addEventListener("online"/"offline")` —
+no polling, no retry loop. A transition only recomputes the snapshot;
+nothing here ever attempts a sync automatically in response to coming back
+online.
+
+**Hooks** (`lib/hooks/useSyncStatus.ts`): `useSyncExternalStore`-backed,
+returns `{ syncStatus, lastSyncAt, pendingOperations, isOffline,
+hasConflicts, conflicts, retrySync, clearQueue }` — `conflicts` is a
+small, pragmatic addition beyond this PR's brief so `SyncConflictDialog`
+has real data to render, not just a boolean.
+
+**Migration** (`lib/sync/migration.ts`): one shared `runMigrations()`
+runner backs all three exported functions (`migrateQueueRecord`,
+`migrateStatusRecord`, `migrateConflictsRecord`), each wired into its
+storage file's read path *before* that file's own field-by-field
+sanitize step — so a future schema break gets a real upgrade path, while
+today's empty migration lists mean every call is an honest, verified
+no-op pass-through.
+
+**Validation & diagnostics** (`lib/sync/validation.ts`,
+`lib/sync/diagnostics.ts`, PR23 Part 3): `validation.ts` operates on each
+key's *raw*, pre-sanitize parsed value — the same data `queue.ts`/
+`conflicts.ts` would otherwise silently filter and drop — and reports
+every issue found (duplicate ids, corrupted `createdAt`/`updatedAt`,
+unknown operation/entity types, missing `entityId`, a bad `resolved`
+flag), rather than a bare "everything's fine." `diagnostics.ts` combines
+this with the live, sanitized queue/conflict/status state and Account's
+own `validateAccountRecord()` into one `SyncDiagnostics` snapshot: queue
+size, pending-operation count (operations whose own `status` is still
+`"pending"` — distinct from queue size, since a failed sync attempt
+leaves operations in the queue with `status: "error"`), conflict count,
+offline state, last sync, per-key storage health (version, whether it's
+recognized, valid/total record counts, issue count), and migration
+status. It is memoized and only recomputes in response to a real
+mutation notification from `lib/sync/service.ts` or
+`lib/account/service.ts` — never polled, never recomputed on every
+render, and only while `useSyncDiagnostics()` (`lib/hooks/
+useSyncDiagnostics.ts`) actually has a subscriber.
+
+**UI components** (`components/sync/`): `SyncStatusCard` (the read-only
+summary — current status, queue size, last sync, offline state, conflict
+count, storage health, and migration status — opened from both the
+Topbar's Sync Status Indicator and the Account Menu's Cloud Sync item;
+"View Queue"/"View Conflicts"/"Diagnostics" navigate to the three
+actionable/detail dialogs rather than mutating anything itself),
+`SyncQueueDialog` (lists every queued operation; the only two actions are
+the hook's own `retrySync()`/`clearQueue()`, never a per-row action the
+service layer doesn't expose), `SyncConflictDialog` (read-only — conflict
+*resolution* isn't built yet, so this only ever lists records, always
+empty in practice today, with an honest empty-state explanation rather
+than a bare "no data" placeholder), `SyncDiagnosticsDialog` (read-only
+report of `useSyncDiagnostics()`'s full snapshot, including a per-key
+Storage Health list).
+
+Each of `SyncStatusCard`'s three navigation buttons closes its own dialog
+before opening the next one, rather than stacking a second `Dialog.Root`
+on top of it — two independent `Dialog.Root` siblings both being "open"
+simultaneously let a single Escape press close the wrong (outer) one and
+orphan the inner dialog, discovered live during this PR's accessibility
+verification. Keeping exactly one dialog open at a time keeps
+Escape/focus-trap/focus-restoration behavior correct for all four
+dialogs.
+
+## Connector Layer
+
+`lib/sync/connectors/` is an architecture-only addition (a recommendation
+made ahead of PR24) sitting between the Sync Engine and any real backend.
+Its entire purpose is to keep the Sync Engine ignorant of *how* data ever
+actually reaches a backend — the engine only ever calls a generic
+`SyncConnector`, never `localStorage`, Supabase, Firebase, Clerk, Auth0, a
+REST client, a GraphQL client, or a WebSocket client directly:
+
+```
+lib/sync/connectors/
+  base.ts        the SyncConnector contract — types only, no
+                  implementation: connect()/disconnect()/health()/push()/
+                  pull()/authenticate()/signOut()/supportsRealtime()/
+                  supportsOffline()/supportsConflictResolution()
+  local.ts        LocalConnector — today's production connector, and the
+                  registry's default. Uses only navigator.onLine (via
+                  lib/sync/status.ts); never a network request. push()
+                  preserves the exact honest outcome the engine had before
+                  this layer existed: an empty batch trivially succeeds,
+                  a non-empty one honestly errors with retry counts
+                  bumped, since there is still no real remote to converge
+                  with — only this device's own local storage.
+  mock.ts         createMockConnector() — a configurable in-memory
+                  connector simulating success, failure, offline,
+                  conflict, and artificial delay, for future automated
+                  testing of the Sync Engine. Never registered as the
+                  active connector in production.
+  registry.ts      register()/unregister()/get()/setActive()/
+                  activeConnector() — the only thing the Sync Engine
+                  imports from this directory. Defaults to LocalConnector.
+```
+
+```mermaid
+flowchart TD
+    Account["Account"] --> Adapter["Sync Adapter Layer"]
+    Adapter --> Queue["Sync Queue"]
+    Queue --> Engine["Sync Engine<br/>lib/sync/engine.ts"]
+    Engine -->|"activeConnector()"| Registry["ConnectorRegistry<br/>lib/sync/connectors/registry.ts"]
+    Registry --> Local["LocalConnector<br/>(today's default)"]
+    Registry -.->|"registered, never active"| Mock["MockConnector<br/>(future testing)"]
+    Local --> Backend["Backend<br/>= localStorage today"]
+    Mock -.->|"future"| Future["Backend<br/>= Supabase / Firebase / REST"]
+```
+
+Swapping the real backend in a future PR means implementing `SyncConnector`
+once more (e.g. a `SupabaseConnector`) and calling
+`register()`/`setActive()` — the Sync Engine, Sync Queue, Sync Adapters,
+and every UI component in `components/sync/` stay completely unchanged.
+This PR implements no such connector: no authentication, no OAuth, no
+Supabase, no Firebase, no REST, no GraphQL, no WebSockets, and no real
+cloud synchronization — `LocalConnector` remains the only registered,
+active connector, and its behavior is observably identical to the Sync
+Engine's pre-Connector-Layer logic.
+
+## Backend Service Layer
+
+`lib/backend/` is another architecture-only addition (a recommendation
+made ahead of PR24, one layer further down the pipeline than the
+Connector Layer) so that no part of the application ever needs to import
+Supabase, Firebase, a REST client, or a GraphQL client directly — every
+capability a real backend would need to provide is expressed as one of
+four narrow service contracts instead:
+
+```
+lib/backend/
+  types.ts          shared aggregate types — BackendServices (the four
+                     services below) and Backend (id, label, services)
+  services/
+    account.ts       AccountService — types only, no implementation:
+                      getAccount()/updateAccount()/deleteAccount()
+    sync.ts          SyncService — types only: push()/pull()/
+                      getStatus()/getConflicts()
+    storage.ts       StorageService — types only: read()/write()/
+                      remove() — the lowest-level generic key/value
+                      contract every other service could be built on
+    health.ts        HealthService — types only: check()
+  local.ts           localBackend — today's only concrete Backend,
+                     the registry's default
+  registry.ts        register()/unregister()/get()/setActive()/
+                     activeBackend()
+```
+
+```mermaid
+flowchart TD
+    Dashboard["Dashboard"] --> AccountLayer["Account Layer"]
+    AccountLayer --> SyncLayer["Sync Layer"]
+    SyncLayer --> ConnectorLayer["Connector Layer"]
+    ConnectorLayer --> BackendRegistry["BackendRegistry<br/>lib/backend/registry.ts"]
+    BackendRegistry --> LocalBackend["localBackend<br/>(today's default)"]
+    LocalBackend -->|"account"| AccountService["lib/account/service.ts"]
+    LocalBackend -->|"sync"| LocalConnector["localConnector<br/>(Connector Layer)"]
+    LocalBackend -->|"storage"| LS["window.localStorage"]
+    LocalBackend -->|"health"| LocalConnector
+    BackendRegistry -.->|"future"| RemoteBackend["a real Backend<br/>= Supabase / Firebase / REST"]
+```
+
+`localBackend` wires all four service contracts to what already exists —
+no new logic, only new seams: `account` forwards to
+`lib/account/service.ts`'s existing `getAccount()`/`updateAccount()`/
+`deleteAccount()`; `sync` forwards `push()`/`pull()` to the Connector
+Layer's `localConnector` and `getStatus()`/`getConflicts()` to
+`lib/sync/service.ts`'s own cached snapshot; `storage` is the one
+genuinely new (but minimal, SSR-safe, best-effort) piece — a thin
+`window.localStorage` wrapper, since no existing generic key/value seam
+was there to reuse; `health` forwards to `localConnector.health()`.
+
+Nothing in the app calls `activeBackend()` yet — this PR is architecture
+only. A future PR could route the Connector Layer (or a future real
+connector) through the active backend's services instead of importing
+Account/Sync/Connector code directly, at which point registering a real
+backend (Supabase, Firebase, a plain REST API) and calling
+`setActive()` would be the only change needed anywhere in this pipeline.
+This PR implements no such backend: no authentication, no OAuth, no
+Supabase, no Firebase, no REST, no GraphQL, no WebSockets, no cloud sync,
+and no backend logic beyond wiring `localBackend` to code that already
+runs today.
+
 ## Theming
 
 Theming is handled by `next-themes` at the root layout, using the standard

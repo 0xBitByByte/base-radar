@@ -230,6 +230,127 @@ the pipeline and
 [API.md](API.md#personalization--advanced-watchlists-api) for the function
 reference.
 
+## Account Layer & Cloud Sync Foundation
+
+**Status**: ✅ Shipped (foundation only)
+
+A local-only account/profile foundation sitting above Personalization and
+below the Dashboard — no authentication provider, no OAuth, no backend, no
+cloud sync, and no API integration. On first launch a "Guest User" default
+account is created automatically; every other layer of the app keeps
+working exactly as before, fully offline, whether the current account is
+that default Guest or a locally-renamed profile.
+
+The Topbar's account menu (replacing the previous placeholder user menu)
+offers Profile (edit Display Name, Username, Avatar, and an optional
+Email — validated for empty/malformed input and a duplicate-username check
+that's real but can never actually trigger with only one local account),
+Preferences, Personalization, Cloud Sync (opens the read-only Sync Status
+dialog), and Sign Out, which returns to a fresh Guest account. Storage is
+versioned and recovers field-by-field from a missing, corrupted, or
+older-version record, and never deletes Personalization or Watchlist data.
+Service functions (`createAccount`, `updateAccount`, `deleteAccount`,
+`exportAccount`) are already shaped for a future real backend, but
+implement nothing beyond local storage today. A dedicated `migration.ts`
+and `validation.ts` were added in a later pass — see below. See
+[ARCHITECTURE.md](ARCHITECTURE.md#account-layer) for the pipeline and
+[API.md](API.md#account-layer-api) for the function reference.
+
+## Sync Layer Foundation
+
+**Status**: ✅ Shipped (foundation only)
+
+An offline-first synchronization foundation sitting above Account and
+below the Dashboard — no backend, no OAuth, no API, and no real
+synchronization. Everything continues to work exactly as before whether
+this layer exists or not; Personalization, Watchlists, Account, and Global
+Search never import from it.
+
+A queued `SyncOperation` model (`{ id, type, entity, entityId, createdAt,
+updatedAt, status, retryCount }`) is persisted locally and survives a
+reload, with `entity` covering the three entities a future sync would
+eventually cover — Watchlists, Preferences, Account — though nothing in
+the app enqueues a real operation for any of them yet; this PR only
+prepares the contract. A `ConflictRecord` model is similarly prepared with
+no automatic producer and no resolution logic yet.
+
+The Topbar gets a Sync Status Indicator (✓ Synced / ⟳ Pending / ⚠ Offline /
+✕ Error, matching real browser `navigator.onLine` state with no polling
+and no retry loop), and the Account Menu's previously-disabled "Cloud
+Sync" placeholder now opens a read-only Sync Status dialog showing current
+status, queue size, last sync, offline state, and conflict count, with
+links through to a queue dialog (retry/clear) and a conflict dialog
+(read-only). `performSync()`/`retrySync()` can never fabricate a success
+for work that was never actually sent anywhere — an empty queue honestly
+succeeds trivially, a non-empty one honestly reports an error until a real
+backend exists. See [ARCHITECTURE.md](ARCHITECTURE.md#sync-layer) for the
+pipeline and [API.md](API.md#sync-layer-api) for the function reference.
+
+Since this foundation shipped, two follow-up passes hardened it further
+without adding any real sync logic:
+
+A **Sync Adapter Layer** (`lib/sync/adapters/{account,watchlists,
+preferences}.ts`) now sits between each entity and the Sync Queue, so the
+queue/operations/engine files only ever handle a generic `SyncOperation` —
+they never know how an Account, Watchlist, or Preferences record is
+shaped. Each adapter owns its own `serialize()`/`deserialize()`/
+`createOperation()`/`merge()`/`validate()`/`version()`, and is the only
+place a `SyncOperation` for that entity is ever constructed. See
+[API.md](API.md#sync-adapter-layer-api) for the interface reference.
+
+A **production-readiness pass** added versioned migrations
+(`lib/account/migration.ts`, `lib/sync/migration.ts`), structural
+diagnostic validation (`lib/account/validation.ts`, `lib/sync/
+validation.ts` — reporting duplicate ids, corrupted timestamps, unknown
+operation/entity types, and invalid storage versions against the raw,
+pre-sanitize value, as a separate concern from the existing silent
+field-by-field recovery), and a `lib/sync/diagnostics.ts` aggregator
+exposing queue size, pending-operation count, conflict count, offline
+state, last sync, and per-storage-key storage/migration health. A new
+`useSyncDiagnostics()` hook and `SyncDiagnosticsDialog` (opened from the
+Sync Status Card) surface all of this read-only, with no new sync logic
+introduced. See [ARCHITECTURE.md](ARCHITECTURE.md#sync-adapter-layer) and
+[API.md](API.md#sync-adapter-layer-api) for details.
+
+A third, architecture-only pass (a recommendation made ahead of PR24)
+introduced a **Connector Layer** (`lib/sync/connectors/{base,local,mock,
+registry}.ts`) between the Sync Engine and any real backend. The Sync
+Engine no longer decides a sync attempt's outcome itself — it delegates
+to whichever `SyncConnector` is active in the `ConnectorRegistry`, and
+never imports `localStorage`, Supabase, Firebase, Clerk, Auth0, a REST
+client, a GraphQL client, or a WebSocket client directly. `LocalConnector`
+(the registry's default and today's only registered connector) preserves
+the exact same honest behavior the engine had before — no backend exists
+yet, so a push can never fabricate success for work that wasn't actually
+delivered anywhere. A `MockConnector` factory (`createMockConnector()`)
+simulates success, failure, offline, conflict, and artificial delay for
+future automated testing, but is never active in production. This PR
+implements no real backend, no authentication, and no OAuth — swapping in
+a real connector (Supabase, Firebase, a plain REST API) later is purely a
+registration change, never a Sync Engine change. See
+[ARCHITECTURE.md](ARCHITECTURE.md#connector-layer) and
+[API.md](API.md#connector-layer-api) for details.
+
+A fourth, architecture-only pass (a recommendation made ahead of PR24, one
+layer further down the pipeline than the Connector Layer) introduced a
+**Backend Service Abstraction Layer** (`lib/backend/`) so no part of the
+application ever needs to import Supabase, Firebase, a REST client, or a
+GraphQL client directly. Every capability a real backend would need to
+provide is expressed as one of four narrow, interface-only contracts
+(`AccountService`, `SyncService`, `StorageService`, `HealthService` in
+`lib/backend/services/`), tracked by a `BackendRegistry`
+(`register()`/`unregister()`/`get()`/`setActive()`/`activeBackend()`).
+`localBackend` (`lib/backend/local.ts`) is today's only registered
+backend and the registry's default — it wires all four contracts to code
+that already exists (`lib/account/service.ts`, the Connector Layer's
+`localConnector`, and a thin `window.localStorage` wrapper), so nothing
+about the app's behavior changes. Nothing calls `activeBackend()` yet;
+this PR implements no real backend, no authentication, no OAuth, and no
+cloud sync — swapping in a real backend (Supabase, Firebase, a plain REST
+API) later is purely a registration change. See
+[ARCHITECTURE.md](ARCHITECTURE.md#backend-service-layer) and
+[API.md](API.md#backend-service-layer-api) for details.
+
 ## Milestone 5 — Provider Layer
 
 **Status**: 📋 Planned

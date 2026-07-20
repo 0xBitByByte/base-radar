@@ -663,6 +663,306 @@ narrative logic of its own.
 | `WatchlistEditor` | Create/rename/edit dialog, plus project add/remove for an existing watchlist. |
 | `PersonalizationPreferencesPage` | `/dashboard/settings/personalization` — preference toggles, watchlist export/import (with a confirmation dialog before any import is applied), and a reset-to-defaults action. |
 
+## Account Layer API
+
+Internal function reference for `lib/account/`. See
+[ARCHITECTURE.md](ARCHITECTURE.md#account-layer) for the pipeline — a
+local-only account/profile foundation with no backend, no OAuth, and no
+network request anywhere in it.
+
+### Types — `lib/account/types.ts`
+
+| Export | Type | Notes |
+| --- | --- | --- |
+| `Account` | type | `{ id, name, username, email: string \| null, avatar: string \| null, createdAt, updatedAt, lastActiveAt, isGuest }`. |
+| `ProfileInput` | type | `{ name, username, email, avatar }` — the editable subset a form submits. |
+| `ProfileValidationError` | type | `"empty-name" \| "empty-username" \| "invalid-username" \| "invalid-email" \| "duplicate-username"`. |
+
+### Store — `lib/account/storage.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `buildGuestAccount()` | `Account` | Fresh id, real `Date.now()`-based timestamps, `isGuest: true`. Used for both first-launch and post-sign-out. |
+| `sanitizeAccount(value, fallback)` | `Account` | Field-by-field recovery — overwrites only the fields that individually validate, so an older-schema or partially-corrupted record still recovers everything else. |
+| `readAccount()` | `Account` | SSR-safe; falls back to a fresh Guest on any parse/validation failure. |
+| `writeAccount(account)` | `void` | Best-effort, try/catch — never throws. |
+
+### Migration — `lib/account/migration.ts`
+
+| Export | Type/Returns | Notes |
+| --- | --- | --- |
+| `CURRENT_ACCOUNT_VERSION` | `number` | The single source of truth for `base-radar:account`'s schema version — `storage.ts` imports this rather than redefining it. |
+| `ACCOUNT_MIGRATIONS` | `AccountMigration[]` | Honestly empty today — there has only ever been one Account schema version. |
+| `migrateAccountRecord(rawVersion, value)` | `{ value, appliedVersions }` | Runs any migrations from `rawVersion` up to `CURRENT_ACCOUNT_VERSION`; a real, active no-op pass-through today since the migration list is empty. Called by `storage.ts`'s `readAccount()` before `sanitizeAccount()`. |
+
+### Validation — `lib/account/validation.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `validateAccountRecord(value)` | `{ valid, issues: AccountValidationIssue[] }` | Pure diagnostic check — reports missing id/name/username, invalid email/avatar type, corrupted timestamps, and a wrong `isGuest` type, rather than silently defaulting them the way `sanitizeAccount()` does. Powers `lib/sync/diagnostics.ts`'s Account storage-health entry. |
+| `validateAccountImport(raw)` | `{ valid, parseError, issues, account }` | Validates a serialized Account payload (the shape `exportAccount()` produces) ahead of a future "Import Account" action — not wired to any UI yet. |
+
+### Service — `lib/account/service.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `getAccount()` | `Account` | Same object reference until the next mutation. |
+| `validateProfileInput(input, currentAccountId)` | `ProfileValidationError[]` | Pure — returns every error found, not just the first. |
+| `updateAccount(patch)` | `Promise<void>` | Applies an already-validated `name`/`username`/`email`/`avatar` patch; bumps `updatedAt`. |
+| `createAccount(input)` | `Promise<void>` | Foundation seam — today, replaces the local Guest record with a new non-guest local profile; no server call. |
+| `signOut()` | `Promise<void>` | Returns to a **fresh** `buildGuestAccount()` — a new id, never reusing the signed-out account's identity. Never touches Personalization/Watchlist/preferences storage. |
+| `deleteAccount()` | `Promise<void>` | Foundation seam — identical to `signOut()` today, kept distinct for a future real server-side delete. |
+| `exportAccount()` | `string` | Versioned JSON envelope (`{ version, exportedAt, account }`) — the same local, no-network shape `lib/personalization/importExport.ts` established. |
+| `validateAccountImport(raw)` | `AccountImportValidation` | Re-exported from `validation.ts` so consumers only need this one public entry point. |
+| `subscribe(listener)` | `() => void` | Registers a listener for any mutation. |
+
+### Hooks — `lib/hooks/useAccount.ts`
+
+| Hook | Backed by | Notes |
+| --- | --- | --- |
+| `useAccount()` | `lib/account/service.ts` | `useSyncExternalStore`-based. Returns `{ account, isGuest, updateProfile, validateProfile, signOut, exportAccount }`. No provider access. |
+
+### UI components — `components/account/`
+
+| Component | Notes |
+| --- | --- |
+| `AccountMenu` | Topbar entry point — Profile, Preferences, Personalization, Cloud Sync (opens the read-only `SyncStatusCard`), and Sign Out. Replaces the previous placeholder `UserMenu`. |
+| `AccountAvatar` | Image or initials fallback, shared by the menu trigger and the profile dialog. |
+| `AccountProfileDialog` | Edit dialog for Display Name, Username, Avatar URL, and optional Email — validated by `validateProfileInput()`, never native browser constraint validation. |
+
+## Sync Layer API
+
+Internal function reference for `lib/sync/`. See
+[ARCHITECTURE.md](ARCHITECTURE.md#sync-layer) for the pipeline — an
+offline-first synchronization foundation with no backend, no OAuth, no
+API, and no network request anywhere in it beyond real browser
+`navigator.onLine` detection.
+
+### Types — `lib/sync/types.ts`
+
+| Export | Type | Notes |
+| --- | --- | --- |
+| `SyncOperation` | type | `{ id, type, entity, entityId, payload, createdAt, updatedAt, status, retryCount }`. `payload` is an opaque `string \| null` — the Sync Queue never inspects its shape; only the owning adapter's `serialize()`/`deserialize()` know how to read it. |
+| `SyncOperationType` | type | `"create" \| "update" \| "delete"`. |
+| `SyncEntity` | type | `"watchlist" \| "preferences" \| "account"`. |
+| `SyncOperationStatus` | type | `"pending" \| "syncing" \| "error" \| "success"` — per-operation. |
+| `ConflictRecord` | type | `{ entity, entityId, localVersion, remoteVersion, resolved }`. |
+| `SyncState` | type | `"idle" \| "pending" \| "syncing" \| "offline" \| "conflict" \| "error" \| "success"` — global status. |
+| `SyncStatus` | type | `{ state, pendingCount, retryCount, conflictCount, lastSyncAt, isOffline }`. |
+| `SyncAdapter<TData>` | type | `{ entity, version(), validate(data), serialize(data), deserialize(payload), createOperation(type, entityId, data), merge(local, remote) }`. See [Sync Adapter Layer API](#sync-adapter-layer-api) below — the queue/operations/engine files only ever handle a generic `SyncOperation` built by one of these adapters, never entity-specific shapes directly. |
+
+### Migration — `lib/sync/migration.ts`
+
+| Export | Type/Returns | Notes |
+| --- | --- | --- |
+| `CURRENT_QUEUE_VERSION` / `CURRENT_STATUS_VERSION` / `CURRENT_CONFLICTS_VERSION` | `number` | Single source of truth for each storage key's schema version — `queue.ts`/`status.ts`/`conflicts.ts` import these rather than redefining them locally, preventing drift. |
+| `QUEUE_MIGRATIONS` / `STATUS_MIGRATIONS` / `CONFLICTS_MIGRATIONS` | `SyncMigration[]` | Honestly empty today — there has only ever been one schema version per key. |
+| `migrateQueueRecord(rawVersion, value)` / `migrateStatusRecord(rawVersion, value)` / `migrateConflictsRecord(rawVersion, value)` | `{ value, appliedVersions }` | Runs any migrations from `rawVersion` up to the current version; a real, active no-op pass-through today. Called by each storage file's read path before its existing field-by-field sanitize step. |
+
+### Validation — `lib/sync/validation.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `validateQueueRecords(rawOperations)` | `{ valid, issues: QueueValidationIssue[], totalRecords, validRecords }` | Pure diagnostic check over the RAW (pre-sanitize) parsed array — reports duplicate ids, missing entity ids, unknown operation/entity types, and corrupted timestamps rather than silently discarding them the way `sanitizeQueue()` does. |
+| `validateConflictRecords(rawConflicts)` | `{ valid, issues: ConflictValidationIssue[], totalRecords, validRecords }` | Same diagnostic approach for conflict records. |
+| `isKnownStorageVersion(version, knownVersions)` | `boolean` | Used by `diagnostics.ts` to flag an unrecognized storage version. |
+
+### Queue storage — `lib/sync/queue.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `readQueue()` / `writeQueue(operations)` | `SyncOperation[]` / `void` | The only file touching localStorage for the queue (key `base-radar:sync-queue`, `STORAGE_VERSION` from `migration.ts`'s `CURRENT_QUEUE_VERSION`). Read path: raw parse → `migrateQueueRecord()` → `sanitizeQueue()`. SSR-safe, try/catch. |
+| `buildOperation(type, entity, entityId, payload?)` | `SyncOperation` | Fresh id, `createdAt`/`updatedAt` now, `status: "pending"`, `retryCount: 0`, `payload` defaulting to `null`. Called only from within an adapter's `createOperation()` — never called directly by `operations.ts`/`service.ts`. |
+
+### Queue semantics — `lib/sync/operations.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `list()` | `SyncOperation[]` | |
+| `enqueue(operation)` | `SyncOperation` | Takes a pre-built `SyncOperation` (constructed by an adapter's `createOperation()`) and appends it — `operations.ts` never constructs an operation itself, keeping the queue generic. |
+| `dequeue(id)` | `SyncOperation[]` | Removes a single operation. |
+| `peek()` | `SyncOperation \| null` | Oldest queued operation, FIFO, without removing it. |
+| `clear()` | `SyncOperation[]` | Empties the queue. |
+| `retry(id)` | `SyncOperation[]` | Increments an operation's retry count, resets its status to `"pending"`. |
+| `replaceAll(next)` | `SyncOperation[]` | Bulk write — used by the engine after a sync attempt changes every operation together. |
+
+### Conflict storage — `lib/sync/conflicts.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `readConflicts()` / `writeConflicts(conflicts)` | `ConflictRecord[]` / `void` | The only file touching localStorage for conflicts (key `base-radar:sync-conflicts`). Read path now runs through `migrateConflictsRecord()` before sanitize. |
+| `addConflict(entity, entityId, localVersion, remoteVersion)` | `ConflictRecord` | Foundation seam — nothing calls this automatically, since there is no remote version to ever compare against without a backend. |
+| `resolveConflict(entity, entityId)` | `ConflictRecord[]` | Flips `resolved: true` only — no merge/reconciliation logic exists yet. |
+
+### Status + engine — `lib/sync/status.ts`, `lib/sync/engine.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `readIsOffline()` | `boolean` | Real `navigator.onLine` check. |
+| `deriveState(pendingCount, isOffline, hasConflicts, phase)` | `SyncState` | Priority: offline → conflict → the attempt's own phase (syncing/error/success) → pending/idle. |
+| `runSyncAttempt(operations)` | `Promise<{ outcome, operations }>` | Delegates to `connectorRegistry.activeConnector().push(operations)` — never touches storage or a network client itself. Today's active connector (`LocalConnector`) preserves the same honest outcome as before: empty queue → `"success"`; non-empty queue → `"error"` with every retry count bumped. |
+
+### Diagnostics — `lib/sync/diagnostics.ts`
+
+| Export | Type/Returns | Notes |
+| --- | --- | --- |
+| `SyncDiagnostics` | type | `{ queueSize, pendingOperationCount, conflictCount, isOffline, lastSyncAt, storageHealth, migrationStatus, storageIntegrity, migrationIntegrity }`. `pendingOperationCount` is deliberately distinct from `queueSize` — a failed sync attempt leaves operations in the queue with `status: "error"` rather than `"pending"`. |
+| `StorageHealthEntry` | type | `{ key, storageKey, exists, version, isKnownVersion, totalRecords, validRecords, issueCount }` per storage key (Sync Queue / Sync Conflicts / Sync Status / Account). `exists: false` renders as "Not yet created" rather than a false "unrecognized version" alarm for a key that has simply never been written. |
+| `MigrationStatusEntry` | type | `{ key, currentVersion, upToDate }` per storage key. |
+| `computeDiagnostics()` | `SyncDiagnostics` | Pure — one pass over each storage key's current raw value plus the existing `validateQueueRecords()`/`validateConflictRecords()`/`validateAccountRecord()` diagnostic validators. Never mutates anything. |
+| `getDiagnostics()` | `SyncDiagnostics` | Lazily computes on first call, then returns the same cached reference until a real upstream mutation triggers a refresh — never recomputed on every render. |
+| `subscribe(listener)` | `() => void` | Lazily attaches to `syncService.subscribe`/`accountService.subscribe` only while at least one consumer is subscribed (detaches on the last unsubscribe) — avoids scanning storage in response to app-wide activity nobody is watching. |
+
+### Service — `lib/sync/service.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `getSyncStatus()` | `SyncStatus` | Same object reference until the next mutation. |
+| `getPendingOperations()` / `getConflicts()` | arrays | Same array reference until the next mutation. |
+| `enqueueOperation(operation)` / `dequeueOperation(id)` / `clearQueue()` | varies | `enqueueOperation` takes a pre-built `SyncOperation` from an adapter's `createOperation()`, not raw `(type, entity, entityId)` fields. Wraps `operations.ts`, refreshes the cached snapshot. |
+| `performSync()` | `Promise<void>` | No-op while offline. Otherwise runs `runSyncAttempt()`, persists the result, and stamps `lastSyncAt` only on an honest `"success"`. |
+| `retrySync()` | `Promise<void>` | Alias for `performSync()` — a retry is just another attempt. |
+| `recordConflict(entity, entityId, localVersion, remoteVersion)` / `resolveConflict(entity, entityId)` | varies | Wraps `conflicts.ts`. |
+| `exportQueue()` | `string` | Versioned JSON export — mirrors `lib/account/service.ts`'s `exportAccount()` shape. |
+| `subscribe(listener)` | `() => void` | Registers a listener for any mutation. |
+
+### Hooks — `lib/hooks/useSyncStatus.ts`, `lib/hooks/useSyncDiagnostics.ts`
+
+| Hook | Backed by | Notes |
+| --- | --- | --- |
+| `useSyncStatus()` | `lib/sync/service.ts` | Returns `{ syncStatus, lastSyncAt, pendingOperations, isOffline, hasConflicts, conflicts, retrySync, clearQueue }`. |
+| `useSyncDiagnostics()` | `lib/sync/diagnostics.ts` | `useSyncExternalStore`-based. Returns the full `SyncDiagnostics` object. No provider access. |
+
+### UI components — `components/sync/`
+
+| Component | Notes |
+| --- | --- |
+| `SyncStatusCard` | Read-only summary dialog — opened from the Topbar's Sync Status Indicator and the Account Menu's Cloud Sync item. Now also shows Storage Health and Migration Status rows, plus a "Diagnostics" button. Its "View Queue"/"View Conflicts"/"Diagnostics" buttons each close this dialog before opening the target one, so exactly one `Dialog.Root` is ever open at a time. |
+| `SyncQueueDialog` | Lists queued operations; actions are `retrySync()`/`clearQueue()` only. |
+| `SyncConflictDialog` | Read-only — conflict resolution isn't built yet. |
+| `SyncDiagnosticsDialog` | Read-only report of queue size, pending operations, conflict count, offline state, last sync, storage integrity, migration integrity, and a per-storage-key health breakdown. Opened from `SyncStatusCard`'s "Diagnostics" button. |
+
+## Sync Adapter Layer API
+
+Internal function reference for `lib/sync/adapters/`. See
+[ARCHITECTURE.md](ARCHITECTURE.md#sync-adapter-layer) for why this layer
+exists: the Sync Queue only ever understands a generic `SyncOperation` —
+every entity-specific concern (how to serialize/validate/merge Account,
+Watchlist, or Preferences data) lives in that entity's own adapter, never
+in `queue.ts`/`operations.ts`/`engine.ts`.
+
+### `SyncAdapter<TData>` interface — `lib/sync/types.ts`
+
+| Member | Signature | Notes |
+| --- | --- | --- |
+| `entity` | `SyncEntity` | The adapter's owning entity name. |
+| `version()` | `() => number` | The adapter's own payload schema version. |
+| `validate(data)` | `(data: unknown) => data is TData` | Type guard — the only place shape assumptions about `TData` are made. |
+| `serialize(data)` | `(data: TData) => string` | Turns `TData` into the opaque `payload` string a `SyncOperation` carries. |
+| `deserialize(payload)` | `(payload: string) => TData` | Inverse of `serialize`; throws on invalid payloads rather than silently returning a guessed default. |
+| `createOperation(type, entityId, data)` | `(type, entityId, data: TData) => SyncOperation` | The *only* place a `SyncOperation` for this entity gets constructed — calls `queue.ts`'s `buildOperation()` internally. |
+| `merge(local, remote)` | `(local: TData, remote: TData) => TData` | Conflict-resolution strategy for this entity. Genuinely callable but never automatically invoked — there is no remote version to merge against without a real backend. |
+
+### Adapters
+
+| Adapter | File | Merge strategy | Notes |
+| --- | --- | --- | --- |
+| `accountSyncAdapter` | `lib/sync/adapters/account.ts` | Last-write-wins by `updatedAt` | `deserialize()` throws `"accountSyncAdapter.deserialize: payload failed validation"` on invalid payloads. |
+| `watchlistSyncAdapter` | `lib/sync/adapters/watchlists.ts` | Last-write-wins by `updatedAt` | `validate()` also checks `icon`/`color` against `WATCHLIST_ICONS`/`WATCHLIST_COLORS`. |
+| `preferencesSyncAdapter` | `lib/sync/adapters/preferences.ts` | Remote wins by convention | Preferences is a singleton entity (`PREFERENCES_ENTITY_ID`) with no per-record timestamp to compare, so `merge()` treats `remote` as authoritative rather than comparing dates. |
+
+## Connector Layer API
+
+Internal function reference for `lib/sync/connectors/`. See
+[ARCHITECTURE.md](ARCHITECTURE.md#connector-layer) for why this layer
+exists: `lib/sync/engine.ts` never imports `localStorage`, Supabase,
+Firebase, Clerk, Auth0, a REST client, a GraphQL client, or a WebSocket
+client directly — it only ever calls a generic `SyncConnector` obtained
+from the registry. This is an architecture-only addition (a recommendation
+made ahead of PR24); no real backend connector is implemented or
+registered.
+
+### `SyncConnector` interface — `lib/sync/connectors/base.ts`
+
+Types only — no implementation. See `local.ts` for the only concrete
+implementation registered today.
+
+| Member | Signature | Notes |
+| --- | --- | --- |
+| `id` / `label` | `string` | The connector's registry key and display name. |
+| `connect()` / `disconnect()` | `() => Promise<void>` | Establishes/tears down whatever this connector needs before it can push/pull. |
+| `health()` | `() => Promise<ConnectorHealth>` | `{ connected, online }` — a cheap, side-effect-free reachability check. |
+| `push(operations)` | `(operations: SyncOperation[]) => Promise<ConnectorPushResult>` | `{ outcome, operations }`. Must never report a fabricated success for work not actually and honestly delivered. |
+| `pull()` | `() => Promise<ConnectorPullResult>` | `{ operations }` — changes the backend reports since the last pull. |
+| `authenticate()` / `signOut()` | `() => Promise<void>` | This connector's own notion of an authenticated session, if it has one. |
+| `supportsRealtime()` / `supportsOffline()` / `supportsConflictResolution()` | `() => boolean` | Capability flags a future UI could use to adapt its messaging per connector. |
+
+### `LocalConnector` — `lib/sync/connectors/local.ts`
+
+| Export | Notes |
+| --- | --- |
+| `localConnector` | Today's production connector and the registry's default. Uses only `navigator.onLine` (via `lib/sync/status.ts`); never a network request. `push()` preserves the exact honest outcome the Sync Engine had before this layer existed — empty batch → `"success"`; non-empty batch → `"error"` with retry counts bumped, since there is still no real remote to converge with, only this device's own local storage (already durable via `lib/sync/queue.ts` before this ever runs). `pull()` always returns no operations — there is no remote counterpart to pull from. `supportsRealtime()` → `false`, `supportsOffline()` → `true`, `supportsConflictResolution()` → `false`. |
+
+### `MockConnector` — `lib/sync/connectors/mock.ts`
+
+| Export | Returns | Notes |
+| --- | --- | --- |
+| `createMockConnector(config?)` | `MockConnector` (a `SyncConnector` plus `setScenario()`/`setDelay()`) | A configurable in-memory connector for future automated testing. `config.scenario` is one of `"success" \| "failure" \| "offline" \| "conflict"` (default `"success"`); `config.delayMs` adds artificial latency before every method resolves (default `0`). Never registered as the active connector in production — nothing in the app wires this in today. |
+
+### `ConnectorRegistry` — `lib/sync/connectors/registry.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `register(connector)` | `void` | Adds or replaces a connector by its `id`. |
+| `unregister(id)` | `void` | Throws if `id` is the currently active connector. |
+| `get(id)` | `SyncConnector \| undefined` | Looks up a registered connector without activating it. |
+| `setActive(id)` | `void` | Throws if `id` isn't registered. |
+| `activeConnector()` | `SyncConnector` | The connector `lib/sync/engine.ts` pushes/pulls through — the only export the engine imports from this directory. Defaults to `localConnector`. |
+
+## Backend Service Layer API
+
+Internal function reference for `lib/backend/`. See
+[ARCHITECTURE.md](ARCHITECTURE.md#backend-service-layer) for why this
+layer exists: one narrow service contract per capability
+(Account/Sync/Storage/Health) so no part of the application ever needs to
+import Supabase, Firebase, a REST client, or a GraphQL client directly.
+This is an architecture-only addition (a recommendation made ahead of
+PR24); nothing in the app calls `activeBackend()` yet.
+
+### Service contracts — `lib/backend/services/`
+
+Each file below is types only — no implementation.
+
+| Type | File | Members | Notes |
+| --- | --- | --- | --- |
+| `AccountService` | `account.ts` | `getAccount()`, `updateAccount(patch)`, `deleteAccount()` | Shaped after `lib/account/service.ts`'s existing public functions. |
+| `SyncService` | `sync.ts` | `push(operations)`, `pull()`, `getStatus()`, `getConflicts()` | Shaped after `SyncConnector` (`lib/sync/connectors/base.ts`), kept as a separate contract since the Backend Service Layer sits below the Connector Layer, not beside it. |
+| `StorageService` | `storage.ts` | `read(key)`, `write(key, value)`, `remove(key)` | The lowest-level generic key/value contract every other service could be built on. |
+| `HealthService` | `health.ts` | `check()` → `{ healthy, message? }` | |
+
+### Aggregate types — `lib/backend/types.ts`
+
+| Export | Type | Notes |
+| --- | --- | --- |
+| `BackendServices` | type | `{ account, sync, storage, health }` — the four service contracts every concrete `Backend` must provide. |
+| `Backend` | type | `{ id, label, services }`. |
+
+### `localBackend` — `lib/backend/local.ts`
+
+| Export | Notes |
+| --- | --- |
+| `localBackend` | Today's only registered backend and the registry's default. Wires all four service contracts to what already exists: `account` forwards to `lib/account/service.ts`'s `getAccount()`/`updateAccount()`/`deleteAccount()`; `sync` forwards `push()`/`pull()` to the Connector Layer's `localConnector` and `getStatus()`/`getConflicts()` to `lib/sync/service.ts`'s cached snapshot; `storage` is a thin `window.localStorage` wrapper (SSR-safe, best-effort — there is no existing generic key/value seam to reuse); `health` forwards to `localConnector.health()`, adapting `{ connected, online }` into `{ healthy }`. |
+
+### `BackendRegistry` — `lib/backend/registry.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `register(backend)` | `void` | Adds or replaces a backend by its `id`. |
+| `unregister(id)` | `void` | Throws if `id` is the currently active backend. |
+| `get(id)` | `Backend \| undefined` | Looks up a registered backend without activating it. |
+| `setActive(id)` | `void` | Throws if `id` isn't registered. |
+| `activeBackend()` | `Backend` | The backend a future Connector Layer would delegate through. Defaults to `localBackend`. Nothing calls this yet. |
+
 ## Future Provider Interfaces
 
 These are internal interfaces the codebase is already shaped for but does

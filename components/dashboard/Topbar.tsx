@@ -1,17 +1,21 @@
 "use client";
 
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import { ChevronRight, Menu, Sparkles, GitCompare, Wallet } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useLiveNetworkStatus } from "@/lib/hooks/useLiveNetworkStatus";
 import { usePersonalizationPreferences } from "@/lib/hooks/usePersonalizationPreferences";
+import { useSyncStatus } from "@/lib/hooks/useSyncStatus";
 import { useWatchlists } from "@/lib/hooks/useWatchlists";
 import { formatGwei } from "@/lib/data/format";
 import { ChainBadge } from "@/components/branding/ChainBadge";
 import { NotificationDrawer } from "@/components/notifications/NotificationDrawer";
 import { CommandPalette } from "@/components/command/CommandPalette";
-import { UserMenu } from "@/components/dashboard/UserMenu";
+import { AccountMenu } from "@/components/account/AccountMenu";
+import { SYNC_STATE_DISPLAY } from "@/components/sync/meta";
+import { SyncStatusCard } from "@/components/sync/SyncStatusCard";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { WatchlistSelector } from "@/components/watchlists/WatchlistSelector";
@@ -41,6 +45,32 @@ function useBreadcrumb() {
   }));
 }
 
+/**
+ * PR23 Part 2 — a compact, always-visible read of the local Sync Layer's
+ * current state (`useSyncStatus()` only; no provider access, no network
+ * call). Clicking it opens the same read-only `SyncStatusCard` the
+ * Account Menu's Cloud Sync item opens.
+ */
+function SyncStatusIndicator({ onOpen }: { onOpen: () => void }) {
+  const { syncStatus } = useSyncStatus();
+  const display = SYNC_STATE_DISPLAY[syncStatus];
+  const Icon = display.icon;
+
+  return (
+    <Tooltip content={`Sync status: ${display.label}`}>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={`Sync status: ${display.label}. Open sync details.`}
+        className="flex shrink-0 items-center gap-1.5 rounded-lg border border-radar-light-border px-2 py-1.5 text-xs font-medium whitespace-nowrap outline-none transition-colors hover:bg-radar-light-surface focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:border-white/10 dark:hover:bg-white/5"
+      >
+        <Icon className={cn("size-3.5", display.textClass, display.spin && "animate-spin motion-reduce:animate-none")} aria-hidden="true" />
+        <span className={cn("hidden sm:inline", display.textClass)}>{display.label}</span>
+      </button>
+    </Tooltip>
+  );
+}
+
 function NetworkBadge() {
   const { status } = useLiveNetworkStatus();
 
@@ -64,6 +94,8 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
   const breadcrumb = useBreadcrumb();
   const { watchlists, activeWatchlist, setActiveWatchlist } = useWatchlists();
   const { preferences } = usePersonalizationPreferences();
+  const { syncStatus } = useSyncStatus();
+  const [syncStatusOpen, setSyncStatusOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b border-radar-light-border bg-radar-light-card/80 px-4 backdrop-blur-xl sm:px-6 lg:px-10 dark:border-white/10 dark:bg-radar-bg/60">
@@ -73,6 +105,13 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
           `/dashboard/watchlists`) is announced without a manual event/effect. */}
       <div aria-live="polite" className="sr-only">
         {activeWatchlist ? `Active watchlist: ${activeWatchlist.name}` : "No active watchlist"}
+      </div>
+
+      {/* PR23 Part 2: announces Sync Layer status changes (e.g. going
+          offline) to assistive tech, mirroring the watchlist announcer
+          above. */}
+      <div aria-live="polite" className="sr-only">
+        Sync status: {SYNC_STATE_DISPLAY[syncStatus].label}
       </div>
 
       <button
@@ -107,6 +146,7 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
       </nav>
 
       <NetworkBadge />
+      <SyncStatusIndicator onOpen={() => setSyncStatusOpen(true)} />
 
       {/* Priority order under space pressure (highest to lowest): Search,
           Connect Wallet, Compare, AI Summary, Notifications, Theme, User.
@@ -170,8 +210,10 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
 
         <ThemeToggle variant="icon" className="hidden shrink-0 sm:flex" />
 
-        <UserMenu />
+        <AccountMenu />
       </div>
+
+      <SyncStatusCard open={syncStatusOpen} onOpenChange={setSyncStatusOpen} />
     </header>
   );
 }
