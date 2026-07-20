@@ -5,6 +5,8 @@ import { ChevronRight, Menu, Sparkles, GitCompare, Wallet } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useLiveNetworkStatus } from "@/lib/hooks/useLiveNetworkStatus";
+import { usePersonalizationPreferences } from "@/lib/hooks/usePersonalizationPreferences";
+import { useWatchlists } from "@/lib/hooks/useWatchlists";
 import { formatGwei } from "@/lib/data/format";
 import { ChainBadge } from "@/components/branding/ChainBadge";
 import { NotificationDrawer } from "@/components/notifications/NotificationDrawer";
@@ -12,6 +14,7 @@ import { CommandPalette } from "@/components/command/CommandPalette";
 import { UserMenu } from "@/components/dashboard/UserMenu";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { WatchlistSelector } from "@/components/watchlists/WatchlistSelector";
 
 type TopbarProps = {
   onOpenMobileNav: () => void;
@@ -59,9 +62,19 @@ function NetworkBadge() {
 
 export function Topbar({ onOpenMobileNav }: TopbarProps) {
   const breadcrumb = useBreadcrumb();
+  const { watchlists, activeWatchlist, setActiveWatchlist } = useWatchlists();
+  const { preferences } = usePersonalizationPreferences();
 
   return (
     <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b border-radar-light-border bg-radar-light-card/80 px-4 backdrop-blur-xl sm:px-6 lg:px-10 dark:border-white/10 dark:bg-radar-bg/60">
+      {/* PR22 Part 2: announces active-watchlist changes to assistive tech —
+          a visually-hidden region whose text mirrors the current
+          `activeWatchlist`, so switching via `WatchlistSelector` (here or on
+          `/dashboard/watchlists`) is announced without a manual event/effect. */}
+      <div aria-live="polite" className="sr-only">
+        {activeWatchlist ? `Active watchlist: ${activeWatchlist.name}` : "No active watchlist"}
+      </div>
+
       <button
         type="button"
         onClick={onOpenMobileNav}
@@ -104,6 +117,20 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
           `xl`/`min-[1440px]` are arbitrary variants scoped to this file
           only, not a change to the app's shared breakpoint tokens. */}
       <CommandPalette className="hidden min-w-0 max-w-[220px] flex-1 sm:flex xl:max-w-xs min-[1440px]:max-w-sm" />
+
+      {/* PR22 Part 3: `showWatchlistSelectorInTopbar` is purely a Topbar
+          display preference — Dashboard personalization keeps filtering by
+          the active watchlist even when this is off, since the selector is
+          only one of several ways to change it (`/dashboard/watchlists`
+          always has one). */}
+      {preferences.showWatchlistSelectorInTopbar && watchlists.length > 0 && (
+        <WatchlistSelector
+          watchlists={watchlists}
+          activeWatchlist={activeWatchlist}
+          onSelect={setActiveWatchlist}
+          className="hidden max-w-[150px] shrink-0 lg:flex xl:max-w-[180px]"
+        />
+      )}
 
       <div className="ml-auto flex items-center gap-1 sm:gap-1.5 xl:gap-1 min-[1440px]:gap-2">
         <Tooltip content="Compare projects">

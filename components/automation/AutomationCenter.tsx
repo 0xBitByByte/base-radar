@@ -16,8 +16,8 @@ import {
 } from "@/components/automation/filters";
 import { AUTOMATION_GROUP_KEYS, AUTOMATION_GROUP_LABEL, groupAutomationResults } from "@/components/automation/grouping";
 import { buildAutomationSummary } from "@/components/automation/summary";
-import { useAutomation } from "@/lib/hooks/useAutomation";
 import { useAutomationMetrics } from "@/lib/hooks/useAutomationMetrics";
+import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
 import type { AutomationAction } from "@/lib/automation/types";
 import type { NotificationPriority } from "@/lib/notifications/types";
 
@@ -27,20 +27,29 @@ const DEFAULT_ACTION_FILTER: AutomationAction | "all" = "all";
 /**
  * The dedicated Automation Center experience
  * (`app/dashboard/automation/page.tsx`). Everything renders from
- * `useAutomation()` — no fetching, no rebuilding, never reading
+ * `usePersonalizedDashboard()` — no fetching, no rebuilding, never reading
  * Notifications/Timeline/Portfolio Intelligence/Daily Brief/Intelligence
  * Alerts/providers directly, and never evaluating a rule itself.
  * Search/priority/action filters are pure, component-local UI state; none
  * of them ever trigger an automation rebuild. Date-group headings
  * (Today/Yesterday/Earlier) are omitted entirely when that group has zero
  * results. The `enabled` check (PR20 Part 3) renders a distinct
- * "Automation is disabled" state before the generic "no results" one —
- * `useAutomation()` already returns an empty `results` array when
- * disabled, but conflating "off" with "nothing matched" would be
- * misleading.
+ * "Automation is disabled" state before the generic "no results" one, and
+ * the active-watchlist check (PR22 Part 2) renders a distinct "nothing in
+ * this watchlist" state before that — three different causes, three
+ * different messages, never conflated. The Metrics section
+ * (`useAutomationMetrics`) deliberately stays on the raw, un-personalized
+ * result set — same precedent `NotificationCenter.tsx`/`Timeline.tsx`
+ * already established for aggregate figures.
  */
 export function AutomationCenter() {
-  const { results, enabled } = useAutomation();
+  const {
+    automationResults: results,
+    automationEnabled: enabled,
+    hasAutomationResults,
+    isPersonalized,
+    activeWatchlist,
+  } = usePersonalizedDashboard();
   const metrics = useAutomationMetrics();
   const [search, setSearch] = useState("");
   const [priority, setPriority] = useState<NotificationPriority | "all">(DEFAULT_PRIORITY_FILTER);
@@ -61,8 +70,12 @@ export function AutomationCenter() {
     return <AutomationEmpty variant="disabled" className="py-16" />;
   }
 
-  if (results.length === 0) {
+  if (!hasAutomationResults) {
     return <AutomationEmpty variant="none" className="py-16" />;
+  }
+
+  if (isPersonalized && results.length === 0) {
+    return <AutomationEmpty variant="watchlist" watchlistName={activeWatchlist?.name} className="py-16" />;
   }
 
   return (

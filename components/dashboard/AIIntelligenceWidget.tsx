@@ -7,7 +7,7 @@ import { NarrativeBadge } from "@/components/alerts/NarrativeBadge";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatRelativeTime } from "@/lib/data/format";
-import { useIntelligenceAlerts } from "@/lib/hooks/useIntelligenceAlerts";
+import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
 
 const TOP_COUNT = 3;
 
@@ -16,13 +16,16 @@ const TOP_COUNT = 3;
  * highest-scored `IntelligenceAlert`s (already sorted by
  * `lib/alerts/intelligence/engine.ts`'s `buildIntelligenceAlerts`, so this
  * only ever slices, never re-sorts). Fully client-driven, no server-fetched
- * `data` prop: `useIntelligenceAlerts()` reads the same Alert Engine store
- * every other alert surface subscribes to, seeded empty on the server and
- * hydrated once `refreshAlerts()` resolves in the browser, same as the
- * Alerts page itself.
+ * `data` prop: `usePersonalizedDashboard()` reads the same Alert Engine
+ * store every other alert surface subscribes to (seeded empty on the
+ * server, hydrated once `refreshAlerts()` resolves in the browser, same as
+ * the Alerts page itself) and, per PR22 Part 2, scopes it to the active
+ * watchlist — every `IntelligenceAlert` is inherently project-specific, so
+ * there's no aggregate-item passthrough case here (unlike Timeline/
+ * Notifications/Automation).
  */
 export function AIIntelligenceWidget() {
-  const intelligenceAlerts = useIntelligenceAlerts();
+  const { intelligenceAlerts, hasIntelligenceAlerts, isPersonalized, activeWatchlist } = usePersonalizedDashboard();
   const topAlerts = intelligenceAlerts.slice(0, TOP_COUNT);
 
   return (
@@ -32,11 +35,17 @@ export function AIIntelligenceWidget() {
       subtitle="Top signals across your Watchlist"
       accent="purple"
     >
-      {topAlerts.length === 0 ? (
+      {!hasIntelligenceAlerts ? (
         <EmptyState
           icon={Sparkles}
           title="No meaningful intelligence detected."
           description="AI-derived reads will appear here once your watched projects have scoreable signals."
+        />
+      ) : isPersonalized && topAlerts.length === 0 ? (
+        <EmptyState
+          icon={Sparkles}
+          title="No AI Intelligence for this watchlist."
+          description={`None of the projects in "${activeWatchlist?.name}" have AI Intelligence signals yet.`}
         />
       ) : (
         <div className="flex flex-col gap-3.5">

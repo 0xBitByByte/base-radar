@@ -10,18 +10,19 @@ import { NotificationBadge } from "@/components/notifications/NotificationBadge"
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatRelativeTime } from "@/lib/data/format";
-import { useAutomation } from "@/lib/hooks/useAutomation";
+import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
 
 /**
  * The Dashboard's compact Automation preview — triggered count, high
  * priority count, and the single latest automation result only.
  * Deliberately shallow (never regenerates or re-derives anything): it
- * renders only the top of the already-sorted `useAutomation()` array —
- * the full grouped feed lives at `/dashboard/automation` only, reached via
- * the link below.
+ * renders only the top of the already-sorted, watchlist-personalized
+ * (PR22 Part 2) `automationResults` array — the full grouped feed lives at
+ * `/dashboard/automation` only, reached via the link below.
  */
 export function AutomationWidget() {
-  const { results, enabled } = useAutomation();
+  const { automationResults: results, automationEnabled: enabled, hasAutomationResults, isPersonalized, activeWatchlist } =
+    usePersonalizedDashboard();
   const latest = results[0];
   const highPriorityCount = results.filter(
     (result) => result.priority === "high" || result.priority === "critical"
@@ -39,11 +40,17 @@ export function AutomationWidget() {
     >
       {!enabled ? (
         <EmptyState icon={Zap} title="Automation is disabled." description="No rule can fire while Automation is turned off." />
-      ) : results.length === 0 ? (
+      ) : !hasAutomationResults ? (
         <EmptyState
           icon={Zap}
           title="No automation results yet."
           description="Results will appear here once a rule matches a real notification from your Watchlist."
+        />
+      ) : isPersonalized && results.length === 0 ? (
+        <EmptyState
+          icon={Zap}
+          title="No automation available."
+          description={`None of the projects in "${activeWatchlist?.name}" have automation results yet.`}
         />
       ) : (
         <div className="flex flex-col gap-3.5">

@@ -11,6 +11,7 @@ import {
   Eye,
   Bell,
   Zap,
+  Layers,
   Settings,
 } from "lucide-react";
 
@@ -51,6 +52,7 @@ export const DASHBOARD_NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Wallet", href: "/dashboard/wallet", icon: Wallet },
       { label: "Watchlist", href: "/dashboard/watchlist", icon: Eye },
+      { label: "Watchlists", href: "/dashboard/watchlists", icon: Layers },
       { label: "Alerts", href: "/dashboard/alerts", icon: Bell },
       { label: "Automation", href: "/dashboard/automation", icon: Zap },
     ],

@@ -7,20 +7,26 @@ import { TimelineEventBadge } from "@/components/timeline/TimelineEventBadge";
 import { TimelineMetric } from "@/components/timeline/TimelineMetric";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { useTimeline } from "@/lib/hooks/useTimeline";
+import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
 import { capitalize } from "@/lib/timeline/summary";
 
 /**
  * The Dashboard's compact "Recent Activity" preview — headline, summary,
  * total events, highest severity, and the single latest event.
  * Deliberately shallow: it renders only the top-level summary
- * `useTimeline()` already provides, never the full chronological feed
- * grouped by Today/Yesterday/Earlier — that depth lives at
- * `/dashboard/timeline` only, reached via the link below.
+ * `usePersonalizedDashboard()` already provides, never the full
+ * chronological feed grouped by Today/Yesterday/Earlier — that depth lives
+ * at `/dashboard/timeline` only, reached via the link below.
+ *
+ * PR22 Part 2: the metric tiles (Total Events/Highest Severity) stay
+ * read off the raw, un-filtered `timeline` — same "aggregate metrics never
+ * recomputed for a filtered subset" precedent `Timeline.tsx`'s own search
+ * feature already established — only the "Latest Event" preview is scoped
+ * to the active watchlist, via `timelineEvents`.
  */
 export function TimelineWidget() {
-  const timeline = useTimeline();
-  const latestEvent = timeline?.events[0];
+  const { timeline, timelineEvents, isPersonalized, activeWatchlist } = usePersonalizedDashboard();
+  const latestEvent = timelineEvents[0];
 
   return (
     <WidgetCard
@@ -35,6 +41,12 @@ export function TimelineWidget() {
           icon={Clock}
           title="No Timeline activity available."
           description="Activity will appear here once your watched projects have scoreable signals."
+        />
+      ) : isPersonalized && timelineEvents.length === 0 ? (
+        <EmptyState
+          icon={Clock}
+          title="No Timeline events for this watchlist."
+          description={`None of the projects in "${activeWatchlist?.name}" have Timeline activity yet.`}
         />
       ) : (
         <div className="flex flex-col gap-3.5">
