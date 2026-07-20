@@ -17,8 +17,9 @@ type WatchlistSelectorProps = {
 /**
  * A compact active-watchlist switcher — standalone in this PR (mounted
  * only on `/dashboard/watchlists`), foreshadowing PR22 Part 2's Dashboard
- * integration. Reuses the same `@base-ui/react/menu` primitive
- * `UserMenu.tsx` already established, rather than a bespoke dropdown.
+ * integration. Reuses the same `@base-ui/react/menu` primitive the
+ * Topbar's account menu (`components/account/AccountMenu.tsx`) also uses,
+ * rather than a bespoke dropdown.
  */
 export function WatchlistSelector({ watchlists, activeWatchlist, onSelect, className }: WatchlistSelectorProps) {
   const ActiveIcon = activeWatchlist ? WATCHLIST_ICON_COMPONENTS[activeWatchlist.icon] : null;
