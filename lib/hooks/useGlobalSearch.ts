@@ -15,6 +15,18 @@
  * `SearchableItem[]` only rebuilds when the underlying engine data actually
  * changes, and `globalSearch` only re-runs when `query` or that aggregated
  * list changes — typing never re-normalizes anything.
+ *
+ * PR22 Part 2: also reads the active Personal Watchlist (`useWatchlists()`)
+ * and passes its `projectIds` through to `globalSearch` as
+ * `prioritizedProjectIds` — a pure ranking hint, never a second filter
+ * pass, so no result is ever hidden by having (or lacking) an active
+ * watchlist.
+ *
+ * PR22 Part 3: that prioritization is itself gated by the
+ * `enableSearchPrioritization` preference — when off,
+ * `prioritizedProjectIds` is `undefined` regardless of the active
+ * watchlist, so `globalSearch()` behaves byte-for-byte like PR21 (scoring
+ * itself is never touched by this hook either way).
  */
 
 import { useMemo } from "react";
@@ -24,8 +36,10 @@ import { COMMANDS } from "@/lib/command/commands";
 import { useAutomation } from "@/lib/hooks/useAutomation";
 import { useDailyBrief } from "@/lib/hooks/useDailyBrief";
 import { useNotifications } from "@/lib/hooks/useNotifications";
+import { usePersonalizationPreferences } from "@/lib/hooks/usePersonalizationPreferences";
 import { usePortfolioIntelligence } from "@/lib/hooks/usePortfolioIntelligence";
 import { useTimeline } from "@/lib/hooks/useTimeline";
+import { useWatchlists } from "@/lib/hooks/useWatchlists";
 import {
   globalSearch,
   normalizeAutomationResult,
@@ -44,6 +58,8 @@ export function useGlobalSearch(query: string): SearchableItem[] {
   const { results: automationResults } = useAutomation();
   const portfolio = usePortfolioIntelligence();
   const dailyBrief = useDailyBrief();
+  const { activeWatchlist } = useWatchlists();
+  const { preferences } = usePersonalizationPreferences();
 
   const items = useMemo<SearchableItem[]>(() => {
     return [
@@ -57,5 +73,10 @@ export function useGlobalSearch(query: string): SearchableItem[] {
     ];
   }, [timeline, notifications, automationResults, portfolio, dailyBrief]);
 
-  return useMemo(() => globalSearch(query, items), [query, items]);
+  const prioritizedProjectIds = useMemo(
+    () => (preferences.enableSearchPrioritization && activeWatchlist ? new Set(activeWatchlist.projectIds) : undefined),
+    [preferences.enableSearchPrioritization, activeWatchlist]
+  );
+
+  return useMemo(() => globalSearch(query, items, prioritizedProjectIds), [query, items, prioritizedProjectIds]);
 }

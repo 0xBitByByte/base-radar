@@ -161,14 +161,32 @@ function scoreItem(item: SearchableItem, query: string): number {
   return score;
 }
 
+function isPrioritizedProject(item: SearchableItem, prioritizedProjectIds: Set<string> | undefined): boolean {
+  if (!prioritizedProjectIds || item.type !== "project") return false;
+  const projectId = item.id.startsWith("project:") ? item.id.slice("project:".length) : item.id;
+  return prioritizedProjectIds.has(projectId);
+}
+
 /**
  * Case-insensitive search across title/description/keywords/group/metadata.
  * Sorted purely by score (then original registry order as a tiebreak) —
  * deliberately NOT group-first, so a strongly-matching Project/Notification
  * ranks above a weakly-matching Command, per the brief's "best match wins."
  * An empty query matches every item (a browsable list), same as PR21 Part 1.
+ *
+ * `prioritizedProjectIds` (PR22 Part 2) — the active Personal Watchlist's
+ * project ids, when provided — only ever breaks a tie between two items that
+ * already scored identically: a Project in the active watchlist sorts
+ * before an equally-scored item that isn't, but a strongly-matching
+ * non-project result still outranks a weakly-matching watchlist project.
+ * This is "prioritize," never "hide" — every non-watchlist project stays in
+ * the results, at the rank its match quality alone earns it.
  */
-export function globalSearch(query: string, items: SearchableItem[]): SearchableItem[] {
+export function globalSearch(
+  query: string,
+  items: SearchableItem[],
+  prioritizedProjectIds?: Set<string>
+): SearchableItem[] {
   const trimmed = normalize(query);
 
   return items
@@ -176,6 +194,9 @@ export function globalSearch(query: string, items: SearchableItem[]): Searchable
     .filter((entry) => entry.score > 0)
     .sort((a, b) => {
       if (a.score !== b.score) return b.score - a.score;
+      const aPrioritized = isPrioritizedProject(a.item, prioritizedProjectIds);
+      const bPrioritized = isPrioritizedProject(b.item, prioritizedProjectIds);
+      if (aPrioritized !== bPrioritized) return aPrioritized ? -1 : 1;
       return a.index - b.index;
     })
     .map((entry) => entry.item);

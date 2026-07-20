@@ -12,7 +12,7 @@
  */
 
 import type { LucideIcon } from "lucide-react";
-import { Bell, Clock, Eye, FolderKanban, LayoutDashboard, LayoutGrid, Newspaper, Settings, Zap } from "lucide-react";
+import { Bell, Clock, Eye, FolderKanban, Layers, LayoutDashboard, LayoutGrid, Newspaper, Settings, Zap } from "lucide-react";
 
 export type CommandGroup =
   | "Dashboard"
@@ -62,6 +62,15 @@ export const COMMANDS: Command[] = [
     icon: Eye,
     route: "/dashboard/watchlist",
     keywords: ["watch", "tracked", "following", "saved"],
+  },
+  {
+    id: "watchlists",
+    title: "Watchlists",
+    description: "Organize projects into your own collections.",
+    group: "Navigation",
+    icon: Layers,
+    route: "/dashboard/watchlists",
+    keywords: ["collections", "organize", "personalization", "lists"],
   },
   {
     id: "alerts",
@@ -143,6 +152,15 @@ export const COMMANDS: Command[] = [
     icon: Settings,
     route: "/dashboard/settings/search",
     keywords: ["settings", "preferences", "search", "recent", "shortcut"],
+  },
+  {
+    id: "settings-personalization",
+    title: "Personalization Preferences",
+    description: "Control Dashboard filtering, search prioritization, and the Topbar watchlist selector.",
+    group: "Settings",
+    icon: Settings,
+    route: "/dashboard/settings/personalization",
+    keywords: ["settings", "preferences", "personalization", "watchlist", "import", "export"],
   },
 ];
 

@@ -25,7 +25,7 @@ import { NotificationItem } from "@/components/notifications/NotificationItem";
 import { NotificationMetric } from "@/components/notifications/NotificationMetric";
 import { buildNotificationSummary } from "@/components/notifications/summary";
 import { useNotificationMetrics } from "@/lib/hooks/useNotificationMetrics";
-import { useNotifications } from "@/lib/hooks/useNotifications";
+import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
 import type { NotificationType } from "@/lib/notifications/types";
 
 const DEFAULT_READ_FILTER: NotificationReadFilter = "all";
@@ -35,15 +35,19 @@ const DEFAULT_SORT: NotificationSort = NOTIFICATION_SORTS[0];
 /**
  * The dedicated Notification Center experience
  * (`app/dashboard/notifications/page.tsx`). Everything renders from
- * `useNotifications()` — no fetching, no rebuilding, never reading
+ * `usePersonalizedDashboard()` — no fetching, no rebuilding, never reading
  * Timeline/Portfolio Intelligence/Daily Brief/Intelligence Alerts
  * directly. Search/read-state/type/sort are pure, component-local UI
  * state; none of them ever trigger a notification rebuild. Date-group
  * headings (Today/Yesterday/Earlier) are omitted entirely when that group
- * has zero notifications.
+ * has zero notifications. The Metrics section (`useNotificationMetrics`)
+ * deliberately stays on the raw, un-personalized notification set — same
+ * "aggregate figures never recompute for a filtered subset" precedent
+ * `Timeline.tsx` already established.
  */
 export function NotificationCenter() {
-  const { notifications, markRead, markUnread, markAllRead } = useNotifications();
+  const { notifications, hasNotifications, isPersonalized, activeWatchlist, markRead, markUnread, markAllRead } =
+    usePersonalizedDashboard();
   const metrics = useNotificationMetrics();
   const [search, setSearch] = useState("");
   const [readState, setReadState] = useState<NotificationReadFilter>(DEFAULT_READ_FILTER);
@@ -62,8 +66,12 @@ export function NotificationCenter() {
 
   const groups = useMemo(() => groupNotifications(filteredNotifications), [filteredNotifications]);
 
-  if (notifications.length === 0) {
+  if (!hasNotifications) {
     return <NotificationEmpty variant="none" className="py-16" />;
+  }
+
+  if (isPersonalized && notifications.length === 0) {
+    return <NotificationEmpty variant="watchlist" watchlistName={activeWatchlist?.name} className="py-16" />;
   }
 
   return (

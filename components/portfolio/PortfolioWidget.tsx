@@ -8,20 +8,25 @@ import { PortfolioHealthBadge } from "@/components/portfolio/PortfolioHealthBadg
 import { PortfolioMetric } from "@/components/portfolio/PortfolioMetric";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { usePortfolioIntelligence } from "@/lib/hooks/usePortfolioIntelligence";
+import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
 
 /**
  * The Dashboard's compact "Portfolio Intelligence" preview — headline,
  * health badge, summary, the three headline stats, and the single top
  * performer. Deliberately shallow: it renders only the top-level summary
- * `usePortfolioIntelligence()` already provides, never the Portfolio
+ * `usePersonalizedDashboard()` already provides, never the Portfolio
  * page's full section list (Top Performers, Projects Needing Attention,
  * Security Risks, Governance Watch, Development Momentum, Dominant
  * Narratives, Recommendations) — that depth lives at `/dashboard/portfolio`
- * only, reached via the link below.
+ * only, reached via the link below. PR22 Part 2: the headline stats
+ * (Projects/Average Score/Average Confidence) stay read off the raw,
+ * un-filtered scalar fields `usePortfolioIntelligence()` already computed
+ * — recomputing an average for a filtered subset would mean re-deriving
+ * engine logic, which this hook never does. Only "Top Performer" is scoped
+ * to the active watchlist, since `topPerformers` is a list field.
  */
 export function PortfolioWidget() {
-  const portfolio = usePortfolioIntelligence();
+  const { portfolio } = usePersonalizedDashboard();
   const topPerformer = portfolio?.topPerformers[0];
 
   return (

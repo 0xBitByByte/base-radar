@@ -594,6 +594,75 @@ notification-generation logic of its own.
 | `CommandSearch` | The combobox input row — `aria-activedescendant`/`aria-controls`. |
 | `CommandEmpty` | "No results found." / "Try another keyword." |
 
+## Personalization & Advanced Watchlists API
+
+Internal function reference for `lib/personalization/`. See
+[ARCHITECTURE.md](ARCHITECTURE.md#personalization--advanced-watchlists) for
+the pipeline — a client-side organization layer that only ever reads
+existing hooks/helpers, never a provider, and introduces no new scoring or
+narrative logic of its own.
+
+### Types — `lib/personalization/types.ts`
+
+| Export | Type | Notes |
+| --- | --- | --- |
+| `PersonalWatchlist` | type | `{ id, name, description, icon, color, projectIds: string[], pinned, createdAt, updatedAt }`. `projectIds` are Project Registry ids only — never a duplicated `Project`. |
+| `PersonalizationState` | type | `{ version, watchlists: PersonalWatchlist[], activeWatchlistId: string \| null }`. |
+| `WATCHLIST_ICONS` / `WatchlistIconKey` | const / type | 10-value closed icon union. |
+| `WATCHLIST_COLORS` / `WatchlistColorKey` | const / type | 10-value closed color union. |
+
+### Store — `lib/personalization/storage.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `getPersonalizationState()` | `PersonalizationState` | Same object reference until the next mutation. |
+| `createWatchlist(input)` / `updateWatchlist(id, patch)` / `deleteWatchlist(id)` / `duplicateWatchlist(id)` / `reorderWatchlists(orderedIds)` / `setPinned(id, pinned)` | varies | Standard CRUD — deleting the active watchlist promotes the next pinned (else first remaining, else `null`). |
+| `setActiveWatchlist(id)` | `void` | Exactly one watchlist may be active, or `null`. Ignores an id that doesn't exist. |
+| `addProjectToWatchlist(watchlistId, projectId)` / `removeProjectFromWatchlist(watchlistId, projectId)` | `void` | Mutates `projectIds` only — never touches the Project Registry. |
+| `importWatchlists(entries)` | `number` | Purely additive (PR22 Part 3) — every entry gets a fresh id and a name suffixed `" (Imported)"` on collision. Never overwrites. Returns the count added. |
+| `subscribe(listener)` | `() => void` | Registers a listener for any mutation. |
+
+### Preferences — `lib/personalization/preferences.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `getPersonalizationPreferences()` | `PersonalizationPreferences` | `{ filterDashboardByActiveWatchlist, enableSearchPrioritization, rememberActiveWatchlist, showWatchlistSelectorInTopbar }` (PR22 Part 3), `localStorage`-backed (key `base-radar:personalization-preferences`), all default `true`. |
+| `setPersonalizationPreferences(patch)` | `void` | Merges `patch`, persists, notifies. |
+| `resetPersonalizationPreferences()` | `void` | Reverts to `DEFAULT_PERSONALIZATION_PREFERENCES`. |
+| `subscribeToPersonalizationPreferences(listener)` | `() => void` | Registers a listener for preference changes. |
+
+### Filtering — `lib/personalization/filter.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `filterTimelineEventsByWatchlist` / `filterNotificationsByWatchlist` / `filterAutomationResultsByWatchlist` | filtered array | Keeps `projectId === null` items unconditionally (aggregate content), filters project-specific items against `new Set(watchlist.projectIds)`. Returns input unchanged if `watchlist` is `null`. |
+| `filterPortfolioIntelligenceByWatchlist` / `filterDailyBriefByWatchlist` | filtered object | Filters only the project-referencing list fields; every scalar/aggregate field passes through untouched. |
+| `filterIntelligenceAlertsByWatchlist` | filtered array | No passthrough case — every `IntelligenceAlert.projectId` is a plain, non-nullable string. |
+
+### Import / Export — `lib/personalization/importExport.ts`
+
+| Function | Returns | Notes |
+| --- | --- | --- |
+| `exportWatchlistsToJson(watchlists)` | `string` | Pretty-printed, versioned JSON envelope (`{ schema, version, exportedAt, watchlists }`). |
+| `validateWatchlistImport(raw)` | `WatchlistImportResult` | Pure — never writes to storage. Rejects the whole file only when it's not JSON, doesn't match the schema, or recovers zero watchlists; every other issue (bad icon/color, stale project reference, corrupted date, duplicate name) is recovered with a reported reason in `issues`. |
+
+### Hooks — `lib/hooks/`
+
+| Hook | Backed by | Notes |
+| --- | --- | --- |
+| `useWatchlists()` | `lib/personalization/storage.ts` | Returns `{ watchlists, activeWatchlist, activeWatchlistId, createWatchlist, renameWatchlist, updateWatchlistDetails, deleteWatchlist, duplicateWatchlist, reorderWatchlists, addProject, removeProject, pinWatchlist, setActiveWatchlist, importWatchlists }`. |
+| `usePersonalizedDashboard()` | `useWatchlists` + 6 engine hooks + `filter.ts` | Returns `isPersonalized`, raw engine output, and filtered list-shaped data for every consumer. |
+| `usePersonalizationPreferences()` | `lib/personalization/preferences.ts` | Returns `{ preferences, setPreferences, resetPreferences }` — load/save/reset only, performs no filtering. |
+
+### UI query layer — `components/watchlists/` / `components/personalization/`
+
+| Component | Notes |
+| --- | --- |
+| `WatchlistsWorkspace` | `/dashboard/watchlists` master/detail composition root. |
+| `WatchlistSelector` | Reused in both the Topbar and the Watchlists page. |
+| `WatchlistEditor` | Create/rename/edit dialog, plus project add/remove for an existing watchlist. |
+| `PersonalizationPreferencesPage` | `/dashboard/settings/personalization` — preference toggles, watchlist export/import (with a confirmation dialog before any import is applied), and a reset-to-defaults action. |
+
 ## Future Provider Interfaces
 
 These are internal interfaces the codebase is already shaped for but does

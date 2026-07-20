@@ -189,6 +189,47 @@ of what an existing hook already computed. See
 pipeline and [API.md](API.md#global-search--command-palette-api) for the
 function reference.
 
+## Personalization & Advanced Watchlists
+
+**Status**: ✅ Shipped
+
+A client-side organization layer sitting above every engine and above
+Global Search — never a ninth intelligence engine, and never a signal any
+engine reads. Multiple named, user-organized project collections
+(`/dashboard/watchlists`), distinct from the single flat Watchlist that
+every intelligence layer's scoping is still built on: create, rename, pin,
+reorder, and duplicate as many watchlists as you like, each with its own
+icon, color, and project membership (ids only, never a duplicated
+`Project` object). Exactly one watchlist may be active at a time.
+
+Marking a watchlist active scopes the Dashboard and every intelligence page
+(Timeline, Notifications, Automation, Portfolio Intelligence, Daily Brief)
+to it — a pure, presentation-only filter over each engine's already-computed
+output, matching by project id, never recomputing a score or narrative.
+Aggregate-level content (narrative rollups, recommendations, portfolio/
+brief summaries) always passes through, since it isn't about any single
+project a watchlist could exclude. Global Search gets the same treatment: an
+active watchlist's projects win score ties, but scoring itself is untouched
+and no result is ever hidden.
+
+Every one of these behaviors is a togglable preference at
+`/dashboard/settings/personalization` — Dashboard filtering, Search
+prioritization, remembering the active watchlist across sessions, and
+showing the `WatchlistSelector` in the Topbar — each defaulting to on, with
+an honest off state (e.g. turning off Dashboard filtering reverts every
+widget to its full, un-filtered dataset; turning off the Topbar selector
+still leaves `/dashboard/watchlists` as a way to change the active one).
+Watchlists can also be exported to a single JSON file and imported back on
+another device or browser: import is schema-validated (duplicate names,
+missing ids, invalid icons/colors, stale project references, corrupted
+dates are all recovered or dropped with a reported reason) and always
+additive — nothing is ever silently overwritten, and the user confirms
+exactly what will be added before anything is written to storage. See
+[ARCHITECTURE.md](ARCHITECTURE.md#personalization--advanced-watchlists) for
+the pipeline and
+[API.md](API.md#personalization--advanced-watchlists-api) for the function
+reference.
+
 ## Milestone 5 — Provider Layer
 
 **Status**: 📋 Planned

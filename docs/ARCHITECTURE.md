@@ -882,6 +882,143 @@ recomputation, never a new scoring or narrative rule. It is the one layer
 in this app whose entire job is aggregation and presentation of what every
 other layer already computed.
 
+## Personalization & Advanced Watchlists
+
+`lib/personalization/` (PR22) sits above every engine and above Global
+Search — a client-side organization layer, never a ninth intelligence
+engine. It never calls a provider, and its filtering never recomputes a
+score, narrative, or any other engine output; it only narrows list-shaped
+data an engine already produced, matching by project id.
+
+```
+lib/personalization/
+  types.ts          PersonalWatchlist, PersonalizationState, icon/color unions
+  storage.ts         CRUD store (create/rename/delete/duplicate/reorder/pin/
+                      setActive/addProject/removeProject/importWatchlists),
+                      localStorage-backed, version-guarded
+  preferences.ts      PersonalizationPreferences (localStorage-backed) —
+                      Dashboard filtering, Search prioritization, remember
+                      active watchlist, show Topbar selector — each on by
+                      default
+  filter.ts           6 pure filter functions, one per consumer (Timeline,
+                      Notifications, Automation, Portfolio, Daily Brief,
+                      AI Intelligence alerts)
+  importExport.ts     exportWatchlistsToJson + validateWatchlistImport —
+                      pure, no storage writes; the caller applies a
+                      validated result via storage.ts only after user
+                      confirmation
+```
+
+```mermaid
+flowchart TD
+    Storage["lib/personalization/storage.ts<br/>PersonalWatchlist[] + activeWatchlistId"] --> UseWatchlists["useWatchlists()"]
+    Prefs["lib/personalization/preferences.ts<br/>PersonalizationPreferences"] --> Dashboard["usePersonalizedDashboard()"]
+    UseWatchlists --> Dashboard
+    Timeline["useTimeline()"] --> Dashboard
+    Notifications["useNotifications()"] --> Dashboard
+    Automation["useAutomation()"] --> Dashboard
+    Portfolio["usePortfolioIntelligence()"] --> Dashboard
+    Brief["useDailyBrief()"] --> Dashboard
+    Alerts["useIntelligenceAlerts()"] --> Dashboard
+    Dashboard -->|"filter.ts — match by projectId"| Widgets["Dashboard widgets + section pages"]
+    UseWatchlists --> Search["useGlobalSearch()"]
+    Prefs -.->|"enableSearchPrioritization gate"| Search
+    Search -->|"prioritizedProjectIds — tie-break only"| Score["globalSearch()<br/>scoring itself unchanged"]
+    Prefs -.->|"showWatchlistSelectorInTopbar gate"| Topbar["Topbar.tsx<br/>WatchlistSelector"]
+    ImportExport["lib/personalization/importExport.ts<br/>validate only"] -.->|"user confirms"| Storage
+```
+
+**Watchlist model**: a `PersonalWatchlist` is `{ id, name, description, icon,
+color, projectIds: string[], pinned, createdAt, updatedAt }` — project
+membership is ids only, never a duplicated `Project` record. This is a
+distinct concept from `lib/watchlist/`'s single flat list, which remains
+the source of truth every intelligence engine's own scoping is built on;
+Personalization never touches or reads that store. Default watchlists
+(Favorites, AI, DeFi, Infrastructure, Gaming, Stablecoins) are created
+empty on first launch and are fully editable/deletable like any other.
+
+**Dashboard filtering** (`lib/personalization/filter.ts` +
+`lib/hooks/usePersonalizedDashboard.ts`): each filter function builds one
+`Set(watchlist.projectIds)` and runs one `.filter()` — O(n), no provider
+call, no engine recomputation. `TimelineEvent`/`Notification`/
+`AutomationResult` have a nullable `projectId`; items with `projectId ===
+null` (narrative rollups, recommendations, portfolio/brief summaries)
+always pass through, since a watchlist can't exclude content that isn't
+about any single project. `PortfolioIntelligence`/`DailyBrief`'s five
+project-referencing list fields are filtered while every scalar field
+(`projectCount`, `averageScore`, `overallHealth`, etc.) is spread through
+unchanged — recomputing an aggregate for a filtered subset would mean
+re-deriving engine logic, which this layer never does.
+`IntelligenceAlert.projectId` is a plain, non-nullable `string`, so its
+filter has no passthrough case. `usePersonalizedDashboard()` is the single
+hook every widget and section page reads: it exposes `isPersonalized`
+(true only when `filterDashboardByActiveWatchlist` is on **and** a
+watchlist is active) plus both the raw engine output (aggregate metric
+tiles) and the filtered, list-shaped data components actually render.
+
+**Search prioritization**: `globalSearch()` accepts an optional
+`prioritizedProjectIds` set used only as a tie-break — when two results
+score identically, a Project in the active watchlist sorts first, but a
+strongly-matching non-project result still outranks a weakly-matching
+watchlist project. `useGlobalSearch()` passes the active watchlist's
+`projectIds` through only when `enableSearchPrioritization` is on;
+otherwise `globalSearch()` behaves exactly as it did before Personalization
+existed. No result is ever hidden, and scoring itself is never modified.
+
+**Preferences** (`lib/personalization/preferences.ts`,
+`/dashboard/settings/personalization`): `filterDashboardByActiveWatchlist`,
+`enableSearchPrioritization`, `rememberActiveWatchlist`,
+`showWatchlistSelectorInTopbar` — each a kill switch over an
+already-built feature, the same shape Automation's master preference
+established, all defaulting to on. Recovery is field-by-field rather than
+all-or-nothing: a persisted object missing the newer fields (an older
+version) or with one corrupted field still recovers everything it can
+validate, defaulting only what's missing or invalid — never discarding the
+whole record over one bad field. `rememberActiveWatchlist` is read once,
+at `lib/personalization/storage.ts`'s module-level state initialization
+(once per session/reload): when off, that session starts with no active
+watchlist rather than restoring the last one, without touching the
+persisted value on disk and without affecting any mutation for the rest of
+that session — picking a new active watchlist still works normally
+afterward.
+
+**Import/Export** (`lib/personalization/importExport.ts`): export
+serializes the current watchlists into a versioned, pretty-printed JSON
+envelope, downloaded as a file via a `Blob` + anchor-element download —
+nothing leaves the browser. Import is a two-step, confirmation-gated flow:
+`validateWatchlistImport()` only parses and sanitizes a raw file — it never
+writes to storage. It rejects the whole file only when it isn't JSON,
+doesn't match the export envelope, or recovers zero usable watchlists;
+every other problem (an invalid icon/color, a project id no longer in the
+registry, a corrupted date, a duplicate name within the file) is recovered
+field-by-field with a reported reason. The settings page shows the user
+exactly what was found before calling `storage.ts`'s `importWatchlists()`,
+which is purely additive: every imported entry gets a fresh id (never
+trusting one from the file) and a name suffixed " (Imported)" if it
+collides with an existing watchlist — nothing already in storage is ever
+overwritten or removed.
+
+**Hooks** (`lib/hooks/`): `useWatchlists` (CRUD + `activeWatchlist`/
+`activeWatchlistId` + `importWatchlists`, no provider access),
+`usePersonalizedDashboard` (composes `useWatchlists` with all six engine
+hooks and `filter.ts`), `usePersonalizationPreferences` (load/save/reset
+only, performs no filtering itself).
+
+**UI components** (`components/watchlists/`, `components/personalization/`):
+`WatchlistsWorkspace`/`WatchlistSidebar`/`WatchlistCard`/`WatchlistEditor`/
+`WatchlistEmpty` (the `/dashboard/watchlists` management surface),
+`WatchlistSelector` (reused in both the Topbar and the Watchlists page —
+`@base-ui/react/menu`, same primitive `UserMenu.tsx` established), and
+`PersonalizationPreferencesPage` (`/dashboard/settings/personalization`,
+same card/section chrome as every other settings page).
+
+**Relationship with every engine below it**: Personalization reads
+Timeline, Notifications, Automation, Portfolio Intelligence, Daily Brief,
+and AI Intelligence alerts each through their own existing hook — never a
+provider, never an engine recomputation, never a new scoring or narrative
+rule. Like Global Search, its entire job is presentation-layer scoping of
+what every other layer already computed.
+
 ## Theming
 
 Theming is handled by `next-themes` at the root layout, using the standard

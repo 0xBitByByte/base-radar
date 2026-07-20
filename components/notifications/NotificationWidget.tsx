@@ -9,17 +9,21 @@ import { TimelineEventBadge } from "@/components/timeline/TimelineEventBadge";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatRelativeTime } from "@/lib/data/format";
-import { useNotifications } from "@/lib/hooks/useNotifications";
+import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
 
 /**
  * The Dashboard's compact Notifications preview — unread count and the
  * single latest notification only. Deliberately shallow (never
  * regenerates or re-derives anything): it renders only the top of the
- * already-sorted `useNotifications()` array — the full grouped feed lives
- * at `/dashboard/notifications` only, reached via the link below.
+ * already-sorted, watchlist-personalized (PR22 Part 2) notification array —
+ * the full grouped feed lives at `/dashboard/notifications` only, reached
+ * via the link below. Unlike Timeline/Portfolio/Daily Brief, Notifications
+ * has no separate scalar engine aggregate — the list itself IS the data —
+ * so "Unread"/"Total" here are counts over the already-personalized array,
+ * not a raw, un-filtered figure.
  */
 export function NotificationWidget() {
-  const { notifications } = useNotifications();
+  const { notifications, hasNotifications, isPersonalized, activeWatchlist } = usePersonalizedDashboard();
   const latest = notifications[0];
   const unreadCount = notifications.filter((notification) => !notification.isRead).length;
 
@@ -31,11 +35,17 @@ export function NotificationWidget() {
       accent="primary"
       lastUpdated={latest?.timestamp}
     >
-      {notifications.length === 0 ? (
+      {!hasNotifications ? (
         <EmptyState
           icon={Bell}
           title="No notifications yet."
           description="Notifications will appear here once your watched projects have scoreable signals."
+        />
+      ) : isPersonalized && notifications.length === 0 ? (
+        <EmptyState
+          icon={Bell}
+          title="No notifications for this watchlist."
+          description={`None of the projects in "${activeWatchlist?.name}" have notifications yet.`}
         />
       ) : (
         <div className="flex flex-col gap-3.5">

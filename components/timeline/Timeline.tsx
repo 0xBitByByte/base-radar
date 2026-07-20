@@ -12,7 +12,7 @@ import { TimelineMetric } from "@/components/timeline/TimelineMetric";
 import { TimelineSection } from "@/components/timeline/TimelineSection";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatRelativeTime } from "@/lib/data/format";
-import { useTimeline } from "@/lib/hooks/useTimeline";
+import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
 import { capitalize } from "@/lib/timeline/summary";
 import type { TimelineEventType } from "@/lib/timeline/types";
 
@@ -22,16 +22,20 @@ const DEFAULT_SORT: TimelineSort = TIMELINE_SORTS[0];
 /**
  * The dedicated Intelligence Timeline experience
  * (`app/dashboard/timeline/page.tsx`). Everything renders from
- * `useTimeline()` — no fetching, no rebuilding, never reading Intelligence
- * Alerts or providers directly. Search/event-type filter/sort are pure,
- * component-local UI state; none of them ever trigger a Timeline rebuild —
- * `filterTimelineEvents`/`sortTimelineEvents` (from `./filters`) only ever
- * narrow or reorder the array `useTimeline()` already returned.
- * Date-group headings (Today/Yesterday/Earlier) are omitted entirely when
- * that group has zero events.
+ * `usePersonalizedDashboard()` — no fetching, no rebuilding, never reading
+ * Intelligence Alerts or providers directly. Search/event-type filter/sort
+ * are pure, component-local UI state; none of them ever trigger a Timeline
+ * rebuild — `filterTimelineEvents`/`sortTimelineEvents` (from `./filters`)
+ * only ever narrow or reorder `timelineEvents`, which is itself already
+ * scoped to the active watchlist (PR22 Part 2) before this component ever
+ * sees it. Date-group headings (Today/Yesterday/Earlier) are omitted
+ * entirely when that group has zero events. Metric tiles (Total Events,
+ * Highest Severity, etc.) stay read off the raw, un-filtered `timeline` —
+ * consistent with this component's own pre-existing precedent of never
+ * recomputing aggregate fields for a locally-filtered subset.
  */
 export function Timeline() {
-  const timeline = useTimeline();
+  const { timeline, timelineEvents, isPersonalized, activeWatchlist } = usePersonalizedDashboard();
   const [search, setSearch] = useState("");
   const [eventTypeFilter, setEventTypeFilter] = useState<TimelineEventType | "all">(DEFAULT_EVENT_TYPE_FILTER);
   const [sort, setSort] = useState<TimelineSort>(DEFAULT_SORT);
@@ -47,16 +51,26 @@ export function Timeline() {
   }, [timeline]);
 
   const filteredEvents = useMemo(() => {
-    if (!timeline) return [];
-    const searched = filterTimelineEvents(timeline.events, normalizedQuery);
+    const searched = filterTimelineEvents(timelineEvents, normalizedQuery);
     const byType = eventTypeFilter === "all" ? searched : searched.filter((event) => event.eventType === eventTypeFilter);
     return sortTimelineEvents(byType, sort);
-  }, [timeline, normalizedQuery, eventTypeFilter, sort]);
+  }, [timelineEvents, normalizedQuery, eventTypeFilter, sort]);
 
   const groups = useMemo(() => groupTimelineEvents(filteredEvents), [filteredEvents]);
 
   if (!timeline || timeline.totalEvents === 0) {
     return <EmptyState icon={ListChecks} title="No Timeline activity available." className="py-16" />;
+  }
+
+  if (isPersonalized && timelineEvents.length === 0) {
+    return (
+      <EmptyState
+        icon={ListChecks}
+        title="No Timeline events for this watchlist."
+        description={`None of the projects in "${activeWatchlist?.name}" have Timeline activity yet.`}
+        className="py-16"
+      />
+    );
   }
 
   return (

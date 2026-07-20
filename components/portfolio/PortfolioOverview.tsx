@@ -24,7 +24,7 @@ import { PortfolioSection } from "@/components/portfolio/PortfolioSection";
 import { RecommendationCard } from "@/components/portfolio/RecommendationCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getProject } from "@/data/projects/helpers";
-import { usePortfolioIntelligence } from "@/lib/hooks/usePortfolioIntelligence";
+import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
 import type { BriefHighlight, BriefOpportunity } from "@/lib/brief/types";
 
 const DEFAULT_SEARCH = "";
@@ -120,14 +120,19 @@ const CARD_GRID_CLASS = "grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2";
 /**
  * The dedicated Portfolio Intelligence experience
  * (`app/dashboard/portfolio/page.tsx`). Everything renders from
- * `usePortfolioIntelligence()` — no fetching, no rebuilding, never reading
+ * `usePersonalizedDashboard()` — no fetching, no rebuilding, never reading
  * providers directly. Search and the section filter
  * (`components/portfolio/filters.ts`) are pure, component-local UI state;
- * neither ever triggers a Portfolio Intelligence rebuild. A section is
- * omitted entirely once filtering leaves it with zero items.
+ * neither ever triggers a Portfolio Intelligence rebuild — both narrow
+ * `portfolio`'s list fields, which are themselves already scoped to the
+ * active watchlist (PR22 Part 2) before this component ever sees them. A
+ * section is omitted entirely once filtering leaves it with zero items.
+ * Scalar fields (`projectCount`, `averageScore`, `overallHealth`, etc.)
+ * stay read off the raw engine output — never recomputed for a filtered
+ * subset.
  */
 export function PortfolioOverview() {
-  const portfolio = usePortfolioIntelligence();
+  const { portfolio, isPersonalized, activeWatchlist } = usePersonalizedDashboard();
 
   const [search, setSearch] = useState(DEFAULT_SEARCH);
   const [sectionFilter, setSectionFilter] = useState<SectionFilterValue>(DEFAULT_SECTION_FILTER);
@@ -150,6 +155,24 @@ export function PortfolioOverview() {
 
   if (!portfolio || portfolio.projectCount === 0) {
     return <EmptyState icon={ListChecks} title="No Portfolio Intelligence available." className="py-16" />;
+  }
+
+  const hasAnyPersonalizedContent =
+    portfolio.topPerformers.length > 0 ||
+    portfolio.projectsNeedingAttention.length > 0 ||
+    portfolio.securityRisks.length > 0 ||
+    portfolio.governanceWatch.length > 0 ||
+    portfolio.developmentMomentum.length > 0;
+
+  if (isPersonalized && !hasAnyPersonalizedContent) {
+    return (
+      <EmptyState
+        icon={ListChecks}
+        title="No Portfolio Intelligence for this watchlist."
+        description={`None of the projects in "${activeWatchlist?.name}" have Portfolio Intelligence yet.`}
+        className="py-16"
+      />
+    );
   }
 
   // `filtered` is only null when `portfolio` is null, already handled above.

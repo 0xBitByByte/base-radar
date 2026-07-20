@@ -7,18 +7,21 @@ import { NarrativeBadge } from "@/components/alerts/NarrativeBadge";
 import { BriefMetric } from "@/components/brief/BriefMetric";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { useDailyBrief } from "@/lib/hooks/useDailyBrief";
+import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
 
 /**
  * The Dashboard's compact "Today's Brief" preview — headline, summary, the
  * three headline stats, and the single top opportunity. Deliberately
- * shallow: it renders only the top-level summary `useDailyBrief()` already
- * provides, never the Brief page's full section list (Security/Governance/
- * Development/TVL Highlights, Emerging Narratives, Recommendations) — that
- * depth lives at `/dashboard/brief` only, reached via the link below.
+ * shallow: it renders only the top-level summary
+ * `usePersonalizedDashboard()` already provides, never the Brief page's
+ * full section list (Security/Governance/Development/TVL Highlights,
+ * Emerging Narratives, Recommendations) — that depth lives at
+ * `/dashboard/brief` only, reached via the link below. PR22 Part 2: the
+ * headline stats stay read off the raw, un-filtered scalar fields — only
+ * "Top Opportunity" is scoped to the active watchlist.
  */
 export function BriefWidget() {
-  const brief = useDailyBrief();
+  const { dailyBrief: brief } = usePersonalizedDashboard();
   const topOpportunity = brief?.topOpportunities[0];
 
   return (

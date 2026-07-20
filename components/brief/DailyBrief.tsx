@@ -23,7 +23,7 @@ import { RecommendationCard } from "@/components/brief/RecommendationCard";
 import { ProjectLogo } from "@/components/branding/ProjectLogo";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getProject } from "@/data/projects/helpers";
-import { useDailyBrief } from "@/lib/hooks/useDailyBrief";
+import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
 import type { BriefHighlight, BriefOpportunity } from "@/lib/brief/types";
 
 const DEFAULT_SEARCH = "";
@@ -118,15 +118,19 @@ const CARD_GRID_CLASS = "grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2";
 
 /**
  * The dedicated Daily Brief experience (`app/dashboard/brief/page.tsx`).
- * Everything renders from `useDailyBrief()` — no fetching, no rebuilding,
- * no inspecting Intelligence Alerts or provider alerts directly. Search
- * and the section filter (`components/brief/filters.ts`) are pure,
- * component-local UI state; neither ever triggers a Daily Brief rebuild.
- * A section is omitted entirely once filtering leaves it with zero items —
- * this component never pads a section with placeholder rows.
+ * Everything renders from `usePersonalizedDashboard()` — no fetching, no
+ * rebuilding, no inspecting Intelligence Alerts or provider alerts
+ * directly. Search and the section filter (`components/brief/filters.ts`)
+ * are pure, component-local UI state; neither ever triggers a Daily Brief
+ * rebuild — both narrow `brief`'s list fields, which are themselves
+ * already scoped to the active watchlist (PR22 Part 2) before this
+ * component ever sees them. A section is omitted entirely once filtering
+ * leaves it with zero items — this component never pads a section with
+ * placeholder rows. Scalar fields (`projectCount`, `averageConfidence`,
+ * `highestScore`, etc.) stay read off the raw engine output.
  */
 export function DailyBrief() {
-  const brief = useDailyBrief();
+  const { dailyBrief: brief, isPersonalized, activeWatchlist } = usePersonalizedDashboard();
 
   const [search, setSearch] = useState(DEFAULT_SEARCH);
   const [sectionFilter, setSectionFilter] = useState<SectionFilterValue>(DEFAULT_SECTION_FILTER);
@@ -150,6 +154,24 @@ export function DailyBrief() {
 
   if (!brief || brief.projectCount === 0) {
     return <EmptyState icon={ListChecks} title="No Daily Brief available." className="py-16" />;
+  }
+
+  const hasAnyPersonalizedContent =
+    brief.topOpportunities.length > 0 ||
+    brief.securityHighlights.length > 0 ||
+    brief.governanceHighlights.length > 0 ||
+    brief.developmentHighlights.length > 0 ||
+    brief.tvlHighlights.length > 0;
+
+  if (isPersonalized && !hasAnyPersonalizedContent) {
+    return (
+      <EmptyState
+        icon={ListChecks}
+        title="No Daily Brief content for this watchlist."
+        description={`None of the projects in "${activeWatchlist?.name}" have Daily Brief content yet.`}
+        className="py-16"
+      />
+    );
   }
 
   // `filtered` is only null when `brief` is null, already handled above.
