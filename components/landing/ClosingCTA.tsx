@@ -16,7 +16,7 @@ export function ClosingCTA() {
         className="mx-auto flex max-w-3xl flex-col items-center gap-6 rounded-3xl border border-radar-light-border bg-gradient-to-b from-radar-light-card to-radar-light-surface px-8 py-16 text-center shadow-[0_20px_60px_-30px_rgba(21,101,255,0.25)] sm:px-16 dark:border-white/10 dark:from-radar-elevated dark:to-radar-card dark:shadow-[0_20px_60px_-30px_rgba(61,118,255,0.3)]"
       >
         <h2 className="text-3xl font-semibold tracking-tight text-radar-light-text sm:text-4xl dark:text-radar-white">
-          Start tracking the Base ecosystem today.
+          Get AI intelligence on the Base ecosystem today.
         </h2>
         <p className="max-w-xl text-lg text-radar-light-muted dark:text-radar-muted">
           Free, open source, and built for everyone building on Base.

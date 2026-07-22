@@ -111,10 +111,10 @@ export function Hero() {
               transition={{ duration: 0.5 }}
               className="text-5xl leading-[1.05] font-semibold tracking-tight text-radar-light-text sm:text-6xl lg:text-7xl dark:text-radar-white"
             >
-              Everything happening on Base.
+              AI intelligence for the Base ecosystem.
               <br />
               <span className="bg-gradient-to-r from-radar-primary to-radar-accent bg-clip-text text-transparent">
-                One intelligent dashboard.
+                Briefed daily. Ready to act.
               </span>
             </motion.h1>
 
@@ -123,8 +123,9 @@ export function Hero() {
               transition={{ duration: 0.5 }}
               className="max-w-xl text-lg leading-relaxed text-radar-light-muted lg:text-xl dark:text-radar-muted"
             >
-              Track projects, narratives, builders, whales, AI ecosystems and emerging
-              opportunities across the Base blockchain from a single platform.
+              Always know what changed and what to do next — an AI-written Daily
+              Brief, Portfolio Intelligence, and Notifications, cross-checked
+              across every source Base Radar uses.
             </motion.p>
 
             <motion.div
