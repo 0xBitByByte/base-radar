@@ -39,25 +39,25 @@ const FEATURE_ITEMS: FeatureItem[] = [
     icon: Sparkles,
     title: "AI Intelligence",
     description: "Every tracked project gets a continuously regenerated AI summary of what changed and why.",
-    href: "/dashboard/ai-research",
+    href: "/dashboard/alerts",
   },
   {
     icon: Radio,
     title: "Signals",
     description: "Buy, sell, momentum, and liquidity signals surfaced the moment they're detected onchain.",
-    href: "/dashboard/signals",
+    href: "/dashboard/alerts",
   },
   {
     icon: Wallet,
     title: "Portfolio Tracking",
     description: "Connect a wallet to see holdings, exposure, and PnL alongside ecosystem intelligence.",
-    href: "/dashboard/wallet",
+    href: "#",
   },
   {
     icon: Fish,
     title: "Whale Monitoring",
     description: "Track large-wallet transfers and smart-money flows across the ecosystem in real time.",
-    href: "/dashboard/wallet",
+    href: "/dashboard",
   },
   {
     icon: Landmark,
@@ -99,7 +99,7 @@ const FEATURE_ITEMS: FeatureItem[] = [
     icon: TrendingUp,
     title: "Market Narratives",
     description: "See which categories and themes are gaining or losing momentum across Base, continuously.",
-    href: "/dashboard/narratives",
+    href: "/dashboard",
   },
   {
     icon: CheckCheck,
@@ -128,39 +128,53 @@ export function Features() {
       </motion.div>
 
       <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {FEATURE_ITEMS.map((feature, index) => (
-          <motion.div
-            key={feature.title}
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-60px" }}
-            transition={{ duration: 0.4, delay: (index % 4) * 0.06 }}
-          >
-            <Link href={feature.href} className="block h-full">
-              <GlassCard className="flex h-full flex-col gap-1.5 p-4">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-radar-primary/15 to-radar-accent/15 text-radar-primary dark:text-radar-accent">
-                  <feature.icon className="size-4" aria-hidden="true" />
-                </span>
-                <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-radar-light-text dark:text-radar-white">
-                    {feature.title}
-                  </h3>
-                  <p className="mt-1 text-xs leading-relaxed text-radar-light-muted dark:text-radar-muted">
-                    {feature.description}
-                  </p>
-                </div>
-                {/* PR9.5 §2 — this CTA used to only reveal on hover; since
-                    hover interactions are removed site-wide, it's now
-                    permanently visible rather than disappearing entirely
-                    (still the same real `Link`, just always legible). */}
-                <span className="flex items-center gap-1.5 text-sm font-medium text-radar-primary dark:text-radar-accent">
-                  Open in Dashboard
-                  <ArrowRight className="size-3.5" />
-                </span>
-              </GlassCard>
-            </Link>
-          </motion.div>
-        ))}
+        {FEATURE_ITEMS.map((feature, index) => {
+          /* PR-LP-001 review fix — this file has no separate live/future
+             status field; "#" is the existing sentinel (set in PR-LP-001)
+             for a card with no real destination yet, so that's what's
+             checked here rather than introducing a new status concept. */
+          const hasDestination = feature.href !== "#";
+          /* PR9.5 §2 — this CTA used to only reveal on hover; since hover
+             interactions are removed site-wide, it's now permanently
+             visible rather than disappearing entirely (still the same real
+             `Link` for cards with a destination, just always legible). */
+          const card = (
+            <GlassCard className="flex h-full flex-col gap-1.5 p-4">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-radar-primary/15 to-radar-accent/15 text-radar-primary dark:text-radar-accent">
+                <feature.icon className="size-4" aria-hidden="true" />
+              </span>
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-radar-light-text dark:text-radar-white">
+                  {feature.title}
+                </h3>
+                <p className="mt-1 text-xs leading-relaxed text-radar-light-muted dark:text-radar-muted">
+                  {feature.description}
+                </p>
+              </div>
+              <span className="flex items-center gap-1.5 text-sm font-medium text-radar-primary dark:text-radar-accent">
+                Open in Dashboard
+                <ArrowRight className="size-3.5" />
+              </span>
+            </GlassCard>
+          );
+          return (
+            <motion.div
+              key={feature.title}
+              initial={{ opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ duration: 0.4, delay: (index % 4) * 0.06 }}
+            >
+              {hasDestination ? (
+                <Link href={feature.href} className="block h-full">
+                  {card}
+                </Link>
+              ) : (
+                <div className="block h-full">{card}</div>
+              )}
+            </motion.div>
+          );
+        })}
       </div>
     </section>
   );

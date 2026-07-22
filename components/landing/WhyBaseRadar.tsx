@@ -35,8 +35,10 @@ type Feature = {
 /**
  * PR9.3.2 §3 — hand-ordered so every LIVE card is a contiguous block first,
  * every COMING SOON card a contiguous block last. This reorders the same
- * 12 features (8 live / 4 future, the actual current product status); the
- * live/future split itself is unchanged, only the display order is.
+ * 12 features (9 live / 3 future, the actual current product status — see
+ * PR-LP-001; "Alerts" moved from future to live and into the live block
+ * since `/dashboard/alerts` has shipped); the live/future split itself is
+ * unchanged aside from that one correction, only the display order is.
  */
 const FEATURES: Feature[] = [
   {
@@ -44,7 +46,7 @@ const FEATURES: Feature[] = [
     title: "AI Research",
     description: "AI-generated narrative summaries and momentum signals from live ecosystem data.",
     metric: "Updated continuously",
-    href: "/dashboard/ai-research",
+    href: "/dashboard/alerts",
   },
   {
     icon: ShieldCheck,
@@ -65,21 +67,21 @@ const FEATURES: Feature[] = [
     title: "Signals",
     description: "Buy, watch, and momentum alerts generated continuously from onchain activity.",
     metric: "86 signals today",
-    href: "/dashboard/signals",
+    href: "/dashboard/alerts",
   },
   {
     icon: TrendingUp,
     title: "Narratives",
     description: "Track which categories and themes are gaining or losing momentum on Base.",
     metric: "12+ categories tracked",
-    href: "/dashboard/narratives",
+    href: "/dashboard",
   },
   {
     icon: LayoutGrid,
     title: "Categories",
     description: "Browse the ecosystem by sector — DeFi, AI, social, gaming, and more.",
     metric: "12 sectors",
-    href: "/dashboard/categories",
+    href: "/dashboard/projects",
   },
   {
     icon: Compass,
@@ -96,19 +98,18 @@ const FEATURES: Feature[] = [
     href: "/dashboard/projects",
   },
   {
-    icon: Wallet,
-    title: "Portfolio Tracking",
-    description: "Connect a wallet to see your Base holdings alongside ecosystem intelligence.",
-    metric: "Wallet connect",
-    href: "/dashboard/wallet",
-    status: "future",
-  },
-  {
     icon: Bell,
     title: "Alerts",
     description: "Get notified the moment a project you follow changes status or momentum.",
     metric: "Real-time push",
     href: "/dashboard/alerts",
+  },
+  {
+    icon: Wallet,
+    title: "Portfolio Tracking",
+    description: "Connect a wallet to see your Base holdings alongside ecosystem intelligence.",
+    metric: "Wallet connect",
+    href: "#",
     status: "future",
   },
   {
@@ -116,7 +117,7 @@ const FEATURES: Feature[] = [
     title: "Wallet Intelligence",
     description: "Understand smart-money behavior and wallet activity across the ecosystem.",
     metric: "Smart-money tracking",
-    href: "/dashboard/wallet",
+    href: "#",
     status: "future",
   },
   {
@@ -150,6 +151,39 @@ export function WhyBaseRadar() {
       <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {FEATURES.map((feature, index) => {
           const isFuture = feature.status === "future";
+          /* PR9.5 §2 — hover lift/border-glow/icon-rotate removed (landing
+             page relies on passive ambient motion, not hover gimmicks);
+             Coming Soon cards stay permanently muted (no hover-triggered
+             brightening) rather than only reading as "live" status via
+             their badge. */
+          const card = (
+            <GlassCard
+              className={cn(
+                "flex h-full flex-col gap-2 p-4",
+                isFuture && "opacity-70"
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-radar-primary/15 to-radar-accent/15 text-radar-primary dark:text-radar-accent">
+                  <feature.icon className="size-5" aria-hidden="true" />
+                </span>
+                <GlowBadge color={isFuture ? "muted" : "success"} dot className="text-[10px] uppercase">
+                  {isFuture ? "Coming soon" : "Live"}
+                </GlowBadge>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-semibold text-radar-light-text dark:text-radar-white">
+                  {feature.title}
+                </h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-radar-light-muted dark:text-radar-muted">
+                  {feature.description}
+                </p>
+              </div>
+              <span className="text-xs font-medium text-radar-primary dark:text-radar-accent">
+                {feature.metric}
+              </span>
+            </GlassCard>
+          );
           return (
             <motion.div
               key={feature.title}
@@ -158,39 +192,17 @@ export function WhyBaseRadar() {
               viewport={{ once: true, margin: "-60px" }}
               transition={{ duration: 0.4, delay: (index % 4) * 0.06 }}
             >
-              <Link href={feature.href} className="block h-full">
-                {/* PR9.5 §2 — hover lift/border-glow/icon-rotate removed
-                    (landing page relies on passive ambient motion, not
-                    hover gimmicks); Coming Soon cards stay permanently
-                    muted (no hover-triggered brightening) rather than only
-                    reading as "live" status via their badge. */}
-                <GlassCard
-                  className={cn(
-                    "flex h-full flex-col gap-2 p-4",
-                    isFuture && "opacity-70"
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-radar-primary/15 to-radar-accent/15 text-radar-primary dark:text-radar-accent">
-                      <feature.icon className="size-5" aria-hidden="true" />
-                    </span>
-                    <GlowBadge color={isFuture ? "muted" : "success"} dot className="text-[10px] uppercase">
-                      {isFuture ? "Coming soon" : "Live"}
-                    </GlowBadge>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-base font-semibold text-radar-light-text dark:text-radar-white">
-                      {feature.title}
-                    </h3>
-                    <p className="mt-1.5 text-sm leading-relaxed text-radar-light-muted dark:text-radar-muted">
-                      {feature.description}
-                    </p>
-                  </div>
-                  <span className="text-xs font-medium text-radar-primary dark:text-radar-accent">
-                    {feature.metric}
-                  </span>
-                </GlassCard>
-              </Link>
+              {isFuture ? (
+                // PR-LP-001 review fix — future cards have no real
+                // destination yet; a plain, non-interactive wrapper (rather
+                // than `<Link href="#">`) avoids a dead/fake link while
+                // rendering the exact same card underneath.
+                <div className="block h-full">{card}</div>
+              ) : (
+                <Link href={feature.href} className="block h-full">
+                  {card}
+                </Link>
+              )}
             </motion.div>
           );
         })}
