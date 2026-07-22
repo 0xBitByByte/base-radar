@@ -24,13 +24,15 @@ const ROADMAP: RoadmapColumn[] = [
       "Health & confidence scoring",
       "Live network status",
       "Narrative heatmap",
+      "Watchlists & alerts",
+      "Portfolio Intelligence",
     ],
   },
   {
     label: "Coming Soon",
     icon: Clock,
     color: "warning",
-    items: ["Wallet connect & portfolio tracking", "Watchlists & alerts", "Wallet intelligence"],
+    items: ["Wallet connect", "Wallet intelligence"],
   },
   {
     label: "Future",
