@@ -83,7 +83,7 @@ export const FOOTER_LINK_GROUPS: FooterLinkGroup[] = [
     links: [
       { label: "Dashboard", href: "/dashboard" },
       { label: "Projects", href: "/dashboard/projects" },
-      { label: "AI Research", href: "/dashboard/alerts" },
+      { label: "AI Intelligence", href: "/dashboard/alerts" },
       { label: "Watchlists", href: "/dashboard/watchlists" },
       { label: "Roadmap", href: "#roadmap" },
     ],

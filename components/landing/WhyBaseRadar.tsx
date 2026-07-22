@@ -36,78 +36,79 @@ type Feature = {
  * PR9.3.2 §3 — hand-ordered so every LIVE card is a contiguous block first,
  * every COMING SOON card a contiguous block last. This reorders the same
  * 12 features (9 live / 3 future, the actual current product status — see
- * PR-LP-001; "Alerts" moved from future to live and into the live block
- * since `/dashboard/alerts` has shipped); the live/future split itself is
- * unchanged aside from that one correction, only the display order is.
+ * PR-LP-001; "Notifications" (formerly mislabeled "Alerts") moved from
+ * future to live and into the live block since it now links to the real,
+ * shipped Notification Center); the live/future split itself is unchanged
+ * aside from that one correction, only the display order is.
  */
 const FEATURES: Feature[] = [
   {
     icon: BrainCircuit,
-    title: "AI Research",
-    description: "AI-generated narrative summaries and momentum signals from live ecosystem data.",
+    title: "AI Intelligence",
+    description: "Skip the raw data — AI turns ecosystem activity into a clear, plain-English read on what changed and why.",
     metric: "Updated continuously",
     href: "/dashboard/alerts",
   },
   {
     icon: ShieldCheck,
     title: "Verification Engine",
-    description: "Verified, community, unverified, and flagged — reviewed trust signals, not guesses.",
+    description: "Know which projects to trust before you dig in — four tiers, backed by evidence, not self-reported claims.",
     metric: "4 trust tiers",
     href: "/dashboard/projects",
   },
   {
     icon: Eye,
     title: "Watchlists",
-    description: "Pin projects, wallets, and tokens to track them at a glance from your dashboard.",
+    description: "Every project you pin reshapes the rest of your dashboard — briefs, alerts, and rankings personalize around it.",
     metric: "Unlimited pins",
     href: "/dashboard/watchlists",
   },
   {
     icon: Radio,
-    title: "Signals",
-    description: "Buy, watch, and momentum alerts generated continuously from onchain activity.",
+    title: "Intelligence Signals",
+    description: "Every signal is scored for confidence first, so a real momentum shift never gets lost in onchain noise.",
     metric: "86 signals today",
     href: "/dashboard/alerts",
   },
   {
     icon: TrendingUp,
     title: "Narratives",
-    description: "Track which categories and themes are gaining or losing momentum on Base.",
+    description: "Know which sectors are heating up or cooling off, without checking a dozen feeds yourself.",
     metric: "12+ categories tracked",
     href: "/dashboard",
   },
   {
     icon: LayoutGrid,
     title: "Categories",
-    description: "Browse the ecosystem by sector — DeFi, AI, social, gaming, and more.",
+    description: "Jump straight to the sector you care about — DeFi, AI, social, gaming, and more — instead of scrolling the whole registry.",
     metric: "12 sectors",
     href: "/dashboard/projects",
   },
   {
     icon: Compass,
     title: "Projects",
-    description: "A complete, continuously updated registry of protocols building on Base.",
+    description: "One verified registry instead of a dozen tabs — every protocol building on Base, kept current automatically.",
     metric: "2,348 verified",
     href: "/dashboard/projects",
   },
   {
     icon: Network,
-    title: "Provider Aggregation",
-    description: "Every metric is cross-checked across multiple independent data providers.",
+    title: "Cross-source Verification",
+    description: "No single provider's number is taken at face value — every metric is cross-checked before it reaches your dashboard.",
     metric: "6 independent providers",
     href: "/dashboard/projects",
   },
   {
     icon: Bell,
-    title: "Alerts",
-    description: "Get notified the moment a project you follow changes status or momentum.",
+    title: "Notifications",
+    description: "Never miss the moment a project you follow changes status or momentum — configurable, not overwhelming.",
     metric: "Real-time push",
-    href: "/dashboard/alerts",
+    href: "/dashboard/notifications",
   },
   {
     icon: Wallet,
     title: "Portfolio Tracking",
-    description: "Connect a wallet to see your Base holdings alongside ecosystem intelligence.",
+    description: "Connect a wallet to see your holdings alongside the same intelligence already watching the rest of the ecosystem.",
     metric: "Wallet connect",
     href: "#",
     status: "future",
@@ -115,7 +116,7 @@ const FEATURES: Feature[] = [
   {
     icon: Fingerprint,
     title: "Wallet Intelligence",
-    description: "Understand smart-money behavior and wallet activity across the ecosystem.",
+    description: "Understand which wallets are accumulating or exiting, and what that signals for a project.",
     metric: "Smart-money tracking",
     href: "#",
     status: "future",
@@ -123,7 +124,7 @@ const FEATURES: Feature[] = [
   {
     icon: Code2,
     title: "Open APIs",
-    description: "Programmatic access to Base Radar's intelligence data for builders.",
+    description: "Pull Base Radar's intelligence data directly into your own tools — no scraping required.",
     metric: "REST + GraphQL",
     href: "#",
     status: "future",
