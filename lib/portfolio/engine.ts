@@ -33,10 +33,10 @@ import { buildOverallHealth, buildPortfolioHeadline, buildPortfolioSummary } fro
 import type { PortfolioIntelligence } from "@/lib/portfolio/types";
 import type { IntelligenceAlert } from "@/lib/alerts/intelligence/types";
 import type { DailyBrief } from "@/lib/brief/types";
-import type { Watchlist } from "@/lib/watchlist/types";
+import type { PersonalWatchlist } from "@/lib/personalization/types";
 
 export function buildPortfolioIntelligence(
-  watchlist: Watchlist,
+  watchlist: PersonalWatchlist | null,
   alerts: IntelligenceAlert[],
   dailyBrief: DailyBrief,
   generatedAt: string

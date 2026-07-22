@@ -66,11 +66,18 @@ export function TimelineWidget() {
           </div>
 
           {latestEvent && (
-            <div className="flex flex-col gap-1 rounded-lg border border-radar-light-border bg-radar-light-surface p-2.5 dark:border-white/10 dark:bg-white/[0.03]">
-              <span className="text-[10.5px] font-medium text-radar-light-muted dark:text-radar-muted">
+            <div className="relative flex flex-col gap-1 rounded-lg border border-radar-light-border bg-radar-light-surface p-2.5 transition-colors hover:bg-radar-light-card dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]">
+              {latestEvent.link && (
+                <Link
+                  href={latestEvent.link}
+                  aria-label={`${latestEvent.title}. Investigate further.`}
+                  className="absolute inset-0 z-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-radar-primary/50"
+                />
+              )}
+              <span className="relative z-[1] text-[10.5px] font-medium text-radar-light-muted dark:text-radar-muted">
                 Latest Event
               </span>
-              <div className="flex items-center gap-1.5">
+              <div className="relative z-[1] flex items-center gap-1.5">
                 <TimelineEventBadge eventType={latestEvent.eventType} />
                 <span className="truncate text-xs font-semibold text-radar-light-text dark:text-radar-white">
                   {latestEvent.title}

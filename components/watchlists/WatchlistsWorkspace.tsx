@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, Pencil, Plus, X } from "lucide-react";
 
+import { AlertToggle } from "@/components/alerts/AlertToggle";
 import { getProject } from "@/data/projects/helpers";
 import { useWatchlists } from "@/lib/hooks/useWatchlists";
 import type { PersonalWatchlist } from "@/lib/personalization/types";
@@ -234,6 +235,7 @@ function WatchlistDetail({ watchlist, isActive, onSetActive, onEdit, onRemovePro
                 >
                   <X className="size-3.5" aria-hidden="true" />
                 </button>
+                <AlertToggle projectId={projectId} projectName={project?.name ?? projectId} />
               </li>
             );
           })}

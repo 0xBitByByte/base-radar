@@ -8,10 +8,12 @@
  * no business logic of its own. Read-only, per the PR brief.
  */
 
-import { Bell, Clock, FolderKanban, LayoutGrid, Newspaper, Zap } from "lucide-react";
+import { Bell, Clock, FolderKanban, LayoutGrid, Newspaper, Sparkles, Zap } from "lucide-react";
 
+import { getProject } from "@/data/projects/helpers";
 import type { Project } from "@/data/projects/types";
 import type { AutomationResult } from "@/lib/automation/types";
+import type { IntelligenceAlert } from "@/lib/alerts/intelligence/types";
 import type { DailyBrief } from "@/lib/brief/types";
 import type { Command } from "@/lib/command/commands";
 import type { Notification } from "@/lib/notifications/types";
@@ -48,9 +50,35 @@ export function normalizeProject(project: Project): SearchableItem {
     type: "project",
     icon: FolderKanban,
     route: `/dashboard/projects/${project.slug}`,
-    keywords: [...project.tags, ...project.categories],
+    keywords: [...project.tags, ...project.categories, ...project.chains],
     metadata: { status: project.status },
     source: "Project Registry",
+  };
+}
+
+/**
+ * The AI Intelligence Engine's per-project reads (`lib/alerts/intelligence`)
+ * were the one upstream layer in the Timeline/Notifications/Automation/
+ * Portfolio/Daily Brief reuse chain NOT represented in Global Search (PR-010)
+ * — every other layer downstream of it already was. Routes straight to the
+ * Project Profile the alert is about (`getProject`, the same lookup
+ * `IntelligenceCard`/`AIIntelligenceWidget` already use), which is more
+ * specific than the generic `/dashboard/alerts` list. Falls back to that
+ * list only if the project can't be resolved (never a broken destination).
+ */
+export function normalizeIntelligenceAlert(alert: IntelligenceAlert): SearchableItem {
+  const project = getProject(alert.projectId);
+  return {
+    id: `intelligence:${alert.id}`,
+    title: alert.headline,
+    description: alert.summary,
+    group: "AI Intelligence",
+    type: "intelligence-alert",
+    icon: Sparkles,
+    route: project ? `/dashboard/projects/${project.slug}` : "/dashboard/alerts",
+    keywords: [alert.projectName, alert.narrative, ...alert.categories],
+    metadata: { confidence: String(alert.confidence), score: String(alert.score) },
+    source: "AI Intelligence Engine",
   };
 }
 

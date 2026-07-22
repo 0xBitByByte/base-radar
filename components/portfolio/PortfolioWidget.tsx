@@ -8,6 +8,7 @@ import { PortfolioHealthBadge } from "@/components/portfolio/PortfolioHealthBadg
 import { PortfolioMetric } from "@/components/portfolio/PortfolioMetric";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { getProject } from "@/data/projects/helpers";
 import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
 
 /**
@@ -28,6 +29,8 @@ import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
 export function PortfolioWidget() {
   const { portfolio } = usePersonalizedDashboard();
   const topPerformer = portfolio?.topPerformers[0];
+  const topPerformerProject = topPerformer ? getProject(topPerformer.projectId) : undefined;
+  const nextStep = portfolio?.recommendations[0];
 
   return (
     <WidgetCard
@@ -62,17 +65,31 @@ export function PortfolioWidget() {
           </div>
 
           {topPerformer && (
-            <div className="flex flex-col gap-1 rounded-lg border border-radar-light-border bg-radar-light-surface p-2.5 dark:border-white/10 dark:bg-white/[0.03]">
-              <span className="text-[10.5px] font-medium text-radar-light-muted dark:text-radar-muted">
+            <div className="relative flex flex-col gap-1 rounded-lg border border-radar-light-border bg-radar-light-surface p-2.5 transition-colors hover:bg-radar-light-card dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]">
+              {topPerformerProject && (
+                <Link
+                  href={`/dashboard/projects/${topPerformerProject.slug}`}
+                  aria-label={`View ${topPerformer.projectName}'s Project Profile.`}
+                  className="absolute inset-0 z-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-radar-primary/50"
+                />
+              )}
+              <span className="relative z-[1] text-[10.5px] font-medium text-radar-light-muted dark:text-radar-muted">
                 Top Performer
               </span>
-              <div className="flex items-center gap-1.5">
+              <div className="relative z-[1] flex items-center gap-1.5">
                 <span className="truncate text-xs font-semibold text-radar-light-text dark:text-radar-white">
                   {topPerformer.projectName}
                 </span>
                 <NarrativeBadge narrative={topPerformer.narrative} />
               </div>
             </div>
+          )}
+
+          {nextStep && (
+            <p className="text-xs leading-relaxed text-radar-light-muted dark:text-radar-muted">
+              <span className="font-medium text-radar-light-text dark:text-radar-white">Suggested next step: </span>
+              {nextStep}
+            </p>
           )}
         </div>
       )}

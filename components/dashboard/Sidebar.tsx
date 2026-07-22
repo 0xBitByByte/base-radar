@@ -68,7 +68,7 @@ export function SidebarNav({ onNavigate, className }: SidebarNavProps) {
                   active={isActive(item.href)}
                   onClick={onNavigate}
                   badge={
-                    item.href === "/dashboard/watchlist"
+                    item.href === "/dashboard/watchlists"
                       ? watchlistCount
                       : item.href === "/dashboard/alerts"
                         ? unreadAlertCount
@@ -125,7 +125,7 @@ export function SidebarNav({ onNavigate, className }: SidebarNavProps) {
                   social.hoverClassName
                 )}
               >
-                <social.Icon className="size-4" />
+                <social.Icon className="size-4" aria-hidden="true" />
               </a>
             </Tooltip>
           ))}

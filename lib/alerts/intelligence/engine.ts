@@ -28,7 +28,7 @@ import type { Alert, AlertSeverity } from "@/lib/alerts/types";
 import { groupAlertsByProject } from "@/lib/alerts/intelligence/grouping";
 import { detectNarrative } from "@/lib/alerts/intelligence/narratives";
 import { computeConfidence, computeScore, scoreAlert } from "@/lib/alerts/intelligence/scoring";
-import { buildHeadline, buildReasoning, buildSummary } from "@/lib/alerts/intelligence/summary";
+import { buildHeadline, buildNextStep, buildReasoning, buildSummary } from "@/lib/alerts/intelligence/summary";
 import type { IntelligenceAlert, IntelligenceSignal } from "@/lib/alerts/intelligence/types";
 
 /** Exported for `lib/alerts/service.ts`'s `sortIntelligenceAlerts` (PR15.3 Part 3, "Highest Severity" sort) — reused rather than redefined there so there's exactly one severity ordering in the codebase. */
@@ -83,6 +83,7 @@ function buildIntelligenceAlertForGroup(projectId: string, projectName: string, 
     relatedAlertIds: alerts.map((alert) => alert.id),
     timestamp: latestTimestamp(alerts),
     reasoning: buildReasoning(signals),
+    nextStep: buildNextStep(narrative),
     narrative,
   };
 }

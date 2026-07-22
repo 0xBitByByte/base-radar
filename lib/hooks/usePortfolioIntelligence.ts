@@ -22,7 +22,7 @@ import { useSyncExternalStore } from "react";
 import { subscribe as subscribeToAlerts } from "@/lib/alerts/service";
 import { getPortfolioIntelligence } from "@/lib/portfolio/storage";
 import type { PortfolioIntelligence } from "@/lib/portfolio/types";
-import { subscribe as subscribeToWatchlist } from "@/lib/watchlist/service";
+import { subscribe as subscribeToWatchlist } from "@/lib/personalization/storage";
 
 function subscribe(onStoreChange: () => void): () => void {
   const unsubscribeAlerts = subscribeToAlerts(onStoreChange);

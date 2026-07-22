@@ -31,7 +31,7 @@ import { getAutomationResults } from "@/lib/automation/storage";
 import type { AutomationResult } from "@/lib/automation/types";
 import { subscribe as subscribeToAlerts } from "@/lib/alerts/service";
 import { subscribe as subscribeToNotifications } from "@/lib/notifications/storage";
-import { subscribe as subscribeToWatchlist } from "@/lib/watchlist/service";
+import { subscribe as subscribeToWatchlist } from "@/lib/personalization/storage";
 
 const EMPTY_AUTOMATION_RESULTS: AutomationResult[] = [];
 

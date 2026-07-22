@@ -2,7 +2,7 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 
-import logoIcon from "@/public/brand/logo-icon.webp";
+const logoIcon = "/brand/logo-icon.webp";
 
 /**
  * PR9.2 — replaces the previous dark, video/particle/blob-heavy background
@@ -49,7 +49,7 @@ export function HeroBackground() {
       <motion.img
         aria-hidden="true"
         alt=""
-        src={logoIcon.src}
+        src={logoIcon}
         className="absolute top-1/2 left-1/2 max-w-none opacity-[0.035] select-none dark:opacity-[0.05]"
         style={{ width: "min(64vmin, 620px)", height: "auto", x: "-50%", y: "-50%" }}
         animate={prefersReducedMotion ? undefined : { rotate: 360 }}

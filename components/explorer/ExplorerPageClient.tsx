@@ -13,6 +13,7 @@ import { ViewToggle, type ExplorerView } from "@/components/explorer/ViewToggle"
 import { normalizeSearch, searchProjects } from "@/components/explorer/search";
 import { sortProjects, DEFAULT_SORT, type SortState } from "@/components/explorer/sort";
 import { EMPTY_FILTERS, filterProjects, hasActiveFilters, type ExplorerFilters } from "@/components/explorer/filters";
+import { useWatchlists } from "@/lib/hooks/useWatchlists";
 import type { ProjectIntelligence } from "@/lib/intelligence/types";
 
 type ExplorerPageClientProps = {
@@ -30,6 +31,7 @@ type ExplorerPageClientProps = {
  */
 export function ExplorerPageClient({ projects, generatedAt }: ExplorerPageClientProps) {
   const router = useRouter();
+  const { activeWatchlist } = useWatchlists();
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
   const [filters, setFilters] = useState<ExplorerFilters>(EMPTY_FILTERS);
@@ -39,6 +41,15 @@ export function ExplorerPageClient({ projects, generatedAt }: ExplorerPageClient
   const hasQuery = normalizeSearch(query).length > 0;
   const filtersActive = hasActiveFilters(filters);
 
+  // PR-011: only ever breaks a tie between two projects the active sort
+  // field already ranks identically — never overrides a real TVL/health/
+  // confidence difference. `undefined` (no active watchlist) leaves
+  // `sortProjects` byte-for-byte unchanged, same as PR-010's Global Search.
+  const prioritizedProjectIds = useMemo(
+    () => (activeWatchlist ? new Set(activeWatchlist.projectIds) : undefined),
+    [activeWatchlist]
+  );
+
   const visibleProjects = useMemo(() => {
     // Pipeline: All Projects -> Search -> Filters -> Sort -> Render.
     const searched = searchProjects(projects, query);
@@ -47,8 +58,8 @@ export function ExplorerPageClient({ projects, generatedAt }: ExplorerPageClient
     // Sort governs order only once no query is narrowing the list — otherwise
     // Sort would silently discard the relevance ranking Search just computed,
     // exactly as established in PR2.
-    return hasQuery ? filtered : sortProjects(filtered, sort);
-  }, [projects, query, filters, sort, hasQuery]);
+    return hasQuery ? filtered : sortProjects(filtered, sort, prioritizedProjectIds);
+  }, [projects, query, filters, sort, hasQuery, prioritizedProjectIds]);
 
   function clearSearch() {
     setQuery("");

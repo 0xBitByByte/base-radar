@@ -21,7 +21,7 @@ import { useSyncExternalStore } from "react";
 import { subscribe as subscribeToAlerts } from "@/lib/alerts/service";
 import { getTimeline } from "@/lib/timeline/storage";
 import type { Timeline } from "@/lib/timeline/types";
-import { subscribe as subscribeToWatchlist } from "@/lib/watchlist/service";
+import { subscribe as subscribeToWatchlist } from "@/lib/personalization/storage";
 
 function subscribe(onStoreChange: () => void): () => void {
   const unsubscribeAlerts = subscribeToAlerts(onStoreChange);

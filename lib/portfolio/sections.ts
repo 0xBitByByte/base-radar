@@ -12,7 +12,7 @@
 
 import type { IntelligenceAlert } from "@/lib/alerts/intelligence/types";
 import type { BriefHighlight, DailyBrief } from "@/lib/brief/types";
-import type { Watchlist } from "@/lib/watchlist/types";
+import type { PersonalWatchlist } from "@/lib/personalization/types";
 
 const DOMINANT_NARRATIVE_COUNT = 3;
 const ATTENTION_COUNT = 5;
@@ -36,12 +36,12 @@ function computeAverageScore(alerts: IntelligenceAlert[]): number {
  * already scoped to.
  */
 export function computePortfolioStats(
-  watchlist: Watchlist,
+  watchlist: PersonalWatchlist | null,
   dailyBrief: DailyBrief,
   alerts: IntelligenceAlert[]
 ): PortfolioStats {
   return {
-    projectCount: watchlist.items.length,
+    projectCount: watchlist?.projectIds.length ?? 0,
     averageConfidence: dailyBrief.averageConfidence,
     averageScore: computeAverageScore(alerts),
   };

@@ -58,7 +58,7 @@ const FEATURES: Feature[] = [
     title: "Watchlists",
     description: "Pin projects, wallets, and tokens to track them at a glance from your dashboard.",
     metric: "Unlimited pins",
-    href: "/dashboard/watchlist",
+    href: "/dashboard/watchlists",
   },
   {
     icon: Radio,

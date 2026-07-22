@@ -15,7 +15,13 @@ export type SortState = {
   direction: SortDirection;
 };
 
-export const DEFAULT_SORT: SortState = { field: "name", direction: "asc" };
+/**
+ * TVL (High to Low), not alphabetical — the registry's own most-established,
+ * most-real-signal ordering (PR-010). Every field here is already a real,
+ * already-computed intelligence value the sort dropdown already supports;
+ * this only changes which one loads first, not what's available.
+ */
+export const DEFAULT_SORT: SortState = { field: "tvl", direction: "desc" };
 
 export const SORT_OPTIONS: { value: string; label: string; state: SortState }[] = [
   { value: "name-asc", label: "Name (A–Z)", state: { field: "name", direction: "asc" } },
@@ -104,10 +110,21 @@ export function toggleSort(current: SortState, field: SortField): SortState {
  * A project with no value for the active sort field sorts to the end of
  * the list, in either direction — never disappears, never errors — per
  * docs/explorer/02-information-architecture.md §7.
+ *
+ * `prioritizedProjectIds` (PR-011) — the active Personal Watchlist's project
+ * ids, when provided — only ever breaks a tie between two projects that
+ * already sort identically on the active field: a watched project sorts
+ * before an equally-ranked unwatched one, but never outranks a project that
+ * genuinely has a higher (or lower, depending on direction) real value. This
+ * is the same "prioritize, never hide or reorder past real data" rule
+ * `lib/search/globalSearch.ts`'s `isPrioritizedProject` already established
+ * for Global Search — applied here to Explorer sorting instead of search
+ * ranking, not a second/competing prioritization system.
  */
 export function sortProjects(
   projects: ProjectIntelligence[],
-  { field, direction }: SortState
+  { field, direction }: SortState,
+  prioritizedProjectIds?: Set<string>
 ): ProjectIntelligence[] {
   const sign = direction === "asc" ? 1 : -1;
 
@@ -115,13 +132,27 @@ export function sortProjects(
     const valueA = sortValue(a, field);
     const valueB = sortValue(b, field);
 
-    if (valueA === null && valueB === null) return 0;
+    if (valueA === null && valueB === null) return tieBreak(a, b, prioritizedProjectIds);
     if (valueA === null) return 1;
     if (valueB === null) return -1;
 
     if (typeof valueA === "string" && typeof valueB === "string") {
-      return sign * valueA.localeCompare(valueB);
+      const comparison = valueA.localeCompare(valueB);
+      return comparison !== 0 ? sign * comparison : tieBreak(a, b, prioritizedProjectIds);
     }
-    return sign * ((valueA as number) - (valueB as number));
+    const comparison = (valueA as number) - (valueB as number);
+    return comparison !== 0 ? sign * comparison : tieBreak(a, b, prioritizedProjectIds);
   });
+}
+
+function tieBreak(
+  a: ProjectIntelligence,
+  b: ProjectIntelligence,
+  prioritizedProjectIds: Set<string> | undefined
+): number {
+  if (!prioritizedProjectIds) return 0;
+  const aWatched = prioritizedProjectIds.has(a.identity.id);
+  const bWatched = prioritizedProjectIds.has(b.identity.id);
+  if (aWatched === bWatched) return 0;
+  return aWatched ? -1 : 1;
 }

@@ -2,14 +2,31 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { Menu } from "@base-ui/react/menu";
 import { Cloud, LogOut, Settings, Sparkles, User } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useAccount } from "@/lib/hooks/useAccount";
 import { AccountAvatar } from "@/components/account/AccountAvatar";
-import { AccountProfileDialog } from "@/components/account/AccountProfileDialog";
-import { SyncStatusCard } from "@/components/sync/SyncStatusCard";
+
+/**
+ * Both dialogs are closed by default and opened only by an explicit menu
+ * click — never part of the initial paint — so their code (and, for
+ * `SyncStatusCard`, the three further dialogs it itself imports) is
+ * deferred out of every dashboard route's initial JS via `next/dynamic`,
+ * rather than bundled unconditionally through `Topbar` → `AccountMenu`
+ * (PR-006). `ssr: false` is correct here since neither dialog has
+ * anything to render on the server — both start closed.
+ */
+const AccountProfileDialog = dynamic(
+  () => import("@/components/account/AccountProfileDialog").then((mod) => mod.AccountProfileDialog),
+  { ssr: false }
+);
+const SyncStatusCard = dynamic(
+  () => import("@/components/sync/SyncStatusCard").then((mod) => mod.SyncStatusCard),
+  { ssr: false }
+);
 
 const MENU_ITEM_CLASS =
   "flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm text-radar-light-text outline-none transition-colors data-[highlighted]:bg-radar-light-surface data-[highlighted]:text-radar-light-text dark:text-radar-muted dark:data-[highlighted]:bg-white/5 dark:data-[highlighted]:text-radar-white";
@@ -37,6 +54,13 @@ export function AccountMenu() {
   const { account, signOut } = useAccount();
   const [profileOpen, setProfileOpen] = useState(false);
   const [syncStatusOpen, setSyncStatusOpen] = useState(false);
+  // Once true, stays true — mounting each dialog only from its first
+  // requested open (rather than unconditionally like `open` alone would)
+  // is what actually defers its dynamic-imported chunk past initial page
+  // load; never resetting to `false` afterward preserves each dialog's
+  // own closing transition on every subsequent close.
+  const [profileEverOpened, setProfileEverOpened] = useState(false);
+  const [syncStatusEverOpened, setSyncStatusEverOpened] = useState(false);
 
   return (
     <>
@@ -71,7 +95,13 @@ export function AccountMenu() {
 
               <div className="my-1 h-px bg-radar-light-border dark:bg-white/10" />
 
-              <Menu.Item onClick={() => setProfileOpen(true)} className={MENU_ITEM_CLASS}>
+              <Menu.Item
+                onClick={() => {
+                  setProfileEverOpened(true);
+                  setProfileOpen(true);
+                }}
+                className={MENU_ITEM_CLASS}
+              >
                 <User className="size-4" aria-hidden="true" />
                 Profile
               </Menu.Item>
@@ -96,7 +126,13 @@ export function AccountMenu() {
 
               <div className="my-1 h-px bg-radar-light-border dark:bg-white/10" />
 
-              <Menu.Item onClick={() => setSyncStatusOpen(true)} className={MENU_ITEM_CLASS}>
+              <Menu.Item
+                onClick={() => {
+                  setSyncStatusEverOpened(true);
+                  setSyncStatusOpen(true);
+                }}
+                className={MENU_ITEM_CLASS}
+              >
                 <Cloud className="size-4" aria-hidden="true" />
                 Cloud Sync
               </Menu.Item>
@@ -115,8 +151,8 @@ export function AccountMenu() {
         </Menu.Portal>
       </Menu.Root>
 
-      <AccountProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
-      <SyncStatusCard open={syncStatusOpen} onOpenChange={setSyncStatusOpen} />
+      {profileEverOpened && <AccountProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />}
+      {syncStatusEverOpened && <SyncStatusCard open={syncStatusOpen} onOpenChange={setSyncStatusOpen} />}
     </>
   );
 }

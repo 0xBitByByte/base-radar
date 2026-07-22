@@ -98,6 +98,33 @@ export const CATEGORY_LABEL: Record<AlertCategory, string> = {
 };
 
 /**
+ * Fixed evidence-priority order for rendering a signal breakdown (PR-012) —
+ * a project's most consequential category always leads regardless of which
+ * order its underlying alerts happened to arrive in. Matches
+ * `lib/alerts/intelligence/narratives.ts`'s own real priority (a security
+ * signal always wins narrative classification first); `scoring.ts`'s six
+ * scoreable categories (`tvl`, `governance`, `release`, `security`, `whale`,
+ * `price`) cover every category that can actually appear in a real
+ * `IntelligenceSignal[]` today. The remaining categories have no scorer yet
+ * (`scoring.ts`'s own comment) and are listed last only as a safe fallback
+ * if one is ever added, never reordered above a real scored category.
+ */
+export const CATEGORY_EVIDENCE_PRIORITY: AlertCategory[] = [
+  "security",
+  "tvl",
+  "release",
+  "governance",
+  "whale",
+  "price",
+  "liquidity",
+  "partnership",
+  "listing",
+  "upgrade",
+  "ecosystem",
+  "community",
+];
+
+/**
  * PR15.3 Part 2 — display metadata for `NarrativeType` (`lib/alerts/
  * intelligence/types.ts`), the AI Intelligence Engine's detected pattern.
  * Icons and the emoji-prefixed label match the PR brief's own worked

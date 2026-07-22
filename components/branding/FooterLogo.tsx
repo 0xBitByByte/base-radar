@@ -1,6 +1,6 @@
 import Image from "next/image";
 
-import footerLockup from "@/public/brand/footer-lockup.webp";
+const footerLockup = "/brand/footer-lockup.webp";
 import { cn } from "@/lib/utils";
 
 /** Intrinsic aspect ratio of `footer-lockup.webp` (455×280 source, keyed

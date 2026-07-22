@@ -21,6 +21,7 @@ import { ProfileIntelligence } from "@/components/explorer/ProfileIntelligence";
 import { ProfileContracts } from "@/components/explorer/ProfileContracts";
 import { ProfileGovernance } from "@/components/explorer/ProfileGovernance";
 import { ProfileQuickStats } from "@/components/explorer/ProfileQuickStats";
+import { ProfileRelatedIntelligence } from "@/components/explorer/ProfileRelatedIntelligence";
 import { ProfileSectionNav } from "@/components/explorer/ProfileSectionNav";
 import { ProjectHealthScorecard } from "@/components/explorer/ProjectHealthScorecard";
 import type { SparklinePoint } from "@/lib/data/types";
@@ -247,6 +248,8 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
         coingeckoId={registryProject.providerIds.coingeckoId ?? null}
         defillamaSlug={registryProject.providerIds.defillamaSlug ?? null}
       />
+
+      <ProfileRelatedIntelligence projectId={registryProject.id} />
 
       <ProfileCommunityMetrics github={profile.github} community={profile.community} contributorCountPromise={contributorCountPromise} />
 

@@ -20,6 +20,27 @@ const NARRATIVE_HEADLINE: Record<NarrativeType, (projectName: string) => string>
   stable: (name) => `${name} is holding steady`,
 };
 
+/**
+ * A short, standing "where to look next" pointer per narrative — deterministic
+ * and generic (never a project-specific claim the real signals don't
+ * support), pointing only at Project Profile sections that genuinely exist
+ * for every project (Governance, Engineering Health, Contracts/security,
+ * Token & Price). `stable` honestly has nothing to flag.
+ */
+const NARRATIVE_NEXT_STEP: Record<NarrativeType, string> = {
+  growth: "Review the Project Profile's TVL, governance, and development sections for what's driving it.",
+  decline: "Check the Project Profile for what's behind the pullback before acting.",
+  "governance-active": "Review the open proposal in the Project Profile's Governance section.",
+  "security-risk": "Review the security event in the Project Profile's Contracts section before taking a position.",
+  accumulation: "Check the Project Profile's on-chain activity for whether this is genuine accumulation or short-term rotation.",
+  "development-active": "See the Project Profile's Engineering Health section for what shipped.",
+  stable: "No action needed — nothing notable to review right now.",
+};
+
+export function buildNextStep(narrative: NarrativeType): string {
+  return NARRATIVE_NEXT_STEP[narrative];
+}
+
 /** Comma-joined with "and" before the last item — the one place this codebase already does this (`lib/intelligence/report.ts`'s clause assembly) reused here, not reinvented. */
 function joinWithAnd(items: string[]): string {
   if (items.length === 0) return "no notable signals";

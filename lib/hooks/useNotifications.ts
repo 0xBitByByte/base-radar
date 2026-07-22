@@ -43,7 +43,7 @@ import {
 } from "@/lib/notifications/preferences";
 import type { Notification } from "@/lib/notifications/types";
 import { subscribe as subscribeToAlerts } from "@/lib/alerts/service";
-import { subscribe as subscribeToWatchlist } from "@/lib/watchlist/service";
+import { subscribe as subscribeToWatchlist } from "@/lib/personalization/storage";
 
 const EMPTY_NOTIFICATIONS: Notification[] = [];
 
