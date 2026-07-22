@@ -93,7 +93,7 @@ const FEATURE_ITEMS: FeatureItem[] = [
     icon: Bookmark,
     title: "Watchlists",
     description: "Curate a personal list of projects, wallets, and tokens to monitor at a glance.",
-    href: "/dashboard/watchlist",
+    href: "/dashboard/watchlists",
   },
   {
     icon: TrendingUp,

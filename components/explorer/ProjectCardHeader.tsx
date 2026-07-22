@@ -1,6 +1,6 @@
 import { ProjectLogo } from "@/components/branding/ProjectLogo";
 import { VerificationBadge } from "@/components/explorer/VerificationBadge";
-import { WatchButton } from "@/components/watchlist/WatchButton";
+import { WatchButton } from "@/components/watchlists/WatchButton";
 import type { Community, Identity } from "@/lib/intelligence/types";
 
 type ProjectCardHeaderProps = {

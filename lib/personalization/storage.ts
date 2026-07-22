@@ -1,11 +1,8 @@
 /**
- * The Personalization Layer's own store — multiple named, user-organized
- * project collections ("watchlists"). Completely separate from
- * `lib/watchlist/`, which remains the single source of truth every
- * intelligence layer (Portfolio Intelligence, Daily Brief, Timeline, ...)
- * reads from — this module is never read by any engine, and this PR does
- * not wire it into any of them (that's PR22 Part 2). A pure client-side
- * organization tool.
+ * The Personalization Layer's Watchlist store — multiple named,
+ * user-organized project collections. Its active (or fallback) collection
+ * is the sole membership source for starred projects and every derived
+ * surface that scopes itself to a Watchlist.
  *
  * Framework-agnostic (no React import) with one in-memory `cached`
  * snapshot as the source of truth for every read, exactly like
@@ -23,6 +20,8 @@ import type { PersonalizationState, PersonalWatchlist, WatchlistColorKey, Watchl
 
 const PERSONALIZATION_STORAGE_KEY = "base-radar:personalization";
 const PERSONALIZATION_VERSION = 1;
+const LEGACY_WATCHLIST_STORAGE_KEY = "base-radar:watchlist";
+const LEGACY_WATCHLIST_MIGRATION_KEY = "base-radar:legacy-watchlist-migrated";
 
 /** A static seed timestamp for the default watchlists — these are configuration, not real user-created records, so a fixed illustrative date is honest here (never `Date.now()`, never implying the user just created them). Matches `lib/automation/rules.ts`'s own `DEFAULT_RULE_TIMESTAMP` precedent. */
 const DEFAULT_TIMESTAMP = "2025-01-01T00:00:00.000Z";
@@ -162,6 +161,43 @@ function isValidState(value: unknown): value is PersonalizationState {
   return true;
 }
 
+function readLegacyProjectIds(): string[] {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const raw = window.localStorage.getItem(LEGACY_WATCHLIST_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as { version?: unknown; items?: unknown };
+    if (parsed.version !== 1 || !Array.isArray(parsed.items)) return [];
+    return [...new Set(parsed.items.map((item) => (typeof item === "object" && item !== null ? (item as { projectId?: unknown }).projectId : null)).filter((projectId): projectId is string => typeof projectId === "string"))];
+  } catch {
+    return [];
+  }
+}
+
+function migrateLegacyWatchlist(state: PersonalizationState): PersonalizationState {
+  if (typeof window === "undefined" || window.localStorage.getItem(LEGACY_WATCHLIST_MIGRATION_KEY)) return state;
+
+  const legacyProjectIds = readLegacyProjectIds();
+  if (legacyProjectIds.length === 0) return state;
+
+  const target = state.watchlists.find((watchlist) => watchlist.id === state.activeWatchlistId) ?? state.watchlists.find((watchlist) => watchlist.pinned) ?? state.watchlists[0] ?? buildDefaultWatchlists()[0];
+  const projectIds = [...new Set([...target.projectIds, ...legacyProjectIds])];
+  const watchlists = state.watchlists.some((watchlist) => watchlist.id === target.id)
+    ? state.watchlists.map((watchlist) => (watchlist.id === target.id ? { ...watchlist, projectIds } : watchlist))
+    : [{ ...target, projectIds }, ...state.watchlists];
+  const migrated = { ...state, watchlists };
+
+  try {
+    window.localStorage.setItem(PERSONALIZATION_STORAGE_KEY, JSON.stringify(migrated));
+    window.localStorage.setItem(LEGACY_WATCHLIST_MIGRATION_KEY, "1");
+  } catch {
+    // The in-memory migration still preserves membership for this session.
+  }
+
+  return migrated;
+}
+
 /**
  * SSR-safe (`window` doesn't exist server-side) and resilient to missing,
  * corrupted, or older-version data — every failure mode falls back to the
@@ -180,15 +216,15 @@ function readState(): PersonalizationState {
 
   try {
     const raw = window.localStorage.getItem(PERSONALIZATION_STORAGE_KEY);
-    if (!raw) return buildDefaultState();
+    if (!raw) return migrateLegacyWatchlist(buildDefaultState());
     const parsed = JSON.parse(raw);
-    if (!isValidState(parsed)) return buildDefaultState();
+    if (!isValidState(parsed)) return migrateLegacyWatchlist(buildDefaultState());
     if (!getPersonalizationPreferences().rememberActiveWatchlist) {
-      return { ...parsed, activeWatchlistId: null };
+      return migrateLegacyWatchlist({ ...parsed, activeWatchlistId: null });
     }
-    return parsed;
+    return migrateLegacyWatchlist(parsed);
   } catch {
-    return buildDefaultState();
+    return migrateLegacyWatchlist(buildDefaultState());
   }
 }
 
@@ -340,6 +376,32 @@ export function removeProjectFromWatchlist(watchlistId: string, projectId: strin
         : watchlist
     ),
   });
+}
+
+/** The membership source every project-level feature reads: the active list when set, otherwise the user's first pinned or first available list. */
+export function getMembershipWatchlist(): PersonalWatchlist | null {
+  return cached.watchlists.find((watchlist) => watchlist.id === cached.activeWatchlistId) ?? cached.watchlists.find((watchlist) => watchlist.pinned) ?? cached.watchlists[0] ?? null;
+}
+
+export function getMembershipProjectIds(): string[] {
+  return getMembershipWatchlist()?.projectIds ?? [];
+}
+
+/** Preserves the legacy star control's immediate toggle behavior while making the active Personalization Watchlist the sole membership owner. */
+export function toggleMembershipProject(projectId: string): void {
+  let watchlist = getMembershipWatchlist();
+  if (!watchlist) {
+    const id = createWatchlist({ name: "Favorites", description: "Your hand-picked favorite projects.", icon: "star", color: "yellow" });
+    setActiveWatchlist(id);
+    watchlist = getMembershipWatchlist();
+  }
+  if (!watchlist) return;
+
+  if (watchlist.projectIds.includes(projectId)) {
+    removeProjectFromWatchlist(watchlist.id, projectId);
+  } else {
+    addProjectToWatchlist(watchlist.id, projectId);
+  }
 }
 
 /**

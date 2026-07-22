@@ -1,4 +1,4 @@
-import { WatchButton } from "@/components/watchlist/WatchButton";
+import { WatchButton } from "@/components/watchlists/WatchButton";
 
 type RowActionsProps = {
   projectId: string;

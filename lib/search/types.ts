@@ -3,6 +3,7 @@ import type { LucideIcon } from "lucide-react";
 export type SearchResultType =
   | "command"
   | "project"
+  | "intelligence-alert"
   | "timeline"
   | "notification"
   | "automation"
@@ -12,6 +13,7 @@ export type SearchResultType =
 export type SearchGroup =
   | "Commands"
   | "Projects"
+  | "AI Intelligence"
   | "Timeline"
   | "Notifications"
   | "Automation"

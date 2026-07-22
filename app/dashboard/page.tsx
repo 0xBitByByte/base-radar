@@ -87,22 +87,28 @@ export default async function DashboardPage() {
         <KPIRow items={kpis.items} lastUpdated={lastUpdated} />
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          <PortfolioWidget data={portfolio} lastUpdated={lastUpdated} />
-          <MarketWidgetLive data={market} lastUpdated={lastUpdated} />
-          <TrendingWidget data={trending} lastUpdated={lastUpdated} />
-          <AIProjectsWidget data={aiProjects} lastUpdated={lastUpdated} />
-          <WhaleActivityWidget data={whaleEvents} lastUpdated={lastUpdated} />
-          <SignalsWidget data={signals} lastUpdated={lastUpdated} />
-          <NarrativeHeatmap data={heatmap} lastUpdated={lastUpdated} />
-          <ProjectSpotlight data={spotlight} lastUpdated={lastUpdated} />
-          <ActivityFeed data={activity} lastUpdated={lastUpdated} />
-          <WatchlistWidget projects={allProjects} lastUpdated={lastUpdated} />
+          {/* Tier 1 — personalized, watchlist-scoped intelligence: the most
+              decision-relevant content on the page, so it leads (PR-008). */}
           <AIIntelligenceWidget />
           <BriefWidget />
           <PortfolioIntelligenceWidget />
-          <TimelineWidget />
+          <WatchlistWidget projects={allProjects} lastUpdated={lastUpdated} />
           <NotificationWidget />
           <AutomationWidget />
+          <TimelineWidget />
+
+          {/* Tier 2 — ecosystem-wide market-moving signals. */}
+          <WhaleActivityWidget data={whaleEvents} lastUpdated={lastUpdated} />
+          <SignalsWidget data={signals} lastUpdated={lastUpdated} />
+          <MarketWidgetLive data={market} lastUpdated={lastUpdated} />
+          <NarrativeHeatmap data={heatmap} lastUpdated={lastUpdated} />
+          <TrendingWidget data={trending} lastUpdated={lastUpdated} />
+
+          {/* Tier 3 — supplementary/informational. */}
+          <AIProjectsWidget data={aiProjects} lastUpdated={lastUpdated} />
+          <ProjectSpotlight data={spotlight} lastUpdated={lastUpdated} />
+          <ActivityFeed data={activity} lastUpdated={lastUpdated} />
+          <PortfolioWidget data={portfolio} lastUpdated={lastUpdated} />
         </div>
       </div>
     </div>

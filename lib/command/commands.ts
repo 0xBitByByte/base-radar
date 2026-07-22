@@ -12,7 +12,7 @@
  */
 
 import type { LucideIcon } from "lucide-react";
-import { Bell, Clock, Eye, FolderKanban, Layers, LayoutDashboard, LayoutGrid, Newspaper, Settings, Zap } from "lucide-react";
+import { Bell, Clock, FolderKanban, Layers, LayoutDashboard, LayoutGrid, Newspaper, Settings, Zap } from "lucide-react";
 
 export type CommandGroup =
   | "Dashboard"
@@ -55,22 +55,13 @@ export const COMMANDS: Command[] = [
     keywords: ["explorer", "registry", "browse", "search projects"],
   },
   {
-    id: "watchlist",
-    title: "Watchlist",
-    description: "View the projects you're watching.",
-    group: "Navigation",
-    icon: Eye,
-    route: "/dashboard/watchlist",
-    keywords: ["watch", "tracked", "following", "saved"],
-  },
-  {
     id: "watchlists",
     title: "Watchlists",
     description: "Organize projects into your own collections.",
     group: "Navigation",
     icon: Layers,
     route: "/dashboard/watchlists",
-    keywords: ["collections", "organize", "personalization", "lists"],
+    keywords: ["collections", "organize", "personalization", "lists", "watch", "tracked", "following", "saved"],
   },
   {
     id: "alerts",

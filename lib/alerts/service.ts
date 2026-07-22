@@ -69,7 +69,7 @@ import type {
   AlertStatusFilter,
   WatchlistProjectAlertInfo,
 } from "@/lib/alerts/types";
-import * as watchlistService from "@/lib/watchlist/service";
+import * as personalizationStorage from "@/lib/personalization/storage";
 
 function mergeOverlay(base: Alert, overlay: AlertOverlay | undefined): Alert {
   if (!overlay) return base;
@@ -95,7 +95,7 @@ function computeAllAlerts(content: Alert[], state: AlertsState): Alert[] {
 
 /** Alerts belonging to a currently-watched project — ignores each project's `alertEnabledByProject` mute toggle, so `getWatchlistProjectsWithAlerts()` can still report a real `alertCount` for a project the user has muted. */
 function computeAlertsForWatchlist(content: Alert[], state: AlertsState): Alert[] {
-  const watchedIds = new Set(watchlistService.getWatchlist().items.map((item) => item.projectId));
+  const watchedIds = new Set(personalizationStorage.getMembershipProjectIds());
   return content
     .filter((alert) => watchedIds.has(alert.projectId))
     .filter((alert) => state.overlay[alert.id]?.dismissed !== true)
@@ -117,11 +117,11 @@ function computeWatchlistProjectsWithAlerts(
     countByProject.set(alert.projectId, (countByProject.get(alert.projectId) ?? 0) + 1);
   }
 
-  return watchlistService.getWatchlist().items.map((item) => ({
-    projectId: item.projectId,
-    projectName: getProject(item.projectId)?.name ?? item.projectId,
-    alertsEnabled: state.alertEnabledByProject[item.projectId] !== false,
-    alertCount: countByProject.get(item.projectId) ?? 0,
+  return personalizationStorage.getMembershipProjectIds().map((projectId) => ({
+    projectId,
+    projectName: getProject(projectId)?.name ?? projectId,
+    alertsEnabled: state.alertEnabledByProject[projectId] !== false,
+    alertCount: countByProject.get(projectId) ?? 0,
   }));
 }
 
@@ -172,7 +172,7 @@ function persist(next: AlertsState): void {
 // visible here even though nothing in THIS module's own state changed —
 // subscribed once, for this module's lifetime (same singleton-for-the-
 // app's-life assumption `listeners` above already makes).
-watchlistService.subscribe(() => {
+personalizationStorage.subscribe(() => {
   recomputeDerived();
   notify();
 });

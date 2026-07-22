@@ -38,7 +38,7 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
               aria-label="Close navigation"
               className="flex size-8 items-center justify-center rounded-lg text-radar-light-muted outline-none transition-colors hover:bg-radar-light-surface focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:text-radar-muted dark:hover:bg-white/5"
             >
-              <X className="size-4" />
+              <X className="size-4" aria-hidden="true" />
             </Dialog.Close>
           </div>
           <SidebarNav onNavigate={() => onOpenChange(false)} />

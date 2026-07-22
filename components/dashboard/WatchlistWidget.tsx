@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Eye, Star } from "lucide-react";
+import { ArrowRight, Eye, Star } from "lucide-react";
 
 import { ProjectLogo } from "@/components/branding/ProjectLogo";
 import { ChangeValue } from "@/components/explorer/ChangeValue";
@@ -88,6 +88,14 @@ export function WatchlistWidget({ projects, lastUpdated }: WatchlistWidgetProps)
           })}
         </ul>
       )}
+
+      <Link
+        href="/dashboard/watchlists"
+        className="flex items-center gap-1 self-start text-xs font-medium text-radar-primary outline-none transition-colors hover:text-radar-primary/80 focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:text-radar-accent dark:hover:text-radar-accent/80"
+      >
+        View full watchlist
+        <ArrowRight className="size-3.5 shrink-0" aria-hidden="true" />
+      </Link>
     </WidgetCard>
   );
 }

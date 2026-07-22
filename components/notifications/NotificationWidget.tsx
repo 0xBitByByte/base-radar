@@ -55,18 +55,25 @@ export function NotificationWidget() {
           </div>
 
           {latest && (
-            <div className="flex flex-col gap-1.5 rounded-lg border border-radar-light-border bg-radar-light-surface p-2.5 dark:border-white/10 dark:bg-white/[0.03]">
-              <span className="text-[10.5px] font-medium text-radar-light-muted dark:text-radar-muted">
+            <div className="relative flex flex-col gap-1.5 rounded-lg border border-radar-light-border bg-radar-light-surface p-2.5 transition-colors hover:bg-radar-light-card dark:border-white/10 dark:bg-white/[0.03] dark:hover:bg-white/[0.06]">
+              {latest.link && (
+                <Link
+                  href={latest.link}
+                  aria-label={`${latest.title}. Investigate further.`}
+                  className="absolute inset-0 z-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-radar-primary/50"
+                />
+              )}
+              <span className="relative z-[1] text-[10.5px] font-medium text-radar-light-muted dark:text-radar-muted">
                 Latest Notification
               </span>
-              <div className="flex flex-wrap items-center gap-1.5">
+              <div className="relative z-[1] flex flex-wrap items-center gap-1.5">
                 <TimelineEventBadge eventType={latest.type} />
                 <NotificationBadge priority={latest.priority} />
               </div>
-              <span className="truncate text-xs font-semibold text-radar-light-text dark:text-radar-white">
+              <span className="relative z-[1] truncate text-xs font-semibold text-radar-light-text dark:text-radar-white">
                 {latest.title}
               </span>
-              <time dateTime={latest.timestamp} className="text-[10.5px] text-radar-light-muted dark:text-radar-muted">
+              <time dateTime={latest.timestamp} className="relative z-[1] text-[10.5px] text-radar-light-muted dark:text-radar-muted">
                 {formatRelativeTime(latest.timestamp)}
               </time>
             </div>

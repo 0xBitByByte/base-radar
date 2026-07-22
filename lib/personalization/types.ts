@@ -1,9 +1,7 @@
 /**
  * The Personalization Layer's data model — multiple named, user-organized
- * project collections ("watchlists"). This is a distinct concept from
- * `lib/watchlist/`'s single flat list (which remains the source of truth
- * every intelligence layer reads from): a `PersonalWatchlist` is a
- * client-side organizational tool, not a signal that feeds any engine.
+ * project collections ("watchlists"). The active collection is the
+ * canonical membership source for Watchlist-scoped experiences.
  */
 
 /** A small, curated icon set — closed, not arbitrary, matching every other closed-vocabulary union in this app (e.g. `NotificationType`, `AutomationTriggerType`). Mapped to real `lucide-react` icons in the UI layer only (`components/watchlists/`), keeping this file framework-agnostic. */
@@ -52,6 +50,6 @@ export type PersonalWatchlist = {
 export type PersonalizationState = {
   version: number;
   watchlists: PersonalWatchlist[];
-  /** Exactly one watchlist may be active at a time, or `null` if every watchlist has been deleted. Does not yet filter any Dashboard widget — that's PR22 Part 2. */
+  /** Exactly one watchlist may be active at a time, or `null` if every watchlist has been deleted. */
   activeWatchlistId: string | null;
 };

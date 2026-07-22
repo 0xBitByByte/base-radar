@@ -8,11 +8,8 @@ export const metadata: Metadata = {
 };
 
 /**
- * PR22 Part 1 — renders entirely client-side (`WatchlistsWorkspace`): no
- * server fetch. Backed by `lib/personalization/storage.ts`, completely
- * separate from the existing single flat Watchlist (`lib/watchlist/`,
- * still used at `/dashboard/watchlist` and by `WatchButton` everywhere
- * else) — this PR does not touch that foundation.
+ * Renders entirely client-side (`WatchlistsWorkspace`) from the sole
+ * Watchlist owner: `lib/personalization/storage.ts`.
  */
 export default function WatchlistsPage() {
   return <WatchlistsWorkspace />;

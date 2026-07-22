@@ -1,4 +1,4 @@
-import { CATEGORY_ICON, CATEGORY_LABEL } from "@/components/alerts/meta";
+import { CATEGORY_EVIDENCE_PRIORITY, CATEGORY_ICON, CATEGORY_LABEL } from "@/components/alerts/meta";
 import type { IntelligenceSignal } from "@/lib/alerts/intelligence/types";
 
 type SignalPillsProps = {
@@ -11,10 +11,16 @@ type SignalPillsProps = {
  * the exact chip styling `AlertCard.tsx`'s category tag already uses, so a
  * "TVL" pill here looks identical to a "TVL" tag on a raw alert. Deduped by
  * category — a project can have two real TVL alerts in one window, but
- * that's one real signal category, not two pills.
+ * that's one real signal category, not two pills. Ordered by
+ * `CATEGORY_EVIDENCE_PRIORITY` (PR-012) rather than insertion order, so the
+ * breakdown always reads Security → TVL → GitHub → Governance → Whale →
+ * Price regardless of which order the underlying alerts arrived in — only
+ * categories that actually contributed a real signal ever appear; nothing
+ * is padded in to fill the sequence.
  */
 export function SignalPills({ signals }: SignalPillsProps) {
-  const distinctCategories = Array.from(new Set(signals.map((signal) => signal.category)));
+  const present = new Set(signals.map((signal) => signal.category));
+  const distinctCategories = CATEGORY_EVIDENCE_PRIORITY.filter((category) => present.has(category));
 
   if (distinctCategories.length === 0) return null;
 

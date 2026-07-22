@@ -1,42 +1,37 @@
 "use client";
 
 /**
- * React binding for `lib/watchlist/service.ts` — `useSyncExternalStore` is
- * the same primitive `components/ui/ThemeToggle.tsx` already uses for an
- * outside-React source of truth, applied here to the watchlist's in-memory/
- * `localStorage`-backed store. Every component calling this hook
- * automatically subscribes on mount and unsubscribes on unmount (React
- * owns that lifecycle internally) and re-renders the instant `toggle`/
- * `add`/`remove`/`clear` runs anywhere in the app — no prop drilling, no
- * router refresh, no manual subscribe/unsubscribe wiring of its own.
+ * Compatibility-shaped React binding for the Personalization-owned active
+ * Watchlist. It preserves the shared star-control API while membership,
+ * persistence, and subscriptions have one owner: `lib/personalization/`.
  */
 
 import { useCallback, useSyncExternalStore } from "react";
 
-import * as watchlistService from "@/lib/watchlist/service";
-import type { Watchlist } from "@/lib/watchlist/types";
+import {
+  getMembershipProjectIds,
+  subscribe,
+  toggleMembershipProject,
+} from "@/lib/personalization/storage";
 
-const EMPTY_WATCHLIST: Watchlist = { version: 1, items: [] };
+const EMPTY_PROJECT_IDS: string[] = [];
 
-function getServerSnapshot(): Watchlist {
-  return EMPTY_WATCHLIST;
+function getServerSnapshot(): string[] {
+  return EMPTY_PROJECT_IDS;
 }
 
 export function useWatchlist() {
-  const watchlist = useSyncExternalStore(watchlistService.subscribe, watchlistService.getWatchlist, getServerSnapshot);
+  const projectIds = useSyncExternalStore(subscribe, getMembershipProjectIds, getServerSnapshot);
 
   const isWatching = useCallback(
-    (projectId: string) => watchlist.items.some((item) => item.projectId === projectId),
-    [watchlist]
+    (projectId: string) => projectIds.includes(projectId),
+    [projectIds]
   );
 
   return {
-    watchlist,
-    count: watchlist.items.length,
+    projectIds,
+    count: projectIds.length,
     isWatching,
-    toggle: watchlistService.toggleProject,
-    add: watchlistService.addProject,
-    remove: watchlistService.removeProject,
-    clear: watchlistService.clear,
+    toggle: toggleMembershipProject,
   };
 }

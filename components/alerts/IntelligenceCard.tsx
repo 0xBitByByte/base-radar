@@ -24,6 +24,7 @@ type IntelligenceCardProps = {
  */
 export function IntelligenceCard({ alert }: IntelligenceCardProps) {
   const project = getProject(alert.projectId);
+  const signalCategories = Array.from(new Set(alert.signals.map((signal) => signal.category)));
 
   return (
     <li className="group relative flex flex-col gap-3 rounded-xl border border-radar-light-border bg-radar-light-card p-4 transition-colors hover:bg-radar-light-surface dark:border-white/10 dark:bg-white/[0.02] dark:hover:bg-white/[0.05]">
@@ -56,6 +57,10 @@ export function IntelligenceCard({ alert }: IntelligenceCardProps) {
         <p className="line-clamp-2 text-xs leading-relaxed text-radar-light-muted dark:text-radar-muted">
           {alert.summary}
         </p>
+        <p className="line-clamp-1 text-xs text-radar-light-muted/80 dark:text-radar-muted/80">
+          <span className="font-medium text-radar-light-text dark:text-radar-white">Next: </span>
+          {alert.nextStep}
+        </p>
       </div>
 
       <div className="relative z-[1] flex flex-wrap items-end justify-between gap-3">
@@ -67,7 +72,7 @@ export function IntelligenceCard({ alert }: IntelligenceCardProps) {
         </div>
 
         <div className="flex shrink-0 items-center gap-4">
-          <ConfidenceBar confidence={alert.confidence} className="w-28" />
+          <ConfidenceBar confidence={alert.confidence} categories={signalCategories} className="w-28" title={alert.reasoning} />
           <div className="flex flex-col items-end">
             <span className="text-[10.5px] font-medium text-radar-light-muted dark:text-radar-muted">Score</span>
             <span className="text-lg font-semibold text-radar-light-text dark:text-radar-white">{alert.score}</span>

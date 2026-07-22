@@ -129,7 +129,7 @@ export function ProjectSpotlight({ data, lastUpdated }: ProjectSpotlightProps) {
                 aria-label="Close quick view"
                 className="flex size-7 items-center justify-center rounded-lg text-radar-light-muted outline-none transition-colors hover:bg-radar-light-surface dark:text-radar-muted dark:hover:bg-white/5"
               >
-                <X className="size-4" />
+                <X className="size-4" aria-hidden="true" />
               </Dialog.Close>
             </div>
             <Dialog.Description className="mb-4 text-xs text-radar-light-muted dark:text-radar-muted">

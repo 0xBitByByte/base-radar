@@ -16,16 +16,16 @@ import { getDailyBrief } from "@/lib/brief/storage";
 import type { DailyBrief } from "@/lib/brief/types";
 import { buildPortfolioIntelligence } from "@/lib/portfolio/engine";
 import type { PortfolioIntelligence } from "@/lib/portfolio/types";
-import { getWatchlist } from "@/lib/watchlist/service";
-import type { Watchlist } from "@/lib/watchlist/types";
+import { getMembershipWatchlist } from "@/lib/personalization/storage";
+import type { PersonalWatchlist } from "@/lib/personalization/types";
 
-let cachedSourceWatchlist: Watchlist | null = null;
+let cachedSourceWatchlist: PersonalWatchlist | null = null;
 let cachedSourceBrief: DailyBrief | null = null;
 let cachedPortfolioIntelligence: PortfolioIntelligence | null = null;
 
 /** The one public entry point — reuses `getWatchlist()`, `getIntelligenceAlerts()`, and `getDailyBrief()`; never touches a provider or rebuilds either upstream engine. */
 export function getPortfolioIntelligence(): PortfolioIntelligence {
-  const watchlist = getWatchlist();
+  const watchlist = getMembershipWatchlist();
   const dailyBrief = getDailyBrief();
 
   if (cachedPortfolioIntelligence && cachedSourceWatchlist === watchlist && cachedSourceBrief === dailyBrief) {

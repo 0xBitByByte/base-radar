@@ -72,5 +72,7 @@ export type IntelligenceAlert = {
   timestamp: string;
   /** One-line, human-readable explanation of why this score/narrative was chosen — real factors only (signal count, category count), never a fabricated justification. */
   reasoning: string;
+  /** A short, actionable pointer to where the user should look next — deterministic, keyed off the real `narrative` (see `summary.ts`'s `buildNextStep`), never project-specific speculation the signals don't support. */
+  nextStep: string;
   narrative: NarrativeType;
 };

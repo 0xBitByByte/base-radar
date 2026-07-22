@@ -120,7 +120,7 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
         aria-label="Open navigation menu"
         className="flex size-9 shrink-0 items-center justify-center rounded-lg text-radar-light-muted outline-none transition-colors hover:bg-radar-light-surface focus-visible:ring-2 focus-visible:ring-radar-primary/50 lg:hidden dark:text-radar-muted dark:hover:bg-white/5"
       >
-        <Menu className="size-5" />
+        <Menu className="size-5" aria-hidden="true" />
       </button>
 
       <nav aria-label="Breadcrumb" className={cn("hidden items-center gap-1.5 text-sm lg:flex", breadcrumb.length === 0 && "lg:hidden")}>
@@ -179,7 +179,7 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
             aria-label="Compare projects"
             className="hidden items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-radar-light-text outline-none transition-colors hover:bg-radar-light-surface focus-visible:ring-2 focus-visible:ring-radar-primary/50 lg:flex xl:px-2.5 min-[1440px]:px-2.5 dark:text-radar-muted dark:hover:bg-white/5"
           >
-            <GitCompare className="size-4" />
+            <GitCompare className="size-4" aria-hidden="true" />
             <span className="hidden xl:inline">Compare</span>
           </button>
         </Tooltip>
@@ -190,7 +190,7 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
             aria-label="AI summary"
             className="hidden items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-radar-purple outline-none transition-colors hover:bg-radar-purple/10 focus-visible:ring-2 focus-visible:ring-radar-purple/50 lg:flex xl:px-2.5 min-[1440px]:px-2.5"
           >
-            <Sparkles className="size-4" />
+            <Sparkles className="size-4" aria-hidden="true" />
             <span className="hidden xl:inline">AI Summary</span>
           </button>
         </Tooltip>
@@ -203,7 +203,7 @@ export function Topbar({ onOpenMobileNav }: TopbarProps) {
             aria-label="Connect wallet"
             className="hidden shrink-0 items-center gap-2 rounded-lg border border-radar-light-border px-2.5 py-1.5 text-sm font-medium whitespace-nowrap text-radar-light-text outline-none transition-colors hover:bg-radar-light-surface focus-visible:ring-2 focus-visible:ring-radar-primary/50 sm:flex xl:px-3 min-[1440px]:px-3 dark:border-white/10 dark:text-radar-white dark:hover:bg-white/5"
           >
-            <Wallet className="size-4" />
+            <Wallet className="size-4" aria-hidden="true" />
             <span>Connect Wallet</span>
           </button>
         </Tooltip>

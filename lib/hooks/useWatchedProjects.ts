@@ -15,10 +15,10 @@ import { useWatchlist } from "@/lib/hooks/useWatchlist";
 import type { ProjectIntelligence } from "@/lib/intelligence/types";
 
 export function useWatchedProjects(allProjects: ProjectIntelligence[]): ProjectIntelligence[] {
-  const { watchlist } = useWatchlist();
+  const { projectIds } = useWatchlist();
 
   return useMemo(() => {
-    const watchedIds = new Set(watchlist.items.map((item) => item.projectId));
+    const watchedIds = new Set(projectIds);
     return allProjects.filter((project) => watchedIds.has(project.identity.id));
-  }, [allProjects, watchlist]);
+  }, [allProjects, projectIds]);
 }

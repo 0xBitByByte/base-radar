@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 
 type WatchButtonProps = {
   projectId: string;
-  /** Used only for the accessible label — falls back to "project" when omitted. */
   projectName?: string;
   size?: "sm" | "md";
   className?: string;
@@ -24,19 +23,7 @@ const ICON_SIZE_CLASS: Record<NonNullable<WatchButtonProps["size"]>, string> = {
   md: "size-4",
 };
 
-/**
- * The one Watch/favorite control this codebase uses everywhere a project
- * can be starred (PR13.1) — Explorer's Project Card and Table, Quick View,
- * and the Project Profile header's quick actions all render this same
- * component rather than each hand-rolling its own toggle. Self-contained:
- * reads and writes `useWatchlist()` directly, so no parent needs to prop-
- * drill watched state or an `onToggle` callback — every mounted
- * `WatchButton` for the same `projectId`, anywhere in the app, updates in
- * lockstep the instant any one of them is clicked (`useWatchlist`'s
- * `useSyncExternalStore` binding). A plain `<button>` gets keyboard
- * activation (Enter/Space) for free; `stopPropagation` keeps a click here
- * from also firing a parent row/card's own `onActivate`.
- */
+/** Shared project-star control. Its membership state comes from the active Personalization Watchlist, so every instance updates from one source of truth. */
 export function WatchButton({ projectId, projectName, size = "md", className }: WatchButtonProps) {
   const { isWatching, toggle } = useWatchlist();
   const watched = isWatching(projectId);

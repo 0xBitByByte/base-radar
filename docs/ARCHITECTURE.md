@@ -334,7 +334,7 @@ lib/alerts/
     scoring.ts                          One modular scorer per alert category → IntelligenceSignal
     grouping.ts                         Groups an Alert[] by project
     narratives.ts                       Fixed-priority rules: signals → one NarrativeType
-    summary.ts                          Deterministic template prose (headline/summary/reasoning)
+    summary.ts                          Deterministic template prose (headline/summary/reasoning/next step)
     engine.ts                           buildIntelligenceAlerts(): the pure pipeline entry point
 ```
 
@@ -378,8 +378,22 @@ input always produces the same output, no randomness, no network call):
    prose built only from real, already-computed values (the project name,
    the real signal labels, real counts). This is what makes the output
    *read* like an AI wrote it without an AI API being involved anywhere.
+   Alongside the headline/summary/reasoning, `summary.ts` also assigns a
+   short `nextStep` (PR-009) — a fixed, narrative-keyed pointer to where the
+   user should look next (e.g. a security-risk narrative always points at
+   the Project Profile's Contracts section). It's a lookup table keyed on
+   the same real, already-detected `narrative`, never a project-specific
+   claim invented beyond what the signals support.
 6. **Expose** — one `IntelligenceAlert` per project, sorted by score
-   (highest-signal projects first).
+   (highest-signal projects first). This score-descending order *is* the
+   alert prioritization: a project's score is the sum of its real signal
+   weights (TVL change, governance activity, GitHub activity, contract/
+   security events, whale transfers, price movement — each weighted by
+   real severity), so the alerts that surface first are always whichever
+   real, currently-scoreable events carry the most combined weight — never
+   an arbitrary or chronological ordering. A `security-risk` narrative is
+   the one case that always wins narrative *classification* regardless of
+   score (`narratives.ts`), though the sort itself remains score-based.
 
 **Severity vs. direction**: this codebase's `AlertSeverity` is not a pure
 sentiment axis (a large *upward* price move and a large *downward* one can
@@ -396,7 +410,82 @@ independent confirmations.
 presentational, reading from hooks rather than computing anything
 themselves. Surfaced on the Alerts page (above the raw alert feed),
 a compact Dashboard widget (`AIIntelligenceWidget`, top 3 by score), and an
-additive sparkle indicator on the Sidebar's Alerts nav item.
+additive sparkle indicator on the Sidebar's Alerts nav item. `IntelligenceCard`
+renders `alert.nextStep` alongside its existing headline/summary (PR-009).
+
+**PR-012 — making the pipeline's own output explainable**: every field this
+section adds UI for already existed on `IntelligenceAlert`; PR-012 changed
+zero scoring/confidence math and added zero new fields.
+- **Evidence flow (Step 3 → `SignalPills`)**: `SignalPills` used to render
+  `alert.signals`' distinct categories in whatever order the underlying
+  `Alert[]` happened to arrive in. It now orders them by
+  `CATEGORY_EVIDENCE_PRIORITY` (`components/alerts/meta.ts`) — Security →
+  TVL → GitHub (`release`) → Governance → Whale Activity → Price, the same
+  six categories `scoring.ts` can actually produce a signal for, in the same
+  priority `narratives.ts` already gives security. Categories that didn't
+  contribute a real signal are never shown — no placeholder pip, no implied
+  category.
+- **Reasoning/confidence flow (Step 4 →`ConfidenceBar`)**: `computeConfidence`
+  (`scoring.ts`) scales with how many *distinct* signal categories agree;
+  `ConfidenceBar` now takes those same categories as an optional prop and
+  prints them under the percentage — "Security + TVL signals" — so the
+  number is explained in the same real terms that produced it, never a
+  probability claim beyond what `computeConfidence` already asserts. A
+  single contributing category reads as singular ("Security signal"), and
+  the line is omitted entirely when there are none (a `stable`-narrative
+  alert with no scoreable signals shows a bare 0%, never invented evidence).
+- **`reasoning` field**: computed by `summary.ts`'s `buildReasoning` since
+  PR15.3 Part 1 but never rendered anywhere until now — `IntelligenceCard`
+  passes it to `ConfidenceBar` as a native `title` tooltip, so the same
+  factual justification ("3 real signals across 2 categories...") is one
+  hover away without duplicating the visible category line.
+- **`nextStep` flow**: unchanged from PR-009 — still a fixed,
+  narrative-keyed lookup, still rendered as `IntelligenceCard`'s "Next:"
+  line.
+
+**PR-013 — closing the Project Profile's one missing connection**: every
+downstream surface (Timeline, Daily Brief, Portfolio Intelligence,
+Notifications, Automation) already links back to a Project Profile, but the
+reverse never existed — a Project Profile had no pointer forward into this
+engine at all, a completely separate system from the page's own
+pre-existing `lib/intelligence/` health/risk report. `ProfileRelatedIntelligence`
+(`components/explorer/ProfileRelatedIntelligence.tsx`), rendered directly
+under `ProfileHeader`, reads the same four client-side stores every other
+AI Intelligence surface already reads (`useIntelligenceAlerts`, `useTimeline`,
+`useDailyBrief`, `usePortfolioIntelligence`) and checks each for a real
+`projectId` match against the project being viewed. A matching source
+renders one small link to its real page (`/dashboard/alerts`,
+`/dashboard/timeline`, `/dashboard/brief`, `/dashboard/portfolio`); a
+non-matching source renders nothing — never a disabled or generic link.
+None of those four routes accept a project-scoped query parameter today, so
+no new routing or global state was introduced to pass one through; this is
+presence-detection and navigation only, not a new filtering capability.
+
+**PR-009 actionability pass**: across the Dashboard's compact intelligence
+previews (`AIIntelligenceWidget`, `BriefWidget`, `PortfolioWidget`,
+`NotificationWidget`, `AutomationWidget`, `TimelineWidget`), the single
+highlighted item (top alert/opportunity/performer/latest notification/
+automation/event) is now a real link to wherever a user should look next —
+a Project Profile (via the same `getProject()` lookup `IntelligenceCard`
+already uses) or the already-computed `TimelineEvent.link`/`Notification.link`/
+`AutomationResult.link` field, reusing the stretched-link pattern
+`IntelligenceCard` established rather than inventing a new one. `BriefWidget`
+and `PortfolioWidget` also surface `DailyBrief.recommendations[0]` /
+`PortfolioIntelligence.recommendations[0]` as a "Suggested next step" line —
+both fields already existed and were computed by `sections.ts`'s
+`buildRecommendations` (and already shown on the full `/dashboard/brief` and
+`/dashboard/portfolio` pages) but were previously omitted from the compact
+Dashboard preview.
+
+**PR-011 personal context line**: `AIIntelligenceWidget` now leads its list
+with `"{intelligenceAlerts.length} watched project(s) with notable signals
+today"` — a direct count of the already-personalized `intelligenceAlerts`
+array `usePersonalizedDashboard()` already produces (PR22 Part 2), not a
+new computation. The word "watched" only appears when `isPersonalized` is
+actually true; with Dashboard filtering off (or no active watchlist) the
+same count reads "N project(s)" instead, since `intelligenceAlerts` is the
+unfiltered, ecosystem-wide array in that case and calling it "watched"
+would misdescribe it.
 
 **Hooks** (`lib/hooks/`): `useIntelligenceAlerts` (a `useSyncExternalStore`
 binding to `service.getIntelligenceAlerts()`, the same pattern
@@ -799,7 +888,7 @@ lib/command/
   commands.ts       COMMANDS registry (11 static destinations) + Command/CommandGroup types
 lib/search/
   types.ts          SearchableItem — the one common shape every result normalizes into
-  globalSearch.ts   7 normalizers + scoreItem() + globalSearch() + groupSearchResults()
+  globalSearch.ts   8 normalizers + scoreItem() + globalSearch() + groupSearchResults()
   preferences.ts    SearchPreferences (localStorage-backed) — Recent Searches on/off, max size, history on/off, keyboard shortcut on/off
   storage.ts        Recent Searches list (query strings only, localStorage-backed)
 ```
@@ -808,6 +897,7 @@ lib/search/
 flowchart TD
     Commands["COMMANDS<br/>lib/command/commands.ts"] --> Search["useGlobalSearch()<br/>lib/hooks/useGlobalSearch.ts"]
     Projects["getProjects()<br/>data/projects/helpers.ts"] --> Search
+    Intelligence["useIntelligenceAlerts()"] --> Search
     Timeline["useTimeline()"] --> Search
     Notifications["useNotifications()"] --> Search
     Automation["useAutomation()"] --> Search
@@ -825,12 +915,23 @@ flowchart TD
 `metadata`/`source`). Commands tagged `"Settings"` (Notification/Automation/
 Search Preferences) keep their own `Settings` group; every other static
 command folds into a generic `Commands` group, so dynamic per-item results —
-not static shortcuts — own the `Projects`/`Timeline`/`Notifications`/
-`Automation`/`Portfolio`/`Daily Brief` groups. Routes always point at a real,
-existing page: Projects get a genuine per-project deep link
-(`/dashboard/projects/{slug}`); Timeline/Notifications/Automation/Portfolio/
-Daily Brief each route to their own section's page, never a fabricated
-per-item URL.
+not static shortcuts — own the `Projects`/`AI Intelligence`/`Timeline`/
+`Notifications`/`Automation`/`Portfolio`/`Daily Brief` groups. Routes always
+point at a real, existing page: Projects get a genuine per-project deep link
+(`/dashboard/projects/{slug}`); AI Intelligence alerts route there too when
+the alert's project resolves (falling back to `/dashboard/alerts` otherwise);
+Timeline/Notifications/Automation/Portfolio/Daily Brief each route to their
+own section's page, never a fabricated per-item URL.
+
+**AI Intelligence as a search source** (PR-010): every layer downstream of
+the AI Intelligence Engine (Daily Brief, Portfolio Intelligence, Timeline,
+Notifications, Automation) was already searchable — the Engine's own
+per-project reads (`IntelligenceAlert`, `lib/alerts/intelligence`) were the
+one gap in that reuse chain. `useIntelligenceAlerts()` subscribes to the same
+Alert Engine store every other alert surface already reads, so this adds no
+new fetch. Project keyword matching (`normalizeProject`) also now includes
+`project.chains` alongside `tags`/`categories` — real, static registry data
+that wasn't reachable via keyword match before.
 
 **Scoring**: `globalSearch()` uses simple weighted substring/keyword/
 description/metadata matching — no fuzzy-match library — and sorts by score
@@ -875,12 +976,12 @@ state, the global keyboard listener, and — as of Part 3 — `recentSearches`/
 `useSearchPreferences` (load/save/reset only — performs no searching
 itself).
 
-**Relationship with every engine below it**: Global Search reads Timeline,
-Notifications, Automation, Portfolio Intelligence, and Daily Brief each
-through their own existing hook — never a provider, never an engine
-recomputation, never a new scoring or narrative rule. It is the one layer
-in this app whose entire job is aggregation and presentation of what every
-other layer already computed.
+**Relationship with every engine below it**: Global Search reads AI
+Intelligence, Timeline, Notifications, Automation, Portfolio Intelligence,
+and Daily Brief each through their own existing hook — never a provider,
+never an engine recomputation, never a new scoring or narrative rule. It is
+the one layer in this app whose entire job is aggregation and presentation
+of what every other layer already computed.
 
 ## Personalization & Advanced Watchlists
 
@@ -964,6 +1065,19 @@ watchlist project. `useGlobalSearch()` passes the active watchlist's
 `projectIds` through only when `enableSearchPrioritization` is on;
 otherwise `globalSearch()` behaves exactly as it did before Personalization
 existed. No result is ever hidden, and scoring itself is never modified.
+
+**Explorer prioritization** (PR-011): `components/explorer/sort.ts`'s
+`sortProjects()` accepts the same kind of optional `prioritizedProjectIds`
+set, applying the identical tie-break rule Global Search already
+established — only when two projects already sort identically on the
+active field (e.g. both have no TVL, or an identical Health score) does
+watchlist membership decide their order; it never overrides a real
+TVL/Health/Confidence/GitHub-stars difference. `ExplorerPageClient` passes
+the active watchlist's `projectIds` unconditionally (no separate
+preference gate — the effect is purely a tie-break, never a filter or a
+hide, so there's nothing for a kill switch to protect against). This is
+the same prioritization concept applied to a second surface, not a second
+system.
 
 **Preferences** (`lib/personalization/preferences.ts`,
 `/dashboard/settings/personalization`): `filterDashboardByActiveWatchlist`,
@@ -1479,6 +1593,16 @@ fetches the live ticker once per request and wraps every dashboard page in
 `DashboardLayout`, so any future page added under `app/dashboard/*` (e.g. a
 Projects Explorer) automatically inherits the sidebar, topbar, and status
 bar without repeating that wiring.
+
+**Error and 404 boundaries** (PR-014): `app/not-found.tsx` is the
+application-wide 404, rendered for any unmatched route and for any explicit
+`notFound()` call not caught by a more specific `not-found.tsx`.
+`app/dashboard/error.tsx` (via the shared `components/dashboard/RouteError`)
+is the error boundary Next.js resolves for every `/dashboard/*` route that
+doesn't define its own — every dashboard page except `/dashboard/projects/[slug]`,
+which keeps its existing, more specific `error.tsx`. Neither existed before
+PR-014, so an unhandled render error on, say, `/dashboard/automation` had no
+boundary above the root and would have blanked the page.
 
 ## Future Expansion
 
