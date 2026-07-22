@@ -1,6 +1,6 @@
 import Image from "next/image";
 
-import headerLockup from "@/public/brand/header-lockup.webp";
+const headerLockup = "/brand/header-lockup.webp";
 import { cn } from "@/lib/utils";
 
 /** Intrinsic aspect ratio of `header-lockup.webp` (2652×900 source, keyed as

@@ -1,6 +1,6 @@
 import Image from "next/image";
 
-import logoIcon from "@/public/brand/logo-icon.webp";
+const logoIcon = "/brand/logo-icon.webp";
 import { cn } from "@/lib/utils";
 
 /** Intrinsic aspect ratio of `logo-icon.webp` (902×1171 source, lossless WebP re-encode of the original PNG — pixel-identical, ~54% smaller) — the mark is taller than it is wide, unlike the old placeholder glyph it replaced. `size` below is treated as the display *height*; width is derived from this so the artwork is never stretched to a square box. */
