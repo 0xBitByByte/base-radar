@@ -1,9 +1,12 @@
 import type {
   Chain,
   ContractType,
+  DiscoverySource,
   ProjectCategory,
   ProjectStatus,
   ProjectTag,
+  RegistryLifecycleState,
+  VerificationLevel,
   VerificationStatus,
 } from "@/data/projects/enums";
 
@@ -88,6 +91,75 @@ export type ProjectGovernance = {
   governanceUrl?: string;
 };
 
+/**
+ * PR-037 — Registry-record lifecycle. Omitted entirely for a project that
+ * has always been a normal active entry (the common case for every current
+ * seed project — absence means `state: "active"`, never "unknown"). See
+ * docs/PROJECT_REGISTRY.md "Project Lifecycle".
+ */
+export type ProjectLifecycle = {
+  state: RegistryLifecycleState;
+  /** ISO date this project was first surfaced by any discovery source. */
+  discoveredAt?: string;
+  discoverySource?: DiscoverySource;
+  /** ISO date `state` (or any lifecycle field) last changed. */
+  updatedAt?: string;
+  /** Set only when `state` is "duplicate" — the canonical project's `id`. */
+  duplicateOf?: string;
+  /** Set only when `state` is "migrated" — the successor project's `id`. */
+  migratedTo?: string;
+  notes?: string;
+};
+
+/**
+ * PR-037 — Pipeline progress toward full live-data coverage. Distinct from
+ * `ProjectVerification` (editorial trust in the metadata): a project can
+ * reach `level: "verified"` only once `verification.status` is "verified"
+ * or "community", but the two fields are recorded and updated
+ * independently — this one never implies the other has changed. See
+ * docs/PROJECT_REGISTRY.md "Verification Levels".
+ */
+export type ProjectVerificationLevel = {
+  level: VerificationLevel;
+  /** ISO date this level was reached. */
+  reachedAt?: string;
+  /** Plain-language description of what's still missing for the next level, if any. */
+  nextRequirement?: string;
+};
+
+/**
+ * PR-037 — Individual 0-100 inputs to `ProjectQualityScore`. Only
+ * `metadataCompleteness` is computable from the static registry alone
+ * today (see `computeMetadataCompletenessFactor` in
+ * `data/projects/quality-score.ts`); the other five require the live
+ * provider/intelligence layer and are future work. See
+ * docs/PROJECT_REGISTRY.md "Quality Score".
+ */
+export type ProjectQualityFactors = {
+  /** Share of optional Project fields populated (logoUrl, github, social, contracts, providerIds, governance). */
+  metadataCompleteness: number;
+  /** Contract verification, absence of flagged issues, audit links if known. */
+  security: number;
+  /** Recent GitHub commit/release activity. */
+  activity: number;
+  /** TVL/volume depth and stability, where the project has a market. */
+  liquidity: number;
+  /** Contributor count, release cadence, repo health. */
+  development: number;
+  /** Social reach and engagement signals, where measurable. */
+  community: number;
+  /** Whether docs/whitepaper/technical documentation is linked and current. */
+  documentation: number;
+};
+
+/** PR-037 — Weighted composite of `ProjectQualityFactors`. Always computed, never hand-authored. */
+export type ProjectQualityScore = {
+  /** 0-100 weighted composite — see docs/PROJECT_REGISTRY.md for the weighting model. */
+  total: number;
+  factors: ProjectQualityFactors;
+  computedAt: string;
+};
+
 export type Project = {
   /** Stable internal identifier, kebab-case, e.g. "aerodrome-finance". Never reused or renamed. */
   id: string;
@@ -112,4 +184,10 @@ export type Project = {
   verification: ProjectVerification;
   providerIds: ProjectProviderIds;
   governance?: ProjectGovernance;
+  /** PR-037 — registry-record lifecycle. Omit entirely for an ordinary active entry. */
+  lifecycle?: ProjectLifecycle;
+  /** PR-037 — pipeline progress toward full live-data coverage. */
+  verificationLevel?: ProjectVerificationLevel;
+  /** PR-037 — composite quality score. Computed by a future scoring pass, never hand-authored. */
+  qualityScore?: ProjectQualityScore;
 };

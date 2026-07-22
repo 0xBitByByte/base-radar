@@ -273,6 +273,8 @@ architecturally distinct from the live pipeline above:
    enums.ts     Categories, tags, status, chains, verification levels, contract types
    types.ts     The `Project` schema
    helpers.ts    Query functions (getProject, searchProjects, getProjectsByCategory, ...)
+   metrics.ts    Registry Metrics model (PR-037)
+   quality-score.ts  Quality Score weighting model (PR-037)
    index.ts      Public barrel export
    seed/
      index.ts     Aggregates every seed file into one array
@@ -285,6 +287,17 @@ Blockscout address, etc.) — lookup keys that a future integration can use
 to join a registry entry with live data from the providers layer above,
 without changing the registry's shape. Nothing in `data/projects/` performs
 network requests; it is deliberately inert, canonical data.
+
+**PR-037 — Registry foundation model**: three optional, additive fields
+(`lifecycle`, `verificationLevel`, `qualityScore`) extend `Project` to
+support a future discovery/ingestion pipeline, without changing any
+existing seed data or behavior. `lifecycle` separates the registry
+record's own state (active/inactive/archived/duplicate/migrated/scam) from
+`status` (the real product's operational state) and from
+`verification`/`verificationLevel` (editorial trust and pipeline
+progress). See `docs/PROJECT_REGISTRY.md` for the full specification,
+including the category taxonomy audit, discovery source list, registry
+metrics model, and quality score weighting.
 
 ## Dashboard Architecture
 

@@ -109,3 +109,68 @@ export const CONTRACT_TYPES = [
   "other",
 ] as const;
 export type ContractType = (typeof CONTRACT_TYPES)[number];
+
+/**
+ * PR-037 — Registry lifecycle: the state of the *registry record itself*,
+ * distinct from `ProjectStatus` (the real-world operational state of the
+ * underlying product). A project can be `status: "sunset"` (the team wound
+ * it down) while `lifecycle.state` stays `"active"` (Base Radar keeps
+ * tracking it for historical value), or conversely reach `"archived"` once
+ * it's no longer worth surfacing in discovery at all. See
+ * docs/PROJECT_REGISTRY.md "Project Lifecycle".
+ */
+export const REGISTRY_LIFECYCLE_STATES = [
+  /** Surfaced by a discovery source; no full registry entry exists yet. */
+  "discovered",
+  /** A full registry entry, surfaced in discovery/search/dashboards as normal. */
+  "active",
+  /** Still a valid entry, but excluded from default discovery surfaces (e.g. long-dormant). */
+  "inactive",
+  /** Deliberately removed from active discovery — kept for historical/audit purposes only. */
+  "archived",
+  /** A confirmed duplicate of another entry — see `ProjectLifecycle.duplicateOf`. */
+  "duplicate",
+  /** Superseded by a successor entry (rebrand, contract migration, chain move) — see `ProjectLifecycle.migratedTo`. */
+  "migrated",
+  /** Confirmed fraudulent/malicious; kept for transparency, never surfaced in discovery. */
+  "scam",
+] as const;
+export type RegistryLifecycleState = (typeof REGISTRY_LIFECYCLE_STATES)[number];
+
+/**
+ * PR-037 — How far a project has progressed through the registry's
+ * ingestion pipeline. Orthogonal to `VerificationStatus` (editorial trust
+ * in the metadata) and to `RegistryLifecycleState` (whether the record is
+ * still active) — a project can be `level: "verified"` while its
+ * `verification.status` is independently re-flagged for an unrelated,
+ * newly-discovered issue. See docs/PROJECT_REGISTRY.md "Verification
+ * Levels" for the full requirements of each level.
+ */
+export const VERIFICATION_LEVELS = [
+  /** Surfaced by a discovery source; no registry entry exists yet. */
+  "discovered",
+  /** A registry entry exists with core identity fields (name, description, category, chains) and provider IDs. */
+  "indexed",
+  /** Reviewed against primary sources — `verification.status` is "verified" or "community", and provider IDs resolve to a real, matching project. */
+  "verified",
+  /** Enough live data resolves through `providerIds`/`github`/`governance` for the Alert Engine, Health Scorecard, and Daily Brief to produce a real (not "not currently available") read. */
+  "intelligence-ready",
+] as const;
+export type VerificationLevel = (typeof VERIFICATION_LEVELS)[number];
+
+/**
+ * PR-037 — Where a candidate project was first surfaced, before it becomes
+ * a registry entry. Recorded on `ProjectLifecycle.discoverySource`. See
+ * docs/PROJECT_REGISTRY.md "Discovery Sources".
+ */
+export const DISCOVERY_SOURCES = [
+  "base-ecosystem",
+  "coingecko",
+  "defillama",
+  "blockscout",
+  "github",
+  "farcaster",
+  "community",
+  "ai-discovery",
+] as const;
+export type DiscoverySource = (typeof DISCOVERY_SOURCES)[number];
