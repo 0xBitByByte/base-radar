@@ -12,7 +12,8 @@ contribution mechanics, see [CONTRIBUTING.md](../CONTRIBUTING.md).
 | Document | Purpose |
 | --- | --- |
 | [PRODUCT_VISION.md](PRODUCT_VISION.md) | Mission, vision, target users, problems solved, core principles, product pillars, monetization, competitive advantages, and what Base Radar will not become. A business/product document, not a technical one. |
-| [ROADMAP.md](ROADMAP.md) | The authoritative, numbered milestone list — completed, in progress, and planned — with a Mermaid diagram of milestone sequencing. |
+| [MASTER_ROADMAP.md](MASTER_ROADMAP.md) | **The canonical engineering roadmap** — completed milestones, current milestone, planned/future milestones, deferred ideas, design system and architecture evolution, repository standards, and release progress, all in one place. |
+| [ROADMAP.md](ROADMAP.md) | Superseded by MASTER_ROADMAP.md above; kept for historical context. The original numbered milestone list with a Mermaid diagram of milestone sequencing. |
 | [CHANGELOG.md](CHANGELOG.md) | Release-by-release history of what shipped. |
 | [RELEASES.md](RELEASES.md) | Versioning scheme (SemVer, alpha/beta/RC/stable) and the release checklist. |
 

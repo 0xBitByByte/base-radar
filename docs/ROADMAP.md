@@ -1,5 +1,11 @@
 # Roadmap
 
+> **This document is superseded by [MASTER_ROADMAP.md](MASTER_ROADMAP.md)**,
+> the canonical, numbered engineering roadmap (completed/current/planned/
+> future/deferred work in one place). This file is kept for historical
+> context but is no longer updated — see MASTER_ROADMAP.md for anything
+> current.
+
 Base Radar ships in numbered milestones rather than on a fixed calendar —
 each milestone is a coherent, independently useful slice of the product.
 This document tracks what's shipped, what's actively underway, and what's
