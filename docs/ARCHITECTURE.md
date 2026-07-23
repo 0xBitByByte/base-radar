@@ -1658,6 +1658,17 @@ without restructuring what already exists:
 > Layer/Project Registry join this section describes; the general,
 > cross-cutting synthesis engine outlined below is still unbuilt.
 
+> **Note (PR-040)**: the reusable `AIIntelligenceBrief` model this section's
+> mermaid diagram labels "Intelligence Brief" now has a real, standalone
+> shape — `lib/ai-intelligence/` — with structured Confidence/Impact/
+> Category/Evidence/Source models, architecture-only (no generation logic,
+> no LLM call, nothing wired into the Dashboard/Daily Brief/Timeline yet).
+> See `docs/AI_INTELLIGENCE_ENGINE.md`, including its explicit naming note
+> distinguishing `AIIntelligenceBrief` from the older, simpler
+> `IntelligenceBrief` type already shipped in `lib/data/types.ts` (the
+> Dashboard's "Base Intelligence Brief" widget) — the two are unrelated
+> shapes that happen to share a domain name.
+
 [docs/ROADMAP.md](ROADMAP.md) names an "Intelligence Engine" milestone
 sitting between the current per-widget Services Layer and the future
 Projects Explorer/Research pillars described in
