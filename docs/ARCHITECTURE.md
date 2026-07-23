@@ -1669,6 +1669,14 @@ without restructuring what already exists:
 > Dashboard's "Base Intelligence Brief" widget) — the two are unrelated
 > shapes that happen to share a domain name.
 
+> **Note (PR-041)**: the rule-based generation half of this diagram
+> (`Providers Layer` + `Project Registry` → `Eng` → `Brief`) is now real —
+> `lib/ai-intelligence/generator/` deterministically turns real Registry/
+> Discovery/Alert input into ranked `AIIntelligenceBrief[]`, via
+> `createIntelligenceBrief()` (PR-040), never bypassed. Still no LLM call,
+> still nothing wired into the Dashboard, Daily Brief, or Timeline — see
+> `docs/DAILY_BRIEF_GENERATOR.md`.
+
 [docs/ROADMAP.md](ROADMAP.md) names an "Intelligence Engine" milestone
 sitting between the current per-widget Services Layer and the future
 Projects Explorer/Research pillars described in

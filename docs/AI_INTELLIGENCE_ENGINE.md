@@ -9,6 +9,13 @@ only**: no generation logic, no LLM integration, no UI, and nothing wired
 into any existing surface. See "Future AI Generation Flow" for what a
 later PR still needs to build.
 
+> **Update (PR-041)**: the rule-based generation pipeline this section's
+> "Future AI Generation Flow" anticipated now exists —
+> `lib/ai-intelligence/generator/`, producing ranked `AIIntelligenceBrief[]`
+> from real Registry/Discovery/Alert input via `createIntelligenceBrief()`
+> (never bypassed). Still no LLM call, still not wired into any UI. See
+> `docs/DAILY_BRIEF_GENERATOR.md`.
+
 ## A naming note, read this first
 
 This codebase already has a type literally named `IntelligenceBrief` —
