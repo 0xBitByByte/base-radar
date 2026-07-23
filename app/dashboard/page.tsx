@@ -32,6 +32,21 @@ import { ProjectSpotlight } from "@/components/dashboard/ProjectSpotlight";
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
 import { WatchlistWidget } from "@/components/dashboard/WatchlistWidget";
 
+/** Matches the tracked-out uppercase label convention already used for
+ * grouped lists elsewhere (`Sidebar`'s `SidebarSectionLabel`,
+ * `CommandGroup`, `WatchlistSidebar`) — reused here, not reinvented, to
+ * give the widget grid's existing three-tier priority order (below) the
+ * same visual grouping treatment those surfaces already have. */
+function DashboardSectionLabel({ children }: { children: string }) {
+  return (
+    <p className="px-1 text-[10.5px] font-semibold tracking-[0.1em] text-radar-light-muted uppercase dark:text-radar-muted/60">
+      {children}
+    </p>
+  );
+}
+
+const WIDGET_GRID_CLASS = "grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3";
+
 /**
  * `async` at the top level (PR9.5.2) — awaiting every critical widget's
  * data directly in the page component, with no inner `<Suspense>` split,
@@ -86,29 +101,42 @@ export default async function DashboardPage() {
 
         <KPIRow items={kpis.items} lastUpdated={lastUpdated} />
 
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          {/* Tier 1 — personalized, watchlist-scoped intelligence: the most
-              decision-relevant content on the page, so it leads (PR-008). */}
-          <AIIntelligenceWidget />
-          <BriefWidget />
-          <PortfolioIntelligenceWidget />
-          <WatchlistWidget projects={allProjects} lastUpdated={lastUpdated} />
-          <NotificationWidget />
-          <AutomationWidget />
-          <TimelineWidget />
+        {/* Tier 1 — personalized, watchlist-scoped intelligence: the most
+            decision-relevant content on the page, so it leads (PR-008). */}
+        <div className="flex flex-col gap-3">
+          <DashboardSectionLabel>Your Intelligence</DashboardSectionLabel>
+          <div className={WIDGET_GRID_CLASS} aria-label="Your Intelligence">
+            <AIIntelligenceWidget />
+            <BriefWidget />
+            <PortfolioIntelligenceWidget />
+            <WatchlistWidget projects={allProjects} lastUpdated={lastUpdated} />
+            <NotificationWidget />
+            <AutomationWidget />
+            <TimelineWidget />
+          </div>
+        </div>
 
-          {/* Tier 2 — ecosystem-wide market-moving signals. */}
-          <WhaleActivityWidget data={whaleEvents} lastUpdated={lastUpdated} />
-          <SignalsWidget data={signals} lastUpdated={lastUpdated} />
-          <MarketWidgetLive data={market} lastUpdated={lastUpdated} />
-          <NarrativeHeatmap data={heatmap} lastUpdated={lastUpdated} />
-          <TrendingWidget data={trending} lastUpdated={lastUpdated} />
+        {/* Tier 2 — ecosystem-wide market-moving signals. */}
+        <div className="flex flex-col gap-3">
+          <DashboardSectionLabel>Market Signals</DashboardSectionLabel>
+          <div className={WIDGET_GRID_CLASS} aria-label="Market Signals">
+            <WhaleActivityWidget data={whaleEvents} lastUpdated={lastUpdated} />
+            <SignalsWidget data={signals} lastUpdated={lastUpdated} />
+            <MarketWidgetLive data={market} lastUpdated={lastUpdated} />
+            <NarrativeHeatmap data={heatmap} lastUpdated={lastUpdated} />
+            <TrendingWidget data={trending} lastUpdated={lastUpdated} />
+          </div>
+        </div>
 
-          {/* Tier 3 — supplementary/informational. */}
-          <AIProjectsWidget data={aiProjects} lastUpdated={lastUpdated} />
-          <ProjectSpotlight data={spotlight} lastUpdated={lastUpdated} />
-          <ActivityFeed data={activity} lastUpdated={lastUpdated} />
-          <PortfolioWidget data={portfolio} lastUpdated={lastUpdated} />
+        {/* Tier 3 — supplementary/informational. */}
+        <div className="flex flex-col gap-3">
+          <DashboardSectionLabel>Ecosystem Overview</DashboardSectionLabel>
+          <div className={WIDGET_GRID_CLASS} aria-label="Ecosystem Overview">
+            <AIProjectsWidget data={aiProjects} lastUpdated={lastUpdated} />
+            <ProjectSpotlight data={spotlight} lastUpdated={lastUpdated} />
+            <ActivityFeed data={activity} lastUpdated={lastUpdated} />
+            <PortfolioWidget data={portfolio} lastUpdated={lastUpdated} />
+          </div>
         </div>
       </div>
     </div>
