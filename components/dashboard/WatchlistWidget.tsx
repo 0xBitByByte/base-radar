@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Eye, Star } from "lucide-react";
+import { ArrowRight, Star } from "lucide-react";
 
 import { ProjectLogo } from "@/components/branding/ProjectLogo";
 import { ChangeValue } from "@/components/explorer/ChangeValue";
@@ -40,7 +40,7 @@ export function WatchlistWidget({ projects, lastUpdated }: WatchlistWidgetProps)
       lastUpdated={lastUpdated}
     >
       {watched.length === 0 ? (
-        <EmptyState icon={Eye} title="No watched projects yet." description="Star a project to track it here." />
+        <EmptyState icon={Star} title="No watched projects yet." description="Star a project to track it here." />
       ) : (
         <ul className="flex flex-col gap-3">
           {watched.map((project) => {
