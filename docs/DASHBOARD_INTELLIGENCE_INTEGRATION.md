@@ -8,6 +8,14 @@ PR**: no dashboard redesign, no routing change, no LLM integration — only
 a new data source behind an unchanged widget, plus two small, additive,
 hide-when-empty sections.
 
+> **Update (PR-043)**: the same generation pipeline is now also surfaced
+> per-project — `getProjectAIIntelligence()` (`lib/data/aggregate.ts`)
+> reuses this file's `getCurrentDailyIntelligenceBriefing()` (extracted
+> from this PR's own `getDashboardIntelligenceBriefImpl()` during PR-043,
+> so both services share one cached generator call) and reuses this PR's
+> `toDashboardEvidenceSummary()`/`toDashboardSourceAttribution()`
+> unchanged. See `docs/PROJECT_INTELLIGENCE_INTEGRATION.md`.
+
 ## Dashboard Integration Flow
 
 ```
