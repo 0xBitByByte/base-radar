@@ -1,7 +1,7 @@
 import {
   getActivityFeed,
   getAIProjects,
-  getIntelligenceBrief,
+  getDashboardIntelligenceBrief,
   getKpis,
   getMarketOverview,
   getNarrativeHeatmap,
@@ -63,7 +63,7 @@ export default async function DashboardPage() {
     activity,
     allProjects,
   ] = await Promise.all([
-    getIntelligenceBrief(),
+    getDashboardIntelligenceBrief(),
     getKpis(),
     getPortfolioSummary(),
     getMarketOverview(),
@@ -82,7 +82,7 @@ export default async function DashboardPage() {
       <WelcomeHeader />
 
       <div className="flex flex-col gap-8 [animation:br-dashboard-reveal_400ms_ease-out] motion-reduce:animate-none">
-        <IntelligenceBrief data={brief} />
+        <IntelligenceBrief data={brief} sources={brief.sources} evidenceSummary={brief.evidenceSummary} />
 
         <KPIRow items={kpis.items} lastUpdated={lastUpdated} />
 

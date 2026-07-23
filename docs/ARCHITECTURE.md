@@ -1677,6 +1677,16 @@ without restructuring what already exists:
 > still nothing wired into the Dashboard, Daily Brief, or Timeline — see
 > `docs/DAILY_BRIEF_GENERATOR.md`.
 
+> **Note (PR-042)**: the `Brief` node is now genuinely reachable from the
+> real Dashboard — `getDashboardIntelligenceBrief()`
+> (`lib/data/aggregate.ts`) replaced the old `getIntelligenceBrief()`/
+> `buildIntelligenceBrief()` pair, feeding real registry/alert data into
+> `generateDailyIntelligenceBriefing()` and adapting its output
+> (`lib/ai-intelligence/dashboard-adapter.ts`) into the existing
+> `components/dashboard/IntelligenceBrief.tsx` widget, unchanged in
+> layout. Still no LLM call. See
+> `docs/DASHBOARD_INTELLIGENCE_INTEGRATION.md`.
+
 [docs/ROADMAP.md](ROADMAP.md) names an "Intelligence Engine" milestone
 sitting between the current per-widget Services Layer and the future
 Projects Explorer/Research pillars described in

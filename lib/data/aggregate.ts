@@ -12,10 +12,9 @@
  * Every exported function is wrapped in React's `cache()` (PR9.3.4 §8) —
  * since each dashboard widget now fetches its own data independently
  * (`app/dashboard/page.tsx`), some of these are called from more than one
- * place within the same request (e.g. `getKpis()` is called directly by the
- * KPI row and again inside `getIntelligenceBrief()`); `cache()` collapses
- * those into a single call per request instead of firing the underlying
- * provider requests twice.
+ * place within the same request; `cache()` collapses those into a single
+ * call per request instead of firing the underlying provider requests
+ * twice.
  */
 
 import { cache } from "react";
@@ -31,6 +30,16 @@ import { getWhaleProvider, type WatchedToken, type WhaleEvent as WhaleDetectionE
 import { getGovernanceProvider, type GovernanceProjectRef } from "@/lib/governance";
 import { getIntelligenceProvider, type NarrativeCategorySample } from "@/lib/intelligence-engine";
 import { getProjects, type ProjectCategory } from "@/data/projects";
+import { getAlerts, getIntelligenceAlerts } from "@/lib/alerts/service";
+import { generateDailyIntelligenceBriefing } from "@/lib/ai-intelligence/generator";
+import type { RegistryUpdateInput } from "@/lib/ai-intelligence/generator/types";
+import {
+  toDashboardEvidenceSummary,
+  toDashboardIntelligenceBrief,
+  toDashboardSourceAttribution,
+  type DashboardEvidenceSummaryItem,
+  type DashboardSourceAttribution,
+} from "@/lib/ai-intelligence/dashboard-adapter";
 import { formatCompactCurrency, formatNumber, formatPercent, formatPrice, formatRelativeTime } from "@/lib/data/format";
 import {
   MOCK_ACTIVITY_FEED,
@@ -332,11 +341,11 @@ function mockWhaleEvents(): WithSource<WhaleEvent[]> {
 /**
  * Real whale-detection events (`lib/whale`'s own shape — not the
  * dashboard-facing `WhaleEvent` shape below). `cache()`-wrapped so both
- * `getWhaleEventsImpl` (dashboard widget) and `buildIntelligenceBrief`
- * (Brief's whale bullet) share one detection pass per request instead of
- * each re-running the confidence-scoring loop independently — the
- * underlying Blockscout calls are already cached at the provider level
- * regardless, but this avoids redundant CPU work too.
+ * `getWhaleEventsImpl` (dashboard widget) and `getIntelligenceWallDataImpl`
+ * (landing page) share one detection pass per request instead of each
+ * re-running the confidence-scoring loop independently — the underlying
+ * Blockscout calls are already cached at the provider level regardless,
+ * but this avoids redundant CPU work too.
  */
 async function getRawWhaleEventsImpl(): Promise<WhaleDetectionEvent[]> {
   const [marketsRes, pairsRes] = await Promise.all([
@@ -586,15 +595,6 @@ async function getWelcomeStatsImpl(): Promise<WithSource<WelcomeStats>> {
 }
 export const getWelcomeStats = cache(getWelcomeStatsImpl);
 
-async function getIntelligenceBriefImpl(): Promise<WithSource<IntelligenceBrief>> {
-  try {
-    return await buildIntelligenceBrief();
-  } catch {
-    return { ...MOCK_INTELLIGENCE_BRIEF, source: "mock" };
-  }
-}
-export const getIntelligenceBrief = cache(getIntelligenceBriefImpl);
-
 /** Registry projects with a real, configured governance source — never all of them, per `lib/governance`'s "omit rather than fabricate" rule. */
 function getGovernanceTrackedProjects(): GovernanceProjectRef[] {
   return getProjects()
@@ -610,86 +610,110 @@ async function getRegistryGovernanceEventsImpl() {
 }
 const getRegistryGovernanceEvents = cache(getRegistryGovernanceEventsImpl);
 
-async function buildIntelligenceBrief(): Promise<WithSource<IntelligenceBrief>> {
-  const governanceProjects = getGovernanceTrackedProjects();
+/**
+ * PR-042 — real, unfabricated registry-change evidence for the Daily
+ * Brief Generation Pipeline (`lib/ai-intelligence/generator`). Reads
+ * `lifecycle.updatedAt`/`verificationLevel.reachedAt` directly off every
+ * registry project (PR-037's optional fields) — no diffing, no stored
+ * snapshot, just "did this real timestamp fall within the lookback
+ * window." Every current seed project has neither field set, so this
+ * returns `[]` today; it activates automatically, per-project, the
+ * moment registry data adopts either field, exactly like every other
+ * "real data only" integration in this codebase (see PR-038's Registry
+ * Summary chips for the same pattern).
+ */
+const REGISTRY_UPDATE_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000;
 
-  const [kpisRes, marketRes, signalsRes, narrativeSamplesRes, whaleRes, governanceRes, commitActivityRes, tvlRes] =
-    await Promise.allSettled([
-      getKpis(),
-      getMarketOverview(),
-      getSignals(),
-      getNarrativeSamples(),
-      getRawWhaleEvents(),
-      getRegistryGovernanceEvents(),
-      github.getCommitActivity(PRIMARY_REPO),
-      defillama.getBaseChainTvl(),
-    ]);
+function getRecentRegistryUpdates(now: string): RegistryUpdateInput[] {
+  const nowMs = new Date(now).getTime();
+  const updates: RegistryUpdateInput[] = [];
 
-  const kpis = kpisRes.status === "fulfilled" ? kpisRes.value : { items: MOCK_KPIS, source: "mock" as const };
-  // `kpis.source === "live"` only means SOME of its six underlying signals came
-  // back live — it says nothing about the tvl item specifically, so the TVL
-  // bullet needs its own liveness check rather than trusting `kpis` wholesale.
-  const tvlIsLive = tvlRes.status === "fulfilled" && unwrap(tvlRes.value) !== null;
-  const kpisForBrief = tvlIsLive
-    ? kpis.items
-    : kpis.items.map((k) => (k.id === "tvl" ? { ...k, deltaPct: undefined } : k));
-  const market =
-    marketRes.status === "fulfilled" ? marketRes.value : { ...MOCK_MARKET_OVERVIEW, source: "mock" as const };
-  const signals =
-    signalsRes.status === "fulfilled"
-      ? signalsRes.value
-      : Object.assign(MOCK_SIGNALS.map((s) => ({ ...s })), { source: "mock" as const });
-  const narrativeSamples = narrativeSamplesRes.status === "fulfilled" ? narrativeSamplesRes.value : [];
-  const rawWhaleEvents = whaleRes.status === "fulfilled" ? whaleRes.value : [];
-  const governanceEvents = governanceRes.status === "fulfilled" ? governanceRes.value : [];
-  const commitActivity = commitActivityRes.status === "fulfilled" ? unwrap(commitActivityRes.value) : null;
+  for (const project of getProjects()) {
+    const level = project.verificationLevel;
+    if (level?.reachedAt && nowMs - new Date(level.reachedAt).getTime() <= REGISTRY_UPDATE_LOOKBACK_MS) {
+      updates.push({
+        projectId: project.id,
+        projectName: project.name,
+        kind: "verification-level-change",
+        detail: level.level,
+        occurredAt: level.reachedAt,
+      });
+    }
 
-  const narrativeSignals =
-    narrativeSamples.length > 0
-      ? (await getIntelligenceProvider().generateNarrative({ samples: narrativeSamples })).signals
-      : [];
-  const topNarrative = narrativeSignals[0] ?? null;
+    const lifecycle = project.lifecycle;
+    if (lifecycle?.updatedAt && nowMs - new Date(lifecycle.updatedAt).getTime() <= REGISTRY_UPDATE_LOOKBACK_MS) {
+      updates.push({
+        projectId: project.id,
+        projectName: project.name,
+        kind: "lifecycle-change",
+        detail: lifecycle.state,
+        occurredAt: lifecycle.updatedAt,
+      });
+    }
+  }
 
-  const topWhale = [...rawWhaleEvents].sort((a, b) => b.usdValue - a.usdValue)[0];
-
-  const brief = await getIntelligenceProvider().generateBrief({
-    kpis: kpisForBrief,
-    market,
-    narrative: topNarrative,
-    whaleEvents: topWhale
-      ? [
-          {
-            tokenSymbol: topWhale.tokenSymbol,
-            usdValue: topWhale.usdValue,
-            classification: topWhale.classification,
-            detail: null,
-          },
-        ]
-      : [],
-    governanceEvents: governanceEvents.map((event) => ({
-      projectName: governanceProjects.find((p) => p.projectId === event.projectId)?.projectName ?? event.projectId,
-      title: event.title,
-      status: event.status,
-    })),
-    topSignal: signals[0] ?? null,
-    developerActivity: commitActivity
-      ? { commitsLast7d: commitActivity.commitsLast7d, repoLabel: commitActivity.fullName }
-      : null,
-  });
-
-  const anyLive =
-    [kpis.source, market.source, signals.source].includes("live") ||
-    narrativeSignals.length > 0 ||
-    rawWhaleEvents.length > 0 ||
-    governanceEvents.length > 0 ||
-    commitActivity !== null;
-
-  return {
-    points: brief.points,
-    generatedAt: brief.generatedAt,
-    source: anyLive ? "live" : "mock",
-  };
+  return updates;
 }
+
+/**
+ * PR-042 — the Dashboard-facing service the Daily Brief Generation
+ * Pipeline plugs into. Orchestrates existing modules only: registry data
+ * (`data/projects`), the Alert Engine's own getters (`lib/alerts/
+ * service.ts` — `getAlerts()`/`getIntelligenceAlerts()`), then
+ * `generateDailyIntelligenceBriefing()` (`lib/ai-intelligence/generator`,
+ * PR-041). No new network call, no persistence, no LLM.
+ *
+ * Two real, documented gaps kept deliberately unfilled rather than faked:
+ * - `discoveryCandidates` stays empty — populating it would mean calling
+ *   `lib/discovery/`'s `runDiscovery()`, which performs real external API
+ *   requests; this lightweight, render-time service does not trigger a
+ *   live Discovery run itself (matches this PR's "no API calls").
+ * - `providerChanges` stays empty — a real percentage-change value needs
+ *   a comparison against a previous snapshot, which needs persistence;
+ *   this PR explicitly prohibits persistence, so there is no honest way
+ *   to populate this field yet.
+ *
+ * `getAlerts()`/`getIntelligenceAlerts()` are themselves empty on the
+ * server today (`lib/alerts/service.ts` only self-initializes in the
+ * browser) — this call is still correct, forward-compatible code; it
+ * starts returning real data automatically once that module gains a
+ * server-safe data source, with zero change needed here.
+ *
+ * Falls back to the existing `MOCK_INTELLIGENCE_BRIEF` — the same
+ * fallback the widget has always shown — whenever the pipeline produces
+ * zero briefs (expected today, given the gaps above) or throws.
+ */
+export type DashboardIntelligenceBriefData = WithSource<IntelligenceBrief> & {
+  sources: DashboardSourceAttribution[];
+  evidenceSummary: DashboardEvidenceSummaryItem[];
+};
+
+async function getDashboardIntelligenceBriefImpl(): Promise<DashboardIntelligenceBriefData> {
+  try {
+    const now = new Date().toISOString();
+
+    const briefing = generateDailyIntelligenceBriefing({
+      registryUpdates: getRecentRegistryUpdates(now),
+      alertEvents: getAlerts(),
+      intelligenceAlerts: getIntelligenceAlerts(),
+      now,
+    });
+
+    if (briefing.briefs.length === 0) {
+      return { ...MOCK_INTELLIGENCE_BRIEF, source: "mock", sources: [], evidenceSummary: [] };
+    }
+
+    return {
+      ...toDashboardIntelligenceBrief(briefing),
+      source: "live",
+      sources: toDashboardSourceAttribution(briefing),
+      evidenceSummary: toDashboardEvidenceSummary(briefing),
+    };
+  } catch {
+    return { ...MOCK_INTELLIGENCE_BRIEF, source: "mock", sources: [], evidenceSummary: [] };
+  }
+}
+export const getDashboardIntelligenceBrief = cache(getDashboardIntelligenceBriefImpl);
 
 /** 0-100, biased by how large a real percentage move is — deterministic, not fabricated. */
 function confidenceFromMagnitude(pct: number, base = 50): number {
