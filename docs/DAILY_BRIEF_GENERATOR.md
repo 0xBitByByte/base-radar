@@ -9,6 +9,12 @@ the same input (including the same explicit clock), the output is
 byte-for-byte identical every time — verified by a smoke test during this
 PR's own build (see "Validation").
 
+> **Update (PR-042)**: this pipeline is now wired into the real Dashboard
+> — `getDashboardIntelligenceBrief()` (`lib/data/aggregate.ts`) assembles
+> its input from `data/projects` + `lib/alerts/service.ts` and calls
+> `generateDailyIntelligenceBriefing()` directly. See
+> `docs/DASHBOARD_INTELLIGENCE_INTEGRATION.md`.
+
 ## A naming note
 
 This is the **third** "Daily Brief"-adjacent thing in this codebase, and
