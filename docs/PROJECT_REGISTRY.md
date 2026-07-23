@@ -302,6 +302,13 @@ No trust level is enforced in code by this PR — the "default trust
 implication" column is guidance for whatever future ingestion pipeline
 consumes `DiscoverySource`, not a rule this layer applies itself.
 
+**PR-039** built that future ingestion pipeline's first stage — the
+Discovery Engine (`lib/discovery/`) encodes this exact table as
+`SOURCE_CONFIDENCE` and produces real `DiscoverySource`-tagged candidates
+for three sources today (`coingecko`, `defillama`, `blockscout`), with the
+remaining five as documented placeholders. It still does not write to
+`data/projects/` — see `docs/DISCOVERY_ENGINE.md`.
+
 ---
 
 ## PR-037 — Registry Metrics
