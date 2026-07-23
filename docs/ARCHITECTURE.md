@@ -299,6 +299,16 @@ progress). See `docs/PROJECT_REGISTRY.md` for the full specification,
 including the category taxonomy audit, discovery source list, registry
 metrics model, and quality score weighting.
 
+**PR-039 — Discovery Engine** (`lib/discovery/`): the pipeline that
+actually produces `DiscoverySource`-tagged candidates — `CandidateProject`s
+collected by one `DiscoveryProvider` per source, deduplicated against
+`data/projects/` via `findDuplicateMatches()`, and modeled as
+`DiscoveryQueueEntry` records awaiting review. Architecturally sits beside
+the Project Registry, the same way the providers layer does: it reads
+`data/projects/` (for duplicate comparison) but never writes to it — no
+route or job converts an accepted candidate into a `Project` yet. See
+`docs/DISCOVERY_ENGINE.md`.
+
 ## Dashboard Architecture
 
 The dashboard is a shell plus a grid of independent widgets:
