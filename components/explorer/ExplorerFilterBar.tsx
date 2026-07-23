@@ -15,6 +15,9 @@ import {
   availableChains,
   availableConfidenceLevels,
   availableHealthLabels,
+  availableLifecycleStates,
+  availableProjectStatuses,
+  availableVerificationLevels,
   availableVerificationStatuses,
   countActiveFilters,
   type ExplorerFilters,
@@ -121,6 +124,27 @@ export function ExplorerFilterBar({
       label: "Chain",
       options: availableChains(projects),
       formatOption: (value) => CHAIN_BRANDING[value]?.label ?? formatLabel(value),
+    },
+    {
+      key: "projectStatuses",
+      label: "Project Status",
+      options: availableProjectStatuses(projects),
+      formatOption: formatLabel,
+    },
+    // PR-038 — both empty on every current seed project (no `verificationLevel`/
+    // `lifecycle` data yet); `FilterGroup`'s own `options.length === 0` guard
+    // hides these two sections automatically until registry data populates them.
+    {
+      key: "verificationLevels",
+      label: "Verification Level",
+      options: availableVerificationLevels(projects),
+      formatOption: formatLabel,
+    },
+    {
+      key: "lifecycleStates",
+      label: "Lifecycle",
+      options: availableLifecycleStates(projects),
+      formatOption: formatLabel,
     },
   ];
 

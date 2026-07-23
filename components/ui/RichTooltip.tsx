@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import type { BrandIconComponent } from "@/lib/branding/types";
 
-type RichTooltipAccent = "primary" | "success" | "warning" | "danger" | "muted";
+export type RichTooltipAccent = "primary" | "success" | "warning" | "danger" | "muted";
 
 type RichTooltipProps = {
   /** A lucide icon or one of this codebase's inline brand marks (`components/ui/BrandIcons.tsx`) — both satisfy this shape. */

@@ -6,6 +6,7 @@ import { ExplorerTableHeader } from "@/components/explorer/ExplorerTableHeader";
 import { ExplorerTableBody } from "@/components/explorer/ExplorerTableBody";
 import { NoResultsState } from "@/components/explorer/NoResultsState";
 import type { SortState } from "@/components/explorer/sort";
+import type { ExplorerFilters } from "@/components/explorer/filters";
 import type { ProjectIntelligence } from "@/lib/intelligence/types";
 
 type ExplorerTableProps = {
@@ -17,6 +18,8 @@ type ExplorerTableProps = {
   sort: SortState;
   onSortChange: (next: SortState) => void;
   onActivate?: (project: ProjectIntelligence) => void;
+  /** PR-038 — passed through to `NoResultsState` for a registry-aware empty message. */
+  filters?: ExplorerFilters;
 };
 
 /**
@@ -34,6 +37,7 @@ export function ExplorerTable({
   sort,
   onSortChange,
   onActivate,
+  filters,
 }: ExplorerTableProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -58,6 +62,7 @@ export function ExplorerTable({
         hasFilters={hasFilters}
         onClearSearch={onClearSearch}
         onClearFilters={onClearFilters}
+        filters={filters}
       />
     );
   }
