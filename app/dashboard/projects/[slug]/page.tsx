@@ -1,10 +1,11 @@
 import { notFound } from "next/navigation";
 
 import { getProject } from "@/data/projects/helpers";
-import { getRawWhaleEvents, getSignals } from "@/lib/data/aggregate";
+import { getProjectAIIntelligence, getRawWhaleEvents, getSignals } from "@/lib/data/aggregate";
 import { buildProjectIntelligence } from "@/lib/intelligence/engine";
 import { buildIntelligenceReport } from "@/lib/intelligence/report";
 import { buildHealthScorecard } from "@/lib/intelligence/scorecard";
+import { toLatestProjectHighlight, toRelatedProjectHighlights } from "@/lib/ai-intelligence/project-adapter";
 import * as base from "@/lib/providers/base/service";
 import * as blockscout from "@/lib/providers/blockscout/service";
 import * as coingecko from "@/lib/providers/coingecko/service";
@@ -18,6 +19,7 @@ import { ProfileTokenAndPriceLive } from "@/components/explorer/ProfileTokenAndP
 import { ProfileMetrics } from "@/components/explorer/ProfileMetrics";
 import { ProfileExecutiveIntelligence } from "@/components/explorer/ProfileExecutiveIntelligence";
 import { ProfileIntelligence } from "@/components/explorer/ProfileIntelligence";
+import { ProfileIntelligencePanel } from "@/components/explorer/ProfileIntelligencePanel";
 import { ProfileContracts } from "@/components/explorer/ProfileContracts";
 import { ProfileGovernance } from "@/components/explorer/ProfileGovernance";
 import { ProfileQuickStats } from "@/components/explorer/ProfileQuickStats";
@@ -89,16 +91,25 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
   // `genesisPromise` above rather than a new streamed component.
   const finalityPromise = base.getFinality();
 
-  const [profileRes, genesisRes, whaleRes, signalsRes, finalityRes] = await Promise.allSettled([
+  const [profileRes, genesisRes, whaleRes, signalsRes, finalityRes, aiIntelligenceRes] = await Promise.allSettled([
     buildProjectIntelligence(registryProject, undefined, { extended: false }),
     genesisPromise,
     getRawWhaleEvents(),
     getSignals(),
     finalityPromise,
+    getProjectAIIntelligence(registryProject.id),
   ]);
 
   const profile = profileRes.status === "fulfilled" ? profileRes.value : null;
   if (!profile) notFound();
+
+  // PR-043 — real, already-ranked briefs mentioning this project, plus
+  // registry metadata. `null` only if `getProjectAIIntelligence` itself
+  // fails; never fabricated, never a placeholder — the Panel simply
+  // renders nothing when this is empty (see `ProfileIntelligencePanel`).
+  const aiIntelligence = aiIntelligenceRes.status === "fulfilled" ? aiIntelligenceRes.value : null;
+  const latestIntelligence = aiIntelligence ? toLatestProjectHighlight(aiIntelligence.briefs) : undefined;
+  const relatedIntelligence = aiIntelligence ? toRelatedProjectHighlights(aiIntelligence.briefs) : [];
 
   const genesisResult = genesisRes.status === "fulfilled" ? genesisRes.value : null;
   // Real, `null` only when CoinGecko has no genesis date for this token —
@@ -317,6 +328,16 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
         confidence={profile.confidence}
         governance={profile.governance}
       />
+
+      {aiIntelligence && (
+        <ProfileIntelligencePanel
+          registry={aiIntelligence.registry}
+          latest={latestIntelligence}
+          related={relatedIntelligence}
+          evidenceSummary={aiIntelligence.evidenceSummary}
+          sources={aiIntelligence.sources}
+        />
+      )}
 
       <ProfileContracts contracts={profile.contracts} chain={profile.chain} contractDetailsPromise={contractDetailsPromise} />
 

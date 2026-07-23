@@ -29,10 +29,19 @@ import type { ProviderResult } from "@/lib/providers/common/types";
 import { getWhaleProvider, type WatchedToken, type WhaleEvent as WhaleDetectionEvent } from "@/lib/whale";
 import { getGovernanceProvider, type GovernanceProjectRef } from "@/lib/governance";
 import { getIntelligenceProvider, type NarrativeCategorySample } from "@/lib/intelligence-engine";
-import { getProjects, type ProjectCategory } from "@/data/projects";
+import {
+  getProject,
+  getProjects,
+  type DiscoverySource,
+  type ProjectCategory,
+  type RegistryLifecycleState,
+  type VerificationLevel,
+} from "@/data/projects";
 import { getAlerts, getIntelligenceAlerts } from "@/lib/alerts/service";
 import { generateDailyIntelligenceBriefing } from "@/lib/ai-intelligence/generator";
 import type { RegistryUpdateInput } from "@/lib/ai-intelligence/generator/types";
+import type { AIIntelligenceBrief } from "@/lib/ai-intelligence/types";
+import type { DailyIntelligenceBriefing } from "@/lib/ai-intelligence/generator/briefing";
 import {
   toDashboardEvidenceSummary,
   toDashboardIntelligenceBrief,
@@ -656,12 +665,16 @@ function getRecentRegistryUpdates(now: string): RegistryUpdateInput[] {
 }
 
 /**
- * PR-042 — the Dashboard-facing service the Daily Brief Generation
- * Pipeline plugs into. Orchestrates existing modules only: registry data
+ * PR-042 — orchestrates existing modules only: registry data
  * (`data/projects`), the Alert Engine's own getters (`lib/alerts/
  * service.ts` — `getAlerts()`/`getIntelligenceAlerts()`), then
  * `generateDailyIntelligenceBriefing()` (`lib/ai-intelligence/generator`,
- * PR-041). No new network call, no persistence, no LLM.
+ * PR-041). No new network call, no persistence, no LLM. `cache()`-wrapped
+ * so a single request never runs the generator more than once, no matter
+ * how many callers ask for it — PR-043's `getProjectAIIntelligence()`
+ * shares this exact same cached call rather than re-running generation
+ * itself (per that PR's "do not trigger duplicate Daily Brief
+ * generation").
  *
  * Two real, documented gaps kept deliberately unfilled rather than faked:
  * - `discoveryCandidates` stays empty — populating it would mean calling
@@ -678,10 +691,24 @@ function getRecentRegistryUpdates(now: string): RegistryUpdateInput[] {
  * browser) — this call is still correct, forward-compatible code; it
  * starts returning real data automatically once that module gains a
  * server-safe data source, with zero change needed here.
- *
- * Falls back to the existing `MOCK_INTELLIGENCE_BRIEF` — the same
+ */
+async function getCurrentDailyIntelligenceBriefingImpl(): Promise<DailyIntelligenceBriefing> {
+  const now = new Date().toISOString();
+  return generateDailyIntelligenceBriefing({
+    registryUpdates: getRecentRegistryUpdates(now),
+    alertEvents: getAlerts(),
+    intelligenceAlerts: getIntelligenceAlerts(),
+    now,
+  });
+}
+export const getCurrentDailyIntelligenceBriefing = cache(getCurrentDailyIntelligenceBriefingImpl);
+
+/**
+ * The Dashboard-facing service the Daily Brief Generation Pipeline plugs
+ * into. Falls back to the existing `MOCK_INTELLIGENCE_BRIEF` — the same
  * fallback the widget has always shown — whenever the pipeline produces
- * zero briefs (expected today, given the gaps above) or throws.
+ * zero briefs (expected today, given the two gaps documented above) or
+ * throws.
  */
 export type DashboardIntelligenceBriefData = WithSource<IntelligenceBrief> & {
   sources: DashboardSourceAttribution[];
@@ -690,14 +717,7 @@ export type DashboardIntelligenceBriefData = WithSource<IntelligenceBrief> & {
 
 async function getDashboardIntelligenceBriefImpl(): Promise<DashboardIntelligenceBriefData> {
   try {
-    const now = new Date().toISOString();
-
-    const briefing = generateDailyIntelligenceBriefing({
-      registryUpdates: getRecentRegistryUpdates(now),
-      alertEvents: getAlerts(),
-      intelligenceAlerts: getIntelligenceAlerts(),
-      now,
-    });
+    const briefing = await getCurrentDailyIntelligenceBriefing();
 
     if (briefing.briefs.length === 0) {
       return { ...MOCK_INTELLIGENCE_BRIEF, source: "mock", sources: [], evidenceSummary: [] };
@@ -714,6 +734,61 @@ async function getDashboardIntelligenceBriefImpl(): Promise<DashboardIntelligenc
   }
 }
 export const getDashboardIntelligenceBrief = cache(getDashboardIntelligenceBriefImpl);
+
+/**
+ * PR-043 — the per-project counterpart to `getDashboardIntelligenceBrief()`.
+ * Named `getProjectAIIntelligence`, not `getProjectIntelligence` — that
+ * name is already taken by `lib/intelligence/engine.ts`'s
+ * `getProjectIntelligence(idOrSlug)`, an unrelated, much larger per-project
+ * bundle (identity/market/trading/tvl/contracts/github/chain/community/
+ * health/confidence/freshness/summary/narrative/risk/governance). This
+ * function only ever surfaces PR-040/041's `AIIntelligenceBrief` model
+ * plus PR-037's registry metadata — a narrower, different concept that
+ * happens to share the word "intelligence."
+ *
+ * Reuses `getCurrentDailyIntelligenceBriefing()` (the same cached call
+ * `getDashboardIntelligenceBrief()` uses) rather than running the
+ * generator again, then filters its real, already-ranked `briefs` down to
+ * the ones whose `affectedProjects` names this project — including
+ * ecosystem-wide briefs (e.g. "3 projects reached Verified status") that
+ * mention several projects at once, not just single-project ones. Reuses
+ * `lib/ai-intelligence/dashboard-adapter.ts`'s evidence/source functions
+ * unchanged — never a duplicate formatter.
+ */
+export type ProjectAIIntelligence = {
+  registry: {
+    verificationLevel: VerificationLevel | undefined;
+    lifecycleState: RegistryLifecycleState | undefined;
+    discoverySource: DiscoverySource | undefined;
+    qualityScore: number | undefined;
+  };
+  /** Already ranked (highest-priority first) — see `lib/ai-intelligence/generator/ranking.ts`. Empty when nothing currently mentions this project. */
+  briefs: AIIntelligenceBrief[];
+  evidenceSummary: DashboardEvidenceSummaryItem[];
+  sources: DashboardSourceAttribution[];
+};
+
+async function getProjectAIIntelligenceImpl(projectId: string): Promise<ProjectAIIntelligence | null> {
+  const project = getProject(projectId);
+  if (!project) return null;
+
+  const briefing = await getCurrentDailyIntelligenceBriefing();
+  const briefs = briefing.briefs.filter((brief) => brief.affectedProjects.includes(project.id));
+  const scoped = { ...briefing, briefs };
+
+  return {
+    registry: {
+      verificationLevel: project.verificationLevel?.level,
+      lifecycleState: project.lifecycle?.state,
+      discoverySource: project.lifecycle?.discoverySource,
+      qualityScore: project.qualityScore?.total,
+    },
+    briefs,
+    evidenceSummary: briefs.length > 0 ? toDashboardEvidenceSummary(scoped) : [],
+    sources: briefs.length > 0 ? toDashboardSourceAttribution(scoped) : [],
+  };
+}
+export const getProjectAIIntelligence = cache(getProjectAIIntelligenceImpl);
 
 /** 0-100, biased by how large a real percentage move is — deterministic, not fabricated. */
 function confidenceFromMagnitude(pct: number, base = 50): number {

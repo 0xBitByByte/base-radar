@@ -1687,6 +1687,16 @@ without restructuring what already exists:
 > layout. Still no LLM call. See
 > `docs/DASHBOARD_INTELLIGENCE_INTEGRATION.md`.
 
+> **Note (PR-043)**: the same `Eng` output now also reaches the individual
+> Project Profile page — `getProjectAIIntelligence()`
+> (`lib/data/aggregate.ts`, named to avoid colliding with
+> `lib/intelligence/engine.ts`'s existing, unrelated
+> `getProjectIntelligence()`) filters the same cached briefing by
+> `affectedProjects`, surfaced via a new `ProfileIntelligencePanel`
+> section that reuses PR-038's registry badges and PR-042's evidence/
+> source formatting unchanged. See
+> `docs/PROJECT_INTELLIGENCE_INTEGRATION.md`.
+
 [docs/ROADMAP.md](ROADMAP.md) names an "Intelligence Engine" milestone
 sitting between the current per-widget Services Layer and the future
 Projects Explorer/Research pillars described in
