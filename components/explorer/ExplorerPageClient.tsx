@@ -15,11 +15,14 @@ import { sortProjects, DEFAULT_SORT, type SortState } from "@/components/explore
 import { EMPTY_FILTERS, filterProjects, hasActiveFilters, type ExplorerFilters } from "@/components/explorer/filters";
 import { useWatchlists } from "@/lib/hooks/useWatchlists";
 import type { ProjectIntelligence } from "@/lib/intelligence/types";
+import type { RegistryMetrics } from "@/data/projects/metrics";
 
 type ExplorerPageClientProps = {
   /** Already resolved by `ExplorerPage` via `getAllProjectIntelligence()` — never fetched here. */
   projects: ProjectIntelligence[];
   generatedAt: string;
+  /** PR-038 — real, computed registry counts (`computeRegistryMetrics(PROJECTS)`), never fetched or derived here. */
+  registryMetrics: RegistryMetrics;
 };
 
 /**
@@ -29,7 +32,7 @@ type ExplorerPageClientProps = {
  * imports from `lib/intelligence/` or `lib/providers/` itself, per
  * docs/explorer/05 §18's anti-patterns.
  */
-export function ExplorerPageClient({ projects, generatedAt }: ExplorerPageClientProps) {
+export function ExplorerPageClient({ projects, generatedAt, registryMetrics }: ExplorerPageClientProps) {
   const router = useRouter();
   const { activeWatchlist } = useWatchlists();
   const [query, setQuery] = useState("");
@@ -75,7 +78,11 @@ export function ExplorerPageClient({ projects, generatedAt }: ExplorerPageClient
 
   return (
     <div className="flex flex-col gap-6">
-      <ExplorerHeader visibleCount={visibleProjects.length} generatedAt={generatedAt} />
+      <ExplorerHeader
+        visibleCount={visibleProjects.length}
+        generatedAt={generatedAt}
+        registryMetrics={registryMetrics}
+      />
 
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-3 sm:flex-row">
@@ -103,6 +110,7 @@ export function ExplorerPageClient({ projects, generatedAt }: ExplorerPageClient
           onClearSearch={clearSearch}
           onClearFilters={clearFilters}
           onActivate={openProfile}
+          filters={filters}
         />
       ) : (
         <ExplorerTable
@@ -114,6 +122,7 @@ export function ExplorerPageClient({ projects, generatedAt }: ExplorerPageClient
           sort={sort}
           onSortChange={setSort}
           onActivate={openProfile}
+          filters={filters}
         />
       )}
     </div>

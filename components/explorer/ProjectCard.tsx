@@ -15,6 +15,7 @@ import {
   GITHUB_STARS_INFO_TOOLTIP,
   HEALTH_SCORE_INFO_TOOLTIP,
 } from "@/components/explorer/metricTooltips";
+import { getProject } from "@/data/projects/helpers";
 import { formatCompactCurrency, formatCompactNumber } from "@/lib/data/format";
 import { cn } from "@/lib/utils";
 import type { ProjectIntelligence } from "@/lib/intelligence/types";
@@ -34,6 +35,16 @@ type ProjectCardProps = {
 function ProjectCardComponent({ project, onActivate }: ProjectCardProps) {
   const { identity, community, health, confidence, tvl, github, freshness, chain } = project;
   const primaryCategory = identity.categories[0];
+
+  /**
+   * PR-038 — `verificationLevel`/`lifecycle` live on the registry's `Project`
+   * record, not on `ProjectIntelligence`, so they're looked up directly
+   * rather than threaded through the Intelligence Engine (mirrors the
+   * precedent already set by `ProfileRelatedIntelligence.tsx`). Both are
+   * `undefined` for every current seed project — the badges below render
+   * nothing until registry data actually adopts these fields.
+   */
+  const registryProject = getProject(identity.id);
 
   const tvlAvailable = tvl.available && tvl.tvlUsd !== null;
   const githubAvailable = github.available && github.stars !== null;
@@ -74,7 +85,12 @@ function ProjectCardComponent({ project, onActivate }: ProjectCardProps) {
         "dark:border-radar-border dark:bg-gradient-to-b dark:from-radar-elevated/60 dark:to-radar-card/70 dark:shadow-[0_1px_2px_rgba(0,0,0,0.2)] dark:hover:border-radar-border-hover dark:hover:shadow-[0_0_50px_-15px_rgba(var(--color-radar-primary-rgb),0.15)]"
       )}
     >
-      <ProjectCardHeader identity={identity} community={community} />
+      <ProjectCardHeader
+        identity={identity}
+        community={community}
+        verificationLevel={registryProject?.verificationLevel?.level}
+        lifecycleState={registryProject?.lifecycle?.state}
+      />
       <ProjectCardDescription shortDescription={identity.shortDescription} />
       {/* Chain (network identity, colored + logo-bearing) always leads,
           on its own row — deliberately distinct from Category (a neutral

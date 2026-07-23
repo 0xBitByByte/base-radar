@@ -4,6 +4,7 @@ import { getAllProjectIntelligence } from "@/lib/intelligence/engine";
 import { ExplorerPageClient } from "@/components/explorer/ExplorerPageClient";
 import { ExplorerEmptyState } from "@/components/explorer/ExplorerEmptyState";
 import { ExplorerErrorState } from "@/components/explorer/ExplorerErrorState";
+import { PROJECTS, computeRegistryMetrics } from "@/data/projects";
 import type { ProjectIntelligence } from "@/lib/intelligence/types";
 
 export const metadata: Metadata = {
@@ -30,6 +31,7 @@ export default async function ExplorerPage() {
   }
 
   const generatedAt = projects[0].metadata.generatedAt;
+  const registryMetrics = computeRegistryMetrics(PROJECTS);
 
-  return <ExplorerPageClient projects={projects} generatedAt={generatedAt} />;
+  return <ExplorerPageClient projects={projects} generatedAt={generatedAt} registryMetrics={registryMetrics} />;
 }

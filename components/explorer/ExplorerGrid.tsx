@@ -1,6 +1,7 @@
 import { ExplorerGridLayout } from "@/components/explorer/ExplorerGridLayout";
 import { ProjectCard } from "@/components/explorer/ProjectCard";
 import { NoResultsState } from "@/components/explorer/NoResultsState";
+import type { ExplorerFilters } from "@/components/explorer/filters";
 import type { ProjectIntelligence } from "@/lib/intelligence/types";
 
 type ExplorerGridProps = {
@@ -10,6 +11,8 @@ type ExplorerGridProps = {
   onClearSearch: () => void;
   onClearFilters: () => void;
   onActivate?: (project: ProjectIntelligence) => void;
+  /** PR-038 — passed through to `NoResultsState` for a registry-aware empty message. */
+  filters?: ExplorerFilters;
 };
 
 /**
@@ -23,6 +26,7 @@ export function ExplorerGrid({
   onClearSearch,
   onClearFilters,
   onActivate,
+  filters,
 }: ExplorerGridProps) {
   if (projects.length === 0) {
     return (
@@ -31,6 +35,7 @@ export function ExplorerGrid({
         hasFilters={hasFilters}
         onClearSearch={onClearSearch}
         onClearFilters={onClearFilters}
+        filters={filters}
       />
     );
   }
