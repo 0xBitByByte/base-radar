@@ -61,7 +61,7 @@ export function SyncQueueDialog({ open, onOpenChange }: SyncQueueDialogProps) {
 
           <div className="mt-4 flex-1 overflow-y-auto">
             {pendingOperations.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-radar-light-border px-3 py-6 text-center text-sm text-radar-light-muted dark:border-white/10 dark:text-radar-muted">
+              <p className="rounded-xl border border-dashed border-radar-light-border px-3 py-6 text-center text-sm text-radar-light-muted dark:border-white/10 dark:text-radar-muted">
                 The queue is empty.
               </p>
             ) : (

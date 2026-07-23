@@ -216,7 +216,7 @@ export function ProfileHeader({
           <ProjectLogo logoUrl={logoUrl} name={identity.name} size={56} />
           <div className="flex min-w-0 flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="truncate text-2xl font-bold tracking-tight text-radar-light-text dark:text-radar-white">
+              <h1 className="truncate text-2xl font-semibold tracking-tight text-radar-light-text sm:text-3xl dark:text-radar-white">
                 {identity.name}
               </h1>
               {market.available && market.symbol && (

@@ -43,7 +43,7 @@ export function RecentTransactions({ transfers, tokenSymbol, explorerUrl, unavai
         {transfers.slice(0, 5).map((transfer) => (
           <li
             key={transfer.txHash}
-            className="flex items-center justify-between gap-3 rounded-xl border border-radar-light-border bg-radar-light-surface p-2.5 text-xs dark:border-white/10 dark:bg-white/[0.02]"
+            className="flex items-center justify-between gap-3 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 text-xs dark:border-white/10 dark:bg-white/[0.02]"
           >
             <span className="min-w-0 truncate text-radar-light-text dark:text-radar-white">
               {truncate(transfer.from)} → {truncate(transfer.to)}

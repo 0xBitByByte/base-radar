@@ -95,7 +95,7 @@ function FactorCard({ factor }: { factor: string }) {
           : "text-radar-light-muted dark:text-radar-muted";
 
   return (
-    <li className="flex items-center gap-2 rounded-xl border border-radar-light-border bg-radar-light-surface p-2.5 text-xs dark:border-white/10 dark:bg-white/[0.02]">
+    <li className="flex items-center gap-2 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 text-xs dark:border-white/10 dark:bg-white/[0.02]">
       <Icon className={cn("size-4 shrink-0", colorClass)} aria-hidden="true" />
       <span className="min-w-0 flex-1 truncate text-radar-light-text dark:text-radar-white">{label}</span>
       {scoreText && <span className={cn("shrink-0 font-semibold tabular-nums", colorClass)}>{scoreText}</span>}

@@ -11,7 +11,7 @@ export function WidgetSkeleton({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "animate-pulse rounded-3xl border border-radar-light-border bg-radar-light-card/60 dark:border-white/10 dark:bg-white/[0.03]",
+        "animate-pulse rounded-2xl border border-radar-light-border bg-radar-light-card/60 dark:border-white/10 dark:bg-white/[0.03]",
         className
       )}
       aria-hidden="true"

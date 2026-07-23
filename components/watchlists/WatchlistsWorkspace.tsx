@@ -213,7 +213,7 @@ function WatchlistDetail({ watchlist, isActive, onSetActive, onEdit, onRemovePro
             return (
               <li
                 key={projectId}
-                className="flex items-center justify-between gap-2 rounded-xl border border-radar-light-border p-3 dark:border-white/10"
+                className="flex items-center justify-between gap-2 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 dark:border-white/10 dark:bg-white/[0.02]"
               >
                 {project ? (
                   <Link

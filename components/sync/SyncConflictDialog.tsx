@@ -54,7 +54,7 @@ export function SyncConflictDialog({ open, onOpenChange }: SyncConflictDialogPro
 
           <div className="mt-4 flex-1 overflow-y-auto">
             {conflicts.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-radar-light-border px-3 py-6 text-center dark:border-white/10">
+              <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-radar-light-border px-3 py-6 text-center dark:border-white/10">
                 <ShieldCheck className="size-5 text-radar-light-muted dark:text-radar-muted" aria-hidden="true" />
                 <p className="text-sm text-radar-light-muted dark:text-radar-muted">
                   No conflicts recorded. Detecting a real conflict requires a cloud backend, which doesn&rsquo;t exist yet.

@@ -14,7 +14,7 @@ export function AlertHeader({ unreadCount, onMarkAllRead }: AlertHeaderProps) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-2.5">
-        <h1 className="text-xl font-bold text-radar-light-text dark:text-radar-white">Alerts</h1>
+        <h1 className="text-xl font-semibold text-radar-light-text dark:text-radar-white">Alerts</h1>
         {unreadCount > 0 && (
           <span
             className="flex h-5 min-w-5 items-center justify-center rounded-full bg-radar-primary px-1.5 text-[10.5px] font-semibold tabular-nums text-white dark:bg-radar-accent dark:text-radar-bg"
