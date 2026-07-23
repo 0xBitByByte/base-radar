@@ -167,11 +167,13 @@ description of every file. Highlights:
 
 ## Roadmap
 
-Base Radar has completed Milestones 1–4 (Repository Foundation, Landing
-Page, Dashboard, Project Registry) and is planning Milestone 5 (Provider
-Layer) next. See [docs/ROADMAP.md](docs/ROADMAP.md) for the full,
-authoritative milestone breakdown and [docs/CHANGELOG.md](docs/CHANGELOG.md)
-for release history — this README doesn't duplicate that detail.
+See [docs/MASTER_ROADMAP.md](docs/MASTER_ROADMAP.md) for the canonical,
+numbered engineering roadmap — completed milestones, the current milestone,
+planned and future work, and deferred ideas, all in one place. (The
+milestone summary previously here, and [docs/ROADMAP.md](docs/ROADMAP.md)
+itself, both predate the work described there and are superseded by it.)
+See [docs/CHANGELOG.md](docs/CHANGELOG.md) for release-by-release history —
+this README doesn't duplicate that detail.
 
 ## Contributing
 

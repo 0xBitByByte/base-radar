@@ -112,6 +112,10 @@ hard rule rather than a convention.
 
 ## Long-Term Roadmap
 
+> For the canonical, numbered engineering roadmap (completed, current, and
+> planned milestones), see [MASTER_ROADMAP.md](MASTER_ROADMAP.md). The
+> summary below is product framing only.
+
 Base Radar's roadmap is milestone-based rather than date-based, reflecting
 that quality and correctness take priority over shipping speed.
 
