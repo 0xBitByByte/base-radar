@@ -5,6 +5,7 @@ import { ArrowRight, Sparkles } from "lucide-react";
 
 import { NarrativeBadge } from "@/components/alerts/NarrativeBadge";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
+import { ManageWatchlistAction } from "@/components/dashboard/ManageWatchlistAction";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getProject } from "@/data/projects/helpers";
 import { formatRelativeTime } from "@/lib/data/format";
@@ -40,8 +41,9 @@ export function AIIntelligenceWidget() {
       {!hasIntelligenceAlerts ? (
         <EmptyState
           icon={Sparkles}
-          title="No meaningful intelligence detected."
-          description="AI-derived reads will appear here once your watched projects have scoreable signals."
+          title="Nothing to analyze yet."
+          description="AI Intelligence turns your Watchlist's activity into scored, narrative reads — growth, risk, momentum, and more. Add a project to start generating them."
+          action={<ManageWatchlistAction />}
         />
       ) : isPersonalized && topAlerts.length === 0 ? (
         <EmptyState

@@ -6,6 +6,7 @@ import { ArrowRight, Newspaper } from "lucide-react";
 import { NarrativeBadge } from "@/components/alerts/NarrativeBadge";
 import { BriefMetric } from "@/components/brief/BriefMetric";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
+import { ManageWatchlistAction } from "@/components/dashboard/ManageWatchlistAction";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getProject } from "@/data/projects/helpers";
 import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
@@ -38,8 +39,9 @@ export function BriefWidget() {
       {!brief || brief.projectCount === 0 ? (
         <EmptyState
           icon={Newspaper}
-          title="No Daily Brief available."
-          description="A brief will generate once your watched projects have scoreable signals."
+          title="No brief to show yet."
+          description="Today's Brief summarizes your Watchlist into one daily read — headline, confidence, and a top opportunity. It builds itself once you're watching at least one project."
+          action={<ManageWatchlistAction />}
         />
       ) : (
         <div className="flex flex-col gap-3.5">

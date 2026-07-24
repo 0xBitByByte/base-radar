@@ -35,11 +35,17 @@ export function NotificationWidget() {
       accent="primary"
       lastUpdated={latest?.timestamp}
     >
-      {!hasNotifications ? (
+      {activeWatchlist && activeWatchlist.projectIds.length === 0 ? (
         <EmptyState
           icon={Bell}
           title="No notifications yet."
-          description="Notifications will appear here once your watched projects have scoreable signals."
+          description="Add projects to your Watchlist to receive intelligent alerts about the activity that matters to you."
+        />
+      ) : !hasNotifications ? (
+        <EmptyState
+          icon={Bell}
+          title="All quiet for now."
+          description="You'll be notified here the moment one of your watched projects has something worth flagging — a risk, a milestone, or a notable move."
         />
       ) : isPersonalized && notifications.length === 0 ? (
         <EmptyState

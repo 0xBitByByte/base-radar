@@ -201,15 +201,29 @@ export const getKpis = cache(getKpisImpl);
 async function getMarketOverviewImpl(): Promise<WithSource<MarketOverview>> {
   const net = unwrap(await baseRpc.getBaseNetworkStatus());
   if (!net) return { ...MOCK_MARKET_OVERVIEW, source: "mock" };
+
+  // Both already integrated elsewhere (`getKpisImpl` calls the same two
+  // functions) — `getOrSet`'s single-flight cache means this never doubles
+  // the actual network request, it just reuses/repopulates the same cache
+  // entry for this widget's own shape.
+  const [tvlRes, chainStatsRes] = await Promise.allSettled([
+    defillama.getBaseChainTvl(),
+    blockscout.getChainStats(),
+  ]);
+  const tvl = tvlRes.status === "fulfilled" ? unwrap(tvlRes.value) : null;
+  const chainStats = chainStatsRes.status === "fulfilled" ? unwrap(chainStatsRes.value) : null;
+
   return {
     gasGwei: net.gasGwei,
     gasTrend: trendOf(net.gasGwei - MOCK_MARKET_OVERVIEW.gasGwei),
     blockHeight: net.blockHeight,
     txCountLatestBlock: net.txCountLatestBlock,
     estimatedTps: net.estimatedTps,
-    activeWallets24h: MOCK_MARKET_OVERVIEW.activeWallets24h,
     chainId: net.chainId,
     chainName: "Base",
+    tvlUsd: tvl ? tvl.tvlUsd : null,
+    transactionsToday: chainStats ? chainStats.transactionsToday : null,
+    totalAddresses: chainStats ? chainStats.totalAddresses : null,
     source: "live",
   };
 }
@@ -426,8 +440,26 @@ async function getSignalsImpl(): Promise<WithSource<Signal[]>> {
       return Object.assign(MOCK_SIGNALS.map((s) => ({ ...s })), { source: "mock" as const });
     }
 
+    // DexScreener's free-tier search endpoint (`?q=base`, not a chain-scoped
+    // "trending" feed — see `dexscreener/client.ts`) can surface several
+    // distinct real contracts that all happen to share the literal token
+    // name/symbol "BASE". Deduping by name here keeps every displayed
+    // project name unique — showing fewer than 6 signals when fewer unique
+    // real names exist, never padding with repeats.
+    const seenNames = new Set<string>();
+    const uniquePairs = pairs.filter((pair) => {
+      const name = (pair.baseToken.name || pair.baseToken.symbol).trim().toLowerCase();
+      if (seenNames.has(name)) return false;
+      seenNames.add(name);
+      return true;
+    });
+
+    if (!uniquePairs.length) {
+      return Object.assign(MOCK_SIGNALS.map((s) => ({ ...s })), { source: "mock" as const });
+    }
+
     const now = Date.now();
-    const signals: Signal[] = pairs.slice(0, 6).map((pair, i) => {
+    const signals: Signal[] = uniquePairs.slice(0, 6).map((pair, i) => {
       const change = pair.priceChangePct24h ?? 0;
       const ageHours = pair.pairCreatedAt ? (now - pair.pairCreatedAt) / 3_600_000 : Infinity;
       const buys = pair.buys24h ?? 0;

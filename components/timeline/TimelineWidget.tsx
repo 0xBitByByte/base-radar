@@ -32,15 +32,21 @@ export function TimelineWidget() {
     <WidgetCard
       icon={<Clock className="size-5" aria-hidden="true" />}
       title="Recent Activity"
-      subtitle="Your Watchlist, chronologically"
+      subtitle="Intelligence events from your Watchlist"
       accent="purple"
       lastUpdated={timeline?.generatedAt}
     >
-      {!timeline || timeline.totalEvents === 0 ? (
+      {activeWatchlist && activeWatchlist.projectIds.length === 0 ? (
         <EmptyState
           icon={Clock}
-          title="No Timeline activity available."
-          description="Activity will appear here once your watched projects have scoreable signals."
+          title="No activity yet."
+          description="This timeline shows intelligence events generated from projects in your Watchlist. Add projects to your Watchlist to start seeing activity here."
+        />
+      ) : !timeline || timeline.totalEvents === 0 ? (
+        <EmptyState
+          icon={Clock}
+          title="Nothing logged yet."
+          description="This timeline chronicles intelligence events from your Watchlist as they happen. It'll fill in as your watched projects generate real activity."
         />
       ) : isPersonalized && timelineEvents.length === 0 ? (
         <EmptyState

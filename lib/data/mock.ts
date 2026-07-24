@@ -27,13 +27,13 @@ function sparkline(base: number, points = 24, volatility = 0.03): SparklinePoint
 export const MOCK_KPIS: Kpi[] = [
   {
     id: "projects",
-    label: "Projects",
+    label: "Indexed Projects",
     value: 2314,
     format: "number",
     deltaPct: 1.8,
     trend: "up",
-    tooltip: "Live protocols and apps tracked on Base.",
-    sparkline: sparkline(2314, 12, 0.02),
+    tooltip:
+      "DefiLlama-tracked protocols with any presence on Base — broader than the curated, verified project Registry shown on the Projects page.",
   },
   {
     id: "tvl",
@@ -43,7 +43,6 @@ export const MOCK_KPIS: Kpi[] = [
     deltaPct: 3.4,
     trend: "up",
     tooltip: "Total value locked across Base DeFi.",
-    sparkline: sparkline(3_680_000_000, 12, 0.02),
   },
   {
     id: "volume24h",
@@ -53,7 +52,6 @@ export const MOCK_KPIS: Kpi[] = [
     deltaPct: 9.2,
     trend: "up",
     tooltip: "Combined 24h transaction volume on Base.",
-    sparkline: sparkline(486_000_000, 12, 0.03),
   },
   {
     id: "dexVolume24h",
@@ -63,7 +61,6 @@ export const MOCK_KPIS: Kpi[] = [
     deltaPct: -4.1,
     trend: "down",
     tooltip: "24h decentralized exchange trading volume on Base.",
-    sparkline: sparkline(142_000_000, 12, 0.03),
   },
   {
     id: "aiProjects",
@@ -73,7 +70,6 @@ export const MOCK_KPIS: Kpi[] = [
     deltaPct: 12.5,
     trend: "up",
     tooltip: "AI-native projects building on Base.",
-    sparkline: sparkline(87, 12, 0.025),
   },
   {
     id: "gas",
@@ -83,7 +79,6 @@ export const MOCK_KPIS: Kpi[] = [
     deltaPct: 6,
     trend: "up",
     tooltip: "Current average gas price on Base.",
-    sparkline: sparkline(0.014, 12, 0.04),
   },
   {
     id: "stablecoins",
@@ -93,7 +88,6 @@ export const MOCK_KPIS: Kpi[] = [
     deltaPct: 1.2,
     trend: "up",
     tooltip: "Total stablecoin supply on Base.",
-    sparkline: sparkline(2_910_000_000, 12, 0.015),
   },
   {
     id: "transactions",
@@ -103,7 +97,6 @@ export const MOCK_KPIS: Kpi[] = [
     deltaPct: 2.7,
     trend: "up",
     tooltip: "Total transactions in the last 24h.",
-    sparkline: sparkline(8_420_000, 12, 0.02),
   },
 ];
 
@@ -113,9 +106,11 @@ export const MOCK_MARKET_OVERVIEW: MarketOverview = {
   blockHeight: 24_812_309,
   txCountLatestBlock: 148,
   estimatedTps: 74,
-  activeWallets24h: 412_000,
   chainId: 8453,
   chainName: "Base",
+  tvlUsd: 2_840_000_000,
+  transactionsToday: 6_120_000,
+  totalAddresses: 156_000_000,
 };
 
 export const MOCK_PORTFOLIO: PortfolioSummary = {

@@ -19,6 +19,8 @@ import { TimelineWidget } from "@/components/timeline/TimelineWidget";
 import { NotificationWidget } from "@/components/notifications/NotificationWidget";
 import { AutomationWidget } from "@/components/automation/AutomationWidget";
 import { WelcomeHeader } from "@/components/dashboard/WelcomeHeader";
+import { GettingStartedCard } from "@/components/dashboard/GettingStartedCard";
+import { DashboardSectionLabel } from "@/components/dashboard/DashboardSectionLabel";
 import { IntelligenceBrief } from "@/components/dashboard/IntelligenceBrief";
 import { KPIRow } from "@/components/dashboard/KPIRow";
 import { PortfolioWidget } from "@/components/dashboard/PortfolioWidget";
@@ -31,19 +33,6 @@ import { NarrativeHeatmap } from "@/components/dashboard/NarrativeHeatmap";
 import { ProjectSpotlight } from "@/components/dashboard/ProjectSpotlight";
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
 import { WatchlistWidget } from "@/components/dashboard/WatchlistWidget";
-
-/** Matches the tracked-out uppercase label convention already used for
- * grouped lists elsewhere (`Sidebar`'s `SidebarSectionLabel`,
- * `CommandGroup`, `WatchlistSidebar`) — reused here, not reinvented, to
- * give the widget grid's existing three-tier priority order (below) the
- * same visual grouping treatment those surfaces already have. */
-function DashboardSectionLabel({ children }: { children: string }) {
-  return (
-    <p className="px-1 text-[10.5px] font-semibold tracking-[0.1em] text-radar-light-muted uppercase dark:text-radar-muted/60">
-      {children}
-    </p>
-  );
-}
 
 const WIDGET_GRID_CLASS = "grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3";
 
@@ -97,14 +86,32 @@ export default async function DashboardPage() {
       <WelcomeHeader />
 
       <div className="flex flex-col gap-8 [animation:br-dashboard-reveal_400ms_ease-out] motion-reduce:animate-none">
-        <IntelligenceBrief data={brief} sources={brief.sources} evidenceSummary={brief.evidenceSummary} />
+        <GettingStartedCard />
+
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+          <IntelligenceBrief
+            data={brief}
+            sources={brief.sources}
+            evidenceSummary={brief.evidenceSummary}
+            className="lg:col-span-2"
+          />
+          {/* PR-047 — relocated from the Tier 3 grid below: this is the same
+              existing `PortfolioWidget`/`getPortfolioSummary()` data, just
+              surfaced beside the Brief instead of leaving that row's large
+              empty area unused, and instead of scrolling past 11 other
+              widgets to reach it. */}
+          <PortfolioWidget data={portfolio} lastUpdated={lastUpdated} />
+        </div>
 
         <KPIRow items={kpis.items} lastUpdated={lastUpdated} />
 
         {/* Tier 1 — personalized, watchlist-scoped intelligence: the most
             decision-relevant content on the page, so it leads (PR-008). */}
         <div className="flex flex-col gap-3">
-          <DashboardSectionLabel>Your Intelligence</DashboardSectionLabel>
+          <DashboardSectionLabel
+            title="Your Intelligence"
+            subtitle="Personalized to the projects in your Watchlist"
+          />
           <div className={WIDGET_GRID_CLASS} aria-label="Your Intelligence">
             <AIIntelligenceWidget />
             <BriefWidget />
@@ -118,7 +125,10 @@ export default async function DashboardPage() {
 
         {/* Tier 2 — ecosystem-wide market-moving signals. */}
         <div className="flex flex-col gap-3">
-          <DashboardSectionLabel>Market Signals</DashboardSectionLabel>
+          <DashboardSectionLabel
+            title="Market Signals"
+            subtitle="Ecosystem-wide activity across all of Base, not just your Watchlist"
+          />
           <div className={WIDGET_GRID_CLASS} aria-label="Market Signals">
             <WhaleActivityWidget data={whaleEvents} lastUpdated={lastUpdated} />
             <SignalsWidget data={signals} lastUpdated={lastUpdated} />
@@ -128,14 +138,17 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* Tier 3 — supplementary/informational. */}
+        {/* Tier 3 — supplementary/informational. Portfolio moved above,
+            beside the Intelligence Brief (PR-047). */}
         <div className="flex flex-col gap-3">
-          <DashboardSectionLabel>Ecosystem Overview</DashboardSectionLabel>
+          <DashboardSectionLabel
+            title="Ecosystem Overview"
+            subtitle="Supplementary context — featured projects and recent events"
+          />
           <div className={WIDGET_GRID_CLASS} aria-label="Ecosystem Overview">
             <AIProjectsWidget data={aiProjects} lastUpdated={lastUpdated} />
             <ProjectSpotlight data={spotlight} lastUpdated={lastUpdated} />
             <ActivityFeed data={activity} lastUpdated={lastUpdated} />
-            <PortfolioWidget data={portfolio} lastUpdated={lastUpdated} />
           </div>
         </div>
       </div>

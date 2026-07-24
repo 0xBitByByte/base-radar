@@ -33,10 +33,11 @@ export function MarketWidgetLive({ data, lastUpdated }: MarketWidgetLiveProps) {
   });
 
   // `NetworkStatus` (the raw provider shape `status` carries) is a strict
-  // subset of `MarketOverview` — `gasTrend`/`chainName`/`activeWallets24h`
-  // have no live source (confirmed: `activeWallets24h` is mock-only even in
-  // the SSR path today, and `MarketWidget` itself never renders `gasTrend`),
-  // so they always pass through from the initial server render unchanged.
+  // subset of `MarketOverview` — `gasTrend`/`chainName`/`tvlUsd`/
+  // `transactionsToday`/`totalAddresses` have no live-polled source in this
+  // 45s loop (they're fetched once per page load in `getMarketOverviewImpl`
+  // instead, since they change far slower than gas/block height), so they
+  // always pass through from the initial server render unchanged.
   const live: WithSource<MarketOverview> = status
     ? { ...data, ...status, source: "live" }
     : data;
