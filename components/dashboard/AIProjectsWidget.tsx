@@ -16,11 +16,16 @@ export function AIProjectsWidget({ data, lastUpdated }: AIProjectsWidgetProps) {
     <WidgetCard
       icon={<Bot className="size-5" aria-hidden="true" />}
       title="AI Ecosystem"
-      subtitle="AI-native projects building on Base"
+      subtitle="Trading activity across AI-native projects on Base"
       accent="purple"
       source={data.source}
       lastUpdated={lastUpdated}
     >
+      <p className="text-[11px] leading-relaxed text-radar-light-muted/80 dark:text-radar-muted/70">
+        Activity compares each project&apos;s 24h trading volume to the busiest AI project right now — a fuller
+        bar means more trading interest today, not a quality or safety score.
+      </p>
+
       <div className="flex flex-col gap-3.5">
         {data.map((project) => (
           <div key={project.symbol} className="flex flex-col gap-1.5">

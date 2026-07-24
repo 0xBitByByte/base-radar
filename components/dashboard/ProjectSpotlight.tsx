@@ -46,11 +46,10 @@ export function ProjectSpotlight({ data, lastUpdated }: ProjectSpotlightProps) {
     <WidgetCard
       icon={<Sparkles className="size-5" aria-hidden="true" />}
       title="Project Spotlight"
-      subtitle="Top project on Base by TVL"
+      subtitle="Auto-selected — highest TVL on Base (not from your Watchlist)"
       accent="primary"
       source={data.source}
       lastUpdated={lastUpdated}
-      className="sm:col-span-2 xl:col-span-1"
     >
       <div className="flex items-center gap-3">
         {/* No `logoUrl` field exists on this legacy dashboard data type yet

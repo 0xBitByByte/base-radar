@@ -26,17 +26,51 @@ type NarrativeHeatmapProps = {
   lastUpdated: string;
 };
 
+/**
+ * A one-line takeaway derived from the same real `data` the bars already
+ * render — never a separate fetch or a fabricated claim. Handles the
+ * edge cases (all-up, all-down, single row) explicitly rather than always
+ * assuming a "winner vs. loser" split exists.
+ */
+function buildHeatmapSummary(rows: NarrativeHeatRow[]): string | null {
+  if (rows.length === 0) return null;
+  const sorted = [...rows].sort((a, b) => b.change24hPct - a.change24hPct);
+  const top = sorted[0];
+  const bottom = sorted[sorted.length - 1];
+
+  if (rows.length === 1) {
+    const verb = top.momentum === "up" ? "gaining attention" : top.momentum === "down" ? "cooling off" : "holding steady";
+    return `${top.category} is ${verb} over the last 24 hours.`;
+  }
+  if (top.change24hPct <= 0) {
+    return `All tracked categories cooled over the last 24 hours, led down by ${bottom.category}.`;
+  }
+  if (bottom.change24hPct >= 0) {
+    return `All tracked categories gained over the last 24 hours, led by ${top.category}.`;
+  }
+  return `${top.category} continues gaining attention while ${bottom.category} activity cooled over the last 24 hours.`;
+}
+
 export function NarrativeHeatmap({ data, lastUpdated }: NarrativeHeatmapProps) {
+  const summary = buildHeatmapSummary(data);
+
   return (
     <WidgetCard
       icon={<Flame className="size-5" aria-hidden="true" />}
       title="Narrative Heatmap"
-      subtitle="Category momentum across Base"
+      subtitle="Which project categories are gaining or losing attention on Base"
       accent="orange"
       source={data.source}
       lastUpdated={lastUpdated}
-      className="sm:col-span-2 xl:col-span-3"
     >
+      <p className="text-[11px] leading-relaxed text-radar-light-muted/80 dark:text-radar-muted/70">
+        Each bar combines price and volume momentum across Base projects in that category — a taller bar means
+        more relative attention right now, and the % shows the 24h change driving it.
+      </p>
+      {summary && (
+        <p className="text-xs leading-relaxed text-radar-light-text dark:text-radar-white">{summary}</p>
+      )}
+
       <div className="flex flex-col gap-3">
         {data.map((row) => {
           const Icon = TREND_ICON[row.momentum];

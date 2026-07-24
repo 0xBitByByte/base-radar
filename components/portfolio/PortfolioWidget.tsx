@@ -7,6 +7,7 @@ import { NarrativeBadge } from "@/components/alerts/NarrativeBadge";
 import { PortfolioHealthBadge } from "@/components/portfolio/PortfolioHealthBadge";
 import { PortfolioMetric } from "@/components/portfolio/PortfolioMetric";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
+import { ManageWatchlistAction } from "@/components/dashboard/ManageWatchlistAction";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { getProject } from "@/data/projects/helpers";
 import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
@@ -43,8 +44,9 @@ export function PortfolioWidget() {
       {!portfolio || portfolio.projectCount === 0 ? (
         <EmptyState
           icon={LayoutGrid}
-          title="No Portfolio Intelligence available."
-          description="Watch a project to start building a picture of your portfolio."
+          title="No portfolio to summarize yet."
+          description="Portfolio Intelligence rolls up your Watchlist's health, top performers, and risks into one score. Add a project and it'll build itself."
+          action={<ManageWatchlistAction />}
         />
       ) : (
         <div className="flex flex-col gap-3.5">

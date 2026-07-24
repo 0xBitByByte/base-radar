@@ -35,7 +35,6 @@ export type Kpi = {
   deltaPct?: number;
   trend?: Trend;
   tooltip: string;
-  sparkline: SparklinePoint[];
 };
 
 export type MarketOverview = {
@@ -44,9 +43,14 @@ export type MarketOverview = {
   blockHeight: number;
   txCountLatestBlock: number;
   estimatedTps: number;
-  activeWallets24h: number;
   chainId: number;
   chainName: string;
+  /** Base-wide TVL from DefiLlama — `null` when unavailable, never fabricated. */
+  tvlUsd: number | null;
+  /** Total on-chain transactions today from Blockscout — `null` when unavailable. */
+  transactionsToday: number | null;
+  /** All-time unique addresses seen on Base, from Blockscout — `null` when unavailable. There is no free "active wallets in 24h" figure, so this is deliberately labeled as a cumulative count, not an activity metric. */
+  totalAddresses: number | null;
 };
 
 export type HoldingAsset = {

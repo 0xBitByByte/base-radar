@@ -34,13 +34,17 @@ export function WatchlistWidget({ projects, lastUpdated }: WatchlistWidgetProps)
     <WidgetCard
       icon={<Star className="size-5" aria-hidden="true" />}
       title="Watchlist"
-      subtitle="Saved projects"
+      subtitle="Projects you're watching"
       accent="primary"
       source="live"
       lastUpdated={lastUpdated}
     >
       {watched.length === 0 ? (
-        <EmptyState icon={Star} title="No watched projects yet." description="Star a project to track it here." />
+        <EmptyState
+          icon={Star}
+          title="Nothing watched yet."
+          description="Star a project from Projects or its profile page to track it here — and unlock personalized intelligence, notifications, and automation across the dashboard."
+        />
       ) : (
         <ul className="flex flex-col gap-3">
           {watched.map((project) => {
