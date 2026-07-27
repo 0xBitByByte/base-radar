@@ -17,14 +17,12 @@ import { formatPercent } from "@/lib/data/format";
 import { cn } from "@/lib/utils";
 import type { Confidence, Health, Risk } from "@/lib/intelligence/types";
 import type { NarrativeSignal, RiskContributorSeverity } from "@/lib/intelligence-engine";
-import type { GovernanceEvent } from "@/lib/governance";
 
 type ProfileIntelligenceProps = {
   narrative: NarrativeSignal | null;
   risk: Risk;
   health: Health;
   confidence: Confidence;
-  governance: GovernanceEvent[] | null;
 };
 
 /** Card border/background tint per contributor severity — the same semantic palette every other severity indicator on this page uses (success/warning/danger), plus a neutral tint for factors this codebase has no real data source for. */
@@ -115,117 +113,110 @@ const DIVIDED_SECTION_CLASS = "flex flex-col gap-1.5 border-t border-radar-light
  * as this component's last sub-card out into its own top-level
  * `ProfileActivityFeed` section (page.tsx now renders it last, per the
  * mandated linear order) — no data or logic changed, only where it renders.
+ *
+ * PR-050 final pass — the one-line "Governance" card this component used to
+ * render below AI Intelligence (`{governance.length} proposals tracked, N
+ * active`) was a confirmed duplicate: `ProfileGovernance.tsx` already owns a
+ * full, dedicated "Governance" section elsewhere on the page with the same
+ * count implied by its real proposal list. Removed rather than merged —
+ * every governance concept (activity as a risk factor here, the actual
+ * proposal list there) now appears exactly once.
  */
-export function ProfileIntelligence({ narrative, risk, health, confidence, governance }: ProfileIntelligenceProps) {
-  const activeGovernanceCount = governance?.filter((event) => event.status === "active").length ?? 0;
-
+export function ProfileIntelligence({ narrative, risk, health, confidence }: ProfileIntelligenceProps) {
   return (
-    <div className="flex flex-col gap-5">
-      <ProfileSectionCard title="AI Intelligence" icon={Brain} className="gap-5">
-        {narrative && (
-          <section className="flex flex-col gap-1.5">
-            <QuickViewSectionLabel>Narrative</QuickViewSectionLabel>
-            <p className="text-sm text-radar-light-text dark:text-radar-white">
-              {narrative.category} narrative: {narrative.label} ({formatPercent(narrative.changePct24h)} 24h)
-            </p>
-          </section>
-        )}
-
-        <section className={narrative ? DIVIDED_SECTION_CLASS : "flex flex-col gap-1.5"}>
-          <QuickViewSectionLabel>Risk Analysis</QuickViewSectionLabel>
-          <p className="text-sm capitalize text-radar-light-text dark:text-radar-white">{risk.level} risk</p>
-          <p className="text-xs text-radar-light-muted dark:text-radar-muted">{risk.explanation}</p>
-          {risk.contributors.length > 0 && (
-            <div className="mt-1 flex flex-col gap-3">
-              {RISK_GROUPS.map((group) => {
-                const members = group.contributorLabels
-                  .map((label) => risk.contributors.find((c) => c.label === label))
-                  .filter((c): c is (typeof risk.contributors)[number] => c !== undefined);
-                if (members.length === 0) return null;
-
-                const worstSeverity = members.reduce<RiskContributorSeverity>(
-                  (worst, c) => (SEVERITY_RANK[c.severity] > SEVERITY_RANK[worst] ? c.severity : worst),
-                  "unknown"
-                );
-                const GroupIcon = group.icon;
-
-                return (
-                  <div key={group.label} className="flex flex-col gap-1.5">
-                    <div className="flex items-center gap-1.5">
-                      <GroupIcon className={cn("size-3.5 shrink-0", SEVERITY_TEXT_CLASS[worstSeverity])} aria-hidden="true" />
-                      <span className="text-xs font-semibold text-radar-light-text dark:text-radar-white">{group.label}</span>
-                    </div>
-                    <ul className="ml-[7px] flex flex-col gap-1.5 border-l border-radar-light-border pl-3 dark:border-white/10">
-                      {members.map((contributor) => {
-                        const Icon = SEVERITY_ICON[contributor.severity];
-                        return (
-                          <li
-                            key={contributor.label}
-                            className={cn("flex flex-col gap-1 rounded-xl border p-2.5", SEVERITY_CARD_CLASS[contributor.severity])}
-                          >
-                            <div className="flex items-center gap-1.5">
-                              <Icon className={cn("size-3.5 shrink-0", SEVERITY_TEXT_CLASS[contributor.severity])} aria-hidden="true" />
-                              <span className="text-xs font-semibold text-radar-light-text dark:text-radar-white">
-                                {CONTRIBUTOR_DISPLAY_LABEL[contributor.label] ?? contributor.label}
-                              </span>
-                              <span
-                                className={cn(
-                                  "ml-auto shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium",
-                                  SEVERITY_TEXT_CLASS[contributor.severity]
-                                )}
-                              >
-                                {SEVERITY_STATUS_LABEL[contributor.severity]}
-                              </span>
-                            </div>
-                            <p className="text-xs text-radar-light-muted dark:text-radar-muted">{contributor.detail}</p>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
-
-        <section className={DIVIDED_SECTION_CLASS}>
-          <QuickViewSectionLabel>Health Explanation</QuickViewSectionLabel>
-          {health.factors.length > 0 ? (
-            <ul className="flex flex-col gap-1.5">
-              {health.factors.map((factor) => (
-                <FactorCard key={factor} factor={factor} />
-              ))}
-            </ul>
-          ) : (
-            <p className="text-xs text-radar-light-muted dark:text-radar-muted">No live signals available to assess health.</p>
-          )}
-        </section>
-
-        <section className={DIVIDED_SECTION_CLASS}>
-          <QuickViewSectionLabel>Confidence Explanation</QuickViewSectionLabel>
-          {confidence.factors.length > 0 ? (
-            <ul className="flex flex-col gap-1.5">
-              {confidence.factors.map((factor) => (
-                <FactorCard key={factor} factor={factor} />
-              ))}
-            </ul>
-          ) : (
-            <p className="text-xs text-radar-light-muted dark:text-radar-muted">No live sources available.</p>
-          )}
-        </section>
-      </ProfileSectionCard>
-
-      {governance && (
-        <ProfileSectionCard title="Governance" icon={Landmark}>
+    <ProfileSectionCard title="AI Intelligence" icon={Brain} className="gap-5">
+      {narrative && (
+        <section className="flex flex-col gap-1.5">
+          <QuickViewSectionLabel>Narrative</QuickViewSectionLabel>
           <p className="text-sm text-radar-light-text dark:text-radar-white">
-            {governance.length} proposal{governance.length === 1 ? "" : "s"} tracked,{" "}
-            <span className={cn(activeGovernanceCount > 0 && "font-semibold text-radar-primary dark:text-radar-accent")}>
-              {activeGovernanceCount} active
-            </span>
+            {narrative.category} narrative: {narrative.label} ({formatPercent(narrative.changePct24h)} 24h)
           </p>
-        </ProfileSectionCard>
+        </section>
       )}
-    </div>
+
+      <section className={narrative ? DIVIDED_SECTION_CLASS : "flex flex-col gap-1.5"}>
+        <QuickViewSectionLabel>Risk Analysis</QuickViewSectionLabel>
+        <p className="text-sm capitalize text-radar-light-text dark:text-radar-white">{risk.level} risk</p>
+        <p className="text-xs text-radar-light-muted dark:text-radar-muted">{risk.explanation}</p>
+        {risk.contributors.length > 0 && (
+          <div className="mt-1 flex flex-col gap-3">
+            {RISK_GROUPS.map((group) => {
+              const members = group.contributorLabels
+                .map((label) => risk.contributors.find((c) => c.label === label))
+                .filter((c): c is (typeof risk.contributors)[number] => c !== undefined);
+              if (members.length === 0) return null;
+
+              const worstSeverity = members.reduce<RiskContributorSeverity>(
+                (worst, c) => (SEVERITY_RANK[c.severity] > SEVERITY_RANK[worst] ? c.severity : worst),
+                "unknown"
+              );
+              const GroupIcon = group.icon;
+
+              return (
+                <div key={group.label} className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <GroupIcon className={cn("size-3.5 shrink-0", SEVERITY_TEXT_CLASS[worstSeverity])} aria-hidden="true" />
+                    <span className="text-xs font-semibold text-radar-light-text dark:text-radar-white">{group.label}</span>
+                  </div>
+                  <ul className="ml-[7px] flex flex-col gap-1.5 border-l border-radar-light-border pl-3 dark:border-white/10">
+                    {members.map((contributor) => {
+                      const Icon = SEVERITY_ICON[contributor.severity];
+                      return (
+                        <li
+                          key={contributor.label}
+                          className={cn("flex flex-col gap-1 rounded-xl border p-2.5", SEVERITY_CARD_CLASS[contributor.severity])}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <Icon className={cn("size-3.5 shrink-0", SEVERITY_TEXT_CLASS[contributor.severity])} aria-hidden="true" />
+                            <span className="text-xs font-semibold text-radar-light-text dark:text-radar-white">
+                              {CONTRIBUTOR_DISPLAY_LABEL[contributor.label] ?? contributor.label}
+                            </span>
+                            <span
+                              className={cn(
+                                "ml-auto shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                                SEVERITY_TEXT_CLASS[contributor.severity]
+                              )}
+                            >
+                              {SEVERITY_STATUS_LABEL[contributor.severity]}
+                            </span>
+                          </div>
+                          <p className="text-xs text-radar-light-muted dark:text-radar-muted">{contributor.detail}</p>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className={DIVIDED_SECTION_CLASS}>
+        <QuickViewSectionLabel>Health Explanation</QuickViewSectionLabel>
+        {health.factors.length > 0 ? (
+          <ul className="flex flex-col gap-1.5">
+            {health.factors.map((factor) => (
+              <FactorCard key={factor} factor={factor} />
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-radar-light-muted dark:text-radar-muted">No live signals available to assess health.</p>
+        )}
+      </section>
+
+      <section className={DIVIDED_SECTION_CLASS}>
+        <QuickViewSectionLabel>Confidence Explanation</QuickViewSectionLabel>
+        {confidence.factors.length > 0 ? (
+          <ul className="flex flex-col gap-1.5">
+            {confidence.factors.map((factor) => (
+              <FactorCard key={factor} factor={factor} />
+            ))}
+          </ul>
+        ) : (
+          <p className="text-xs text-radar-light-muted dark:text-radar-muted">No live sources available.</p>
+        )}
+      </section>
+    </ProfileSectionCard>
   );
 }

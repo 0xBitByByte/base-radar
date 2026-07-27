@@ -44,7 +44,7 @@ export function ProfileContracts({ contracts, chain, contractDetailsPromise }: P
         <EmptyState
           icon={Blocks}
           title="No verified contracts available"
-          description="No verified contracts have been added to Base Radar yet. Base Radar only displays manually verified contracts to ensure users always receive trusted addresses."
+          description="No verified contracts have been indexed for this project yet. Base Radar only displays manually verified contracts to ensure users always receive trusted addresses. When available, this section will include verified addresses, deployment network, and explorer links."
           className="bg-radar-light-surface/60 dark:bg-white/[0.02]"
           action={
             <span className="inline-flex items-center gap-1.5 rounded-full border border-radar-warning/30 bg-radar-warning/10 px-2.5 py-1 text-[11px] font-medium text-radar-warning">

@@ -12,10 +12,23 @@ export const zora: Project = {
   tags: ["creator-economy", "base-native"],
   status: "live",
   chains: ["base", "ethereum", "optimism"],
-  contracts: [],
+  contracts: [
+    {
+      chain: "base",
+      address: "0x1111111111166b7fe7bd91427724b487980afc69",
+      type: "token",
+      label: "ZORA token (Base)",
+    },
+  ],
   github: {
     owner: "ourzora",
-    url: "https://github.com/ourzora",
+    // PR-051 — resolved to the org's real, pinned, most-active repo
+    // ("Monorepo for Zora Protocol (contracts & sdks)") — the org-only
+    // reference here previously meant `matchGithub` never had a specific
+    // repo to query, so this project's GitHub stats were always dark
+    // despite `ourzora` being a large, active real org.
+    repo: "zora-protocol",
+    url: "https://github.com/ourzora/zora-protocol",
   },
   social: {
     twitter: "https://twitter.com/ourzora",
@@ -24,5 +37,13 @@ export const zora: Project = {
     status: "community",
     source: "Base ecosystem directory",
   },
-  providerIds: {},
+  providerIds: {
+    // PR-051 — verified live on CoinGecko: real listing, "About Zora
+    // (ZORA): Zora is a decentralized protocol and Layer 2 network
+    // dedicated to the creator economy..." — matches this project's own
+    // description. Contract cross-checked against Basescan/GeckoTerminal
+    // links on the same CoinGecko page.
+    coingeckoId: "zora",
+    blockscoutAddress: "0x1111111111166b7fe7bd91427724b487980afc69",
+  },
 };

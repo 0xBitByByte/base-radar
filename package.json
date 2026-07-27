@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "registry:validate": "vitest run tests/data/projects/validation.test.ts",
+    "registry:coverage": "vitest run tests/data/projects/coverage.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

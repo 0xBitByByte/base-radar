@@ -40,3 +40,67 @@ export function LinktreeMark({ className }: BrandIconProps) {
     </svg>
   );
 }
+
+export function TelegramMark({ className }: BrandIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M21.9 3.53a1.2 1.2 0 0 0-1.24-.17L2.6 10.6a1.15 1.15 0 0 0 .1 2.17l4.6 1.44 1.78 5.72a1.03 1.03 0 0 0 1.8.34l2.53-2.98 4.9 3.6a1.14 1.14 0 0 0 1.8-.68l3.16-14.87a1.2 1.2 0 0 0-.37-1.15ZM9.4 14.7l-.55 3.24-1.22-3.9 9.9-6.2a.25.25 0 0 1 .33.36l-8.46 6.5Z" />
+    </svg>
+  );
+}
+
+export function MediumMark({ className }: BrandIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M3 5.5A1.5 1.5 0 0 1 4.5 4h2.68l5.02 8.9L17 4h2.5A1.5 1.5 0 0 1 21 5.5v13a1.5 1.5 0 0 1-1.5 1.5H18v-9.2l-4.9 8.5h-1.2L7 10.9V20H4.5A1.5 1.5 0 0 1 3 18.5v-13Z" />
+    </svg>
+  );
+}
+
+export function FarcasterMark({ className }: BrandIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M5.5 3h13v2.2h-2.2V18.8h2.2V21h-6.6v-2.2h2.2v-5.3h-5V18.8h2.2V21H4.1v-2.2h2.2V5.2H4.1V3h1.4Zm3.5 2.2v5.4h6v-5.4h-6Z" />
+    </svg>
+  );
+}
+
+export function MirrorMark({ className }: BrandIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M12 2 3 6.5V12c0 5.05 3.6 9.36 9 10.5 5.4-1.14 9-5.45 9-10.5V6.5L12 2Zm0 2.24 6.75 3.38V12c0 3.86-2.7 7.16-6.75 8.24V4.24Zm-6.75 5.38V12c0 3.86 2.7 7.16 6.75 8.24V4.24L5.25 7.62Z" />
+    </svg>
+  );
+}
+
+export function CoinGeckoMark({ className }: BrandIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm4.2 6.6a1.3 1.3 0 1 1 0 2.6 1.3 1.3 0 0 1 0-2.6ZM9 8c1.9 0 3.9.9 5.2 2.3.5.5.3 1.4-.4 1.6-1.7.5-2.8 1.9-2.8 3.6 0 .6-.1 1.1-.4 1.5-1.6-.4-3.3-1.7-4.1-3.5C5.6 11.6 6.6 8 9 8Z" />
+    </svg>
+  );
+}
+
+export function DefiLlamaMark({ className }: BrandIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M9 2c.3 1.3.9 2.2 1.8 3.1.7-.6 1.5-.9 2.2-.9.9 0 1.7.4 2.2 1.1.7-.4 1.4-.2 1.7.4.3.6.1 1.6-.6 2.6.9 1.4 1.4 3.1 1.4 5 0 1.6-.4 2.9-1 4l1.3 2.7c.2.4-.1.9-.6.9h-2.9l-.6 1.2a.7.7 0 0 1-.6.4H9.6a.7.7 0 0 1-.6-.4L8.4 21H5.5a.65.65 0 0 1-.6-.9L6.2 17.4c-.6-1.1-1-2.4-1-4 0-3.9 2-7 4.4-8.4C9.2 3.9 9 3 9 2Zm2.7 8.4a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2Z" />
+    </svg>
+  );
+}
+
+export function RedditMark({ className }: BrandIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M22 12.3c0-1.1-.9-2-2-2-.5 0-1 .2-1.3.5-1.3-.9-3.1-1.5-5.1-1.6l.9-3.9 2.9.7a1.4 1.4 0 1 0 .2-.9l-3.2-.7a.45.45 0 0 0-.5.3l-1 4.5c-2 0-3.8.6-5.1 1.6-.3-.3-.8-.5-1.3-.5-1.1 0-2 .9-2 2 0 .8.5 1.5 1.1 1.8a3 3 0 0 0-.1.9c0 2.7 3.1 4.8 7 4.8s7-2.1 7-4.8c0-.3 0-.6-.1-.9.6-.3 1.1-1 1.1-1.8ZM8.5 13.5a1.2 1.2 0 1 1 2.4 0 1.2 1.2 0 0 1-2.4 0Zm6.9 3.4c-.8.8-2.1 1.1-3.4 1.1s-2.6-.3-3.4-1.1a.4.4 0 0 1 .6-.6c.6.6 1.6.9 2.8.9s2.2-.3 2.8-.9a.4.4 0 0 1 .6.6Zm-.3-2.2a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4Z" />
+    </svg>
+  );
+}
+
+export function YoutubeMark({ className }: BrandIconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M22.5 7.4a2.9 2.9 0 0 0-2-2.1C18.7 4.8 12 4.8 12 4.8s-6.7 0-8.5.5a2.9 2.9 0 0 0-2 2.1A30 30 0 0 0 1 12a30 30 0 0 0 .5 4.6 2.9 2.9 0 0 0 2 2c1.8.5 8.5.5 8.5.5s6.7 0 8.5-.5a2.9 2.9 0 0 0 2-2 30 30 0 0 0 .5-4.6 30 30 0 0 0-.5-4.6ZM9.8 15.3V8.7l5.7 3.3-5.7 3.3Z" />
+    </svg>
+  );
+}

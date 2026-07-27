@@ -13,6 +13,7 @@
 
 import type { Project } from "@/data/projects/types";
 import { normalizeName, sumBy } from "@/lib/intelligence/helpers";
+import { resolveMetric } from "@/lib/intelligence/resolution";
 import type {
   ChainInfo,
   Community,
@@ -22,12 +23,22 @@ import type {
   Identity,
   Market,
   ProjectSources,
+  SourceAttribution,
   Trading,
   TradingPool,
   Tvl,
 } from "@/lib/intelligence/types";
 import type { CommitActivity } from "@/lib/providers/github/service";
 import type { SparklinePoint } from "@/lib/data/types";
+import type { ProviderName } from "@/lib/providers/common/types";
+
+/** Adapts a `ProviderSlice`-shaped provider result into the generic `SourceAttribution` `resolveMetric` needs — reuses the already-real status/detail/fetchedAt, never recomputes them. */
+function sliceAttribution(
+  provider: ProviderName,
+  slice: { status: SourceAttribution["status"]; fetchedAt: string | null; detail: string | null }
+): SourceAttribution {
+  return { provider, status: slice.status, fetchedAt: slice.fetchedAt, detail: slice.detail };
+}
 
 /**
  * Real percentage change between the oldest point in `history` at least
@@ -61,13 +72,34 @@ export function mergeIdentity(project: Project): Identity {
   };
 }
 
+/**
+ * PR-050 provider-resolution — `priceUsd` is resolved, not just read off
+ * CoinGecko: CoinGecko is tried first (broadest, most authoritative for a
+ * listed token), and DexScreener's own on-chain pair price is a real,
+ * already-fetched fallback for a project with a live trading pair but no
+ * CoinGecko listing. Both candidates are real data this Engine already
+ * fetches for other fields — this never fetches anything new.
+ */
 export function mergeMarket(sources: ProjectSources, genesisDate: string | null = null): Market {
   const market = sources.market.data;
+  const pairs = sources.trading.data ?? [];
+  const largestPair = pairs.length > 0 ? [...pairs].sort((a, b) => (b.liquidityUsd ?? 0) - (a.liquidityUsd ?? 0))[0] : null;
+
+  const priceResolution = resolveMetric<number>([
+    { provider: "coingecko", value: market?.priceUsd ?? null, attribution: sliceAttribution("coingecko", sources.market) },
+    {
+      provider: "dexscreener",
+      value: largestPair?.priceUsd ?? null,
+      attribution: sliceAttribution("dexscreener", sources.trading),
+      confidence: "medium",
+    },
+  ]);
+
   return {
     available: sources.market.status === "live" && market !== null,
     imageUrl: market?.imageUrl ?? null,
     symbol: market?.symbol ?? null,
-    priceUsd: market?.priceUsd ?? null,
+    priceUsd: priceResolution.value,
     marketCapUsd: market?.marketCapUsd ?? null,
     marketCapRank: market?.marketCapRank ?? null,
     fullyDilutedValuationUsd: market?.fullyDilutedValuationUsd ?? null,
@@ -83,9 +115,20 @@ export function mergeMarket(sources: ProjectSources, genesisDate: string | null 
     atlDate: market?.atlDate ?? null,
     sparkline7d: market?.sparkline7d ?? [],
     genesisDate,
+    priceResolution,
   };
 }
 
+/**
+ * PR-050 provider-resolution — `volume24hUsd` tries DexScreener first (this
+ * project's actual tracked on-chain pair volume) then CoinGecko's
+ * `total_volume` (real, already mapped by `coingecko/mapper.ts`, previously
+ * fetched and discarded) as a fallback — flagged `"medium"` confidence since
+ * it's exchange-wide volume for the asset globally, not Base-DEX-specific,
+ * a real but broader-scoped number. `liquidityUsd` has only one real
+ * candidate (DexScreener) in this codebase's Provider Layer today; it's
+ * still wrapped in the same resolution shape for a consistent UI contract.
+ */
 export function mergeTrading(sources: ProjectSources): Trading {
   const pairs = sources.trading.data ?? [];
   const available = sources.trading.status === "live" && pairs.length > 0;
@@ -102,21 +145,52 @@ export function mergeTrading(sources: ProjectSources): Trading {
         .sort((a, b) => (b.liquidityUsd ?? 0) - (a.liquidityUsd ?? 0))
     : [];
 
+  const dexVolume = available ? sumBy(pairs, (p) => p.volume24hUsd ?? 0) : null;
+  const dexLiquidity = available ? sumBy(pairs, (p) => p.liquidityUsd ?? 0) : null;
+
+  const volumeResolution = resolveMetric<number>([
+    { provider: "dexscreener", value: dexVolume, attribution: sliceAttribution("dexscreener", sources.trading) },
+    {
+      provider: "coingecko",
+      value: sources.market.data?.volume24hUsd ?? null,
+      attribution: sliceAttribution("coingecko", sources.market),
+      confidence: "medium",
+    },
+  ]);
+
+  const liquidityResolution = resolveMetric<number>([
+    { provider: "dexscreener", value: dexLiquidity, attribution: sliceAttribution("dexscreener", sources.trading) },
+  ]);
+
   return {
     available,
-    volume24hUsd: available ? sumBy(pairs, (p) => p.volume24hUsd ?? 0) : null,
-    liquidityUsd: available ? sumBy(pairs, (p) => p.liquidityUsd ?? 0) : null,
+    volume24hUsd: volumeResolution.value,
+    liquidityUsd: dexLiquidity,
     buys24h: available ? sumBy(pairs, (p) => p.buys24h ?? 0) : null,
     sells24h: available ? sumBy(pairs, (p) => p.sells24h ?? 0) : null,
     priceChangePct24h: available ? (pairs[0].priceChangePct24h ?? null) : null,
     pairCount: pairs.length,
     pools,
     largestPool: pools[0] ?? null,
+    volumeResolution,
+    liquidityResolution,
   };
 }
 
+/**
+ * PR-050 provider-resolution — DefiLlama is the only protocol-TVL provider
+ * this Engine integrates (CoinGecko's API doesn't expose per-protocol TVL,
+ * and no on-chain TVL aggregator is implemented here). Wrapped in the same
+ * resolution shape as price/volume/liquidity for a consistent UI contract,
+ * even though there's currently only one real candidate.
+ */
 export function mergeTvl(sources: ProjectSources, tvlHistory: SparklinePoint[] | null = null): Tvl {
   const protocol = sources.tvl.data;
+
+  const tvlResolution = resolveMetric<number>([
+    { provider: "defillama", value: protocol?.tvlUsd ?? null, attribution: sliceAttribution("defillama", sources.tvl) },
+  ]);
+
   return {
     available: sources.tvl.status === "live" && protocol !== null,
     tvlUsd: protocol?.tvlUsd ?? null,
@@ -124,6 +198,7 @@ export function mergeTvl(sources: ProjectSources, tvlHistory: SparklinePoint[] |
     changePct7d: changePctOverDays(tvlHistory, 7),
     changePct30d: changePctOverDays(tvlHistory, 30),
     defillamaCategory: protocol?.category ?? null,
+    tvlResolution,
   };
 }
 

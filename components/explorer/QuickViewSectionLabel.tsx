@@ -15,8 +15,8 @@ type QuickViewSectionLabelProps = {
  */
 export function QuickViewSectionLabel({ children }: QuickViewSectionLabelProps) {
   return (
-    <h3 className="text-xs font-medium tracking-wide text-radar-light-muted uppercase dark:text-radar-muted">
+    <h2 className="text-xs font-medium tracking-wide text-radar-light-muted uppercase dark:text-radar-muted">
       {children}
-    </h3>
+    </h2>
   );
 }

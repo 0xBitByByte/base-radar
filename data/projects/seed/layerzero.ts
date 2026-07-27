@@ -12,10 +12,21 @@ export const layerZero: Project = {
   tags: ["cross-chain", "developer-tooling"],
   status: "live",
   chains: ["base", "ethereum", "arbitrum", "optimism", "polygon", "avalanche"],
-  contracts: [],
+  contracts: [
+    {
+      chain: "base",
+      address: "0x6985884c4392d348587b19cb9eaaf157f13271cd",
+      type: "token",
+      label: "ZRO token (Base)",
+    },
+  ],
   github: {
     owner: "LayerZero-Labs",
-    url: "https://github.com/LayerZero-Labs",
+    // PR-051 — resolved to the org's real, most-starred, currently-shipping
+    // V2 protocol repo (previously org-only, so `matchGithub` never had a
+    // specific repo to query for this project).
+    repo: "LayerZero-v2",
+    url: "https://github.com/LayerZero-Labs/LayerZero-v2",
   },
   social: {
     twitter: "https://twitter.com/LayerZero_Labs",
@@ -27,5 +38,7 @@ export const layerZero: Project = {
   providerIds: {
     coingeckoId: "layerzero",
     defillamaSlug: "layerzero",
+    // PR-051 — verified via CoinGecko's own "Contract" panel / Basescan link.
+    blockscoutAddress: "0x6985884c4392d348587b19cb9eaaf157f13271cd",
   },
 };

@@ -48,6 +48,8 @@ type ProfileMetricsProps = {
   tokenSymbol: string | null;
   /** PR13.7 Goal 14 — real finality lag, already resolved by `page.tsx` (Base RPC is fast enough not to defer behind Suspense — see `base.getFinality`'s own doc comment). `null` when the fetch failed. */
   finality: number | null;
+  /** Real registry-level signal (`Boolean(project.github)`) — distinct from `github.available`, which is also `false` when a *configured* repo's live fetch fails (rate limit, network error). Lets the Engineering Health empty state say "not linked" only when that's actually true. */
+  githubConfigured: boolean;
 };
 
 /** One shared tile per related group of stats — same recipe `QuickViewMetrics` already uses, tightened further in PR11.2 Part 5 for a denser, less padded read. */
@@ -90,6 +92,7 @@ export function ProfileMetrics({
   transfersPromise,
   tokenSymbol,
   finality,
+  githubConfigured,
 }: ProfileMetricsProps) {
   const starsAvailable = github.available && github.stars !== null;
   const forksAvailable = github.available && github.forks !== null;
@@ -143,6 +146,15 @@ export function ProfileMetrics({
       : [];
   const topDexId = exchangeDistribution[0]?.dexId ?? trading.largestPool?.dexId ?? null;
 
+  // PR-050 provider-resolution — reads the already-resolved `liquidityResolution`/
+  // `tvlResolution` (`lib/intelligence/resolution.ts`) instead of reaching
+  // into raw provider status itself; this component never decides fallback
+  // or interprets a provider's status code, it only renders what the
+  // Provider/Engine layer already resolved.
+  const tradingUnavailableLabel = trading.liquidityResolution.attemptedProviders[0]?.status === "not_configured" ? "Not Configured" : "Unavailable";
+  const tradingUnavailableReason =
+    trading.liquidityResolution.failureReason ?? "No live DexScreener trading data for this project.";
+
   return (
     <div className="flex flex-col gap-5">
       <ProfileSectionCard
@@ -184,8 +196,8 @@ export function ProfileMetrics({
               </div>
             ) : (
               <p className="rounded-xl border border-dashed border-radar-light-border p-3 text-xs text-radar-light-muted dark:border-white/10 dark:text-radar-muted">
-                <span className="font-semibold text-radar-light-text dark:text-radar-white">Not Tracked —</span> no
-                DexScreener trading pair is configured for this project in the Base Radar registry yet.
+                <span className="font-semibold text-radar-light-text dark:text-radar-white">{tradingUnavailableLabel} — </span>
+                {tradingUnavailableReason}
               </p>
             )}
 
@@ -240,7 +252,7 @@ export function ProfileMetrics({
           <EmptyState
             icon={Layers}
             title="No TVL or liquidity data available"
-            description="This project has no DefiLlama protocol or trending DexScreener pair configured in the Base Radar registry yet. Checked just now — this section updates automatically once one is added."
+            description={`DefiLlama: ${tvl.tvlResolution.failureReason ?? "unavailable"}. DexScreener: ${tradingUnavailableReason}. This section updates automatically once either resolves.`}
             className="bg-radar-light-surface/60 dark:bg-white/[0.02]"
           />
         )}
@@ -308,11 +320,18 @@ export function ProfileMetrics({
               </div>
             )}
           </>
+        ) : githubConfigured ? (
+          <EmptyState
+            icon={GitBranch}
+            title="Engineering metadata has not yet been indexed"
+            description="This project's GitHub repository is configured, but GitHub returned no public stars, forks, issues, or release activity for it just now. This section will populate automatically once that data is available."
+            className="bg-radar-light-surface/60 dark:bg-white/[0.02]"
+          />
         ) : (
           <EmptyState
             icon={GitBranch}
-            title="No engineering health data"
-            description="This project's GitHub repository isn't linked in the Base Radar registry, or GitHub returned no public activity for it. Last checked just now — this section will populate automatically once a repository is configured."
+            title="Repository has not been linked"
+            description="This project has no GitHub repository configured in the Base Radar registry yet. Engineering health will populate automatically once one is added."
             className="bg-radar-light-surface/60 dark:bg-white/[0.02]"
           />
         )}

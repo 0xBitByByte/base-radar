@@ -15,7 +15,11 @@ export const farcaster: Project = {
   contracts: [],
   github: {
     owner: "farcasterxyz",
-    url: "https://github.com/farcasterxyz",
+    // PR-051 — resolved to the org's real, highest-fork-count, actively
+    // maintained implementation repo (previously org-only, so
+    // `matchGithub` never had a specific repo to query for this project).
+    repo: "hub-monorepo",
+    url: "https://github.com/farcasterxyz/hub-monorepo",
   },
   social: {
     twitter: "https://twitter.com/farcaster_xyz",
@@ -24,5 +28,9 @@ export const farcaster: Project = {
     status: "community",
     source: "Base ecosystem directory",
   },
+  // PR-051 — no CoinGecko/DefiLlama identifiers added: the Farcaster
+  // protocol itself has no fungible token (its identity/registry contracts
+  // exist on Optimism, not as a tradable asset), so there is nothing real
+  // to link here. Left empty rather than guessed.
   providerIds: {},
 };

@@ -23,8 +23,12 @@ import { ProfileIntelligencePanel } from "@/components/explorer/ProfileIntellige
 import { ProfileContracts } from "@/components/explorer/ProfileContracts";
 import { ProfileGovernance } from "@/components/explorer/ProfileGovernance";
 import { ProfileQuickStats } from "@/components/explorer/ProfileQuickStats";
+import { ProfileRecentHighlights } from "@/components/explorer/ProfileRecentHighlights";
 import { ProfileRelatedIntelligence } from "@/components/explorer/ProfileRelatedIntelligence";
 import { ProfileSectionNav } from "@/components/explorer/ProfileSectionNav";
+import { ProfileSources } from "@/components/explorer/ProfileSources";
+import { ProfileSummary } from "@/components/explorer/ProfileSummary";
+import { ProfileWhyItMatters } from "@/components/explorer/ProfileWhyItMatters";
 import { ProjectHealthScorecard } from "@/components/explorer/ProjectHealthScorecard";
 import type { SparklinePoint } from "@/lib/data/types";
 
@@ -180,6 +184,13 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
       : null;
 
   const githubUrl = profile.github.available && profile.github.fullName ? `https://github.com/${profile.github.fullName}` : null;
+  // Real registry-level signal, independent of whether the live GitHub fetch
+  // itself succeeded — `profile.github.available` is `false` both when no
+  // repo is configured AND when a configured repo's live fetch fails (rate
+  // limit, network error), so it alone can't tell those two cases apart.
+  // Empty states that need to say "not linked" vs. "linked but unavailable"
+  // read this instead.
+  const githubConfigured = Boolean(registryProject.github);
   const narrativeLabel = profile.narrative?.label ?? null;
 
   // Real completeness count (links present ÷ platforms this codebase
@@ -217,8 +228,6 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
     communityLinkCount,
     communityLinkTotal,
   });
-
-  const developerFallbackTile = scorecardTiles.find((tile) => tile.id === "developer")!;
 
   const intelligenceReport = buildIntelligenceReport({
     identity: profile.identity,
@@ -262,26 +271,29 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
 
       <ProfileRelatedIntelligence projectId={registryProject.id} />
 
-      <ProfileCommunityMetrics github={profile.github} community={profile.community} contributorCountPromise={contributorCountPromise} />
-
       <ProfileQuickStats market={profile.market} tvl={profile.tvl} trading={profile.trading} />
 
       <ProfileSectionNav />
 
       {/*
-        PR13.3 — one strict linear column (Header → Quick Stats →
-        Executive Intelligence → Health Scorecard → Token & Price →
-        Metrics → AI Intelligence → Contracts → Governance → Community →
-        Activity Feed), replacing the previous 8/4 two-column grid so the
-        mandated reading order holds on every viewport, not just mobile.
+        PR-050 follow-up — the page now reads as one intelligence-report
+        narrative (Header → Project Summary → Why It Matters → Health &
+        Trust → Evidence & Sources → Recent Highlights → Timeline → Token
+        & Price → Metrics → Community → AI Intelligence → Contracts →
+        Governance) instead of PR13.3's "widget grid" ordering. Every
+        section still receives the exact same `profile.*`/`intelligenceReport`
+        fields it always did — this is a render-order change only, no new
+        provider call, no new calculation.
       */}
+      <ProfileSummary thesis={intelligenceReport.thesis} />
+
+      <ProfileWhyItMatters highlights={intelligenceReport.highlights} />
+
       <ProfileExecutiveIntelligence
         report={intelligenceReport}
         freshness={profile.freshness}
-        developerFallbackTile={developerFallbackTile}
-        commitActivityPromise={commitActivityPromise}
-        contributorCountPromise={contributorCountPromise}
-        releasesPromise={releasesPromise}
+        sources={profile.sources}
+        verificationStatus={profile.community.verificationStatus}
       />
 
       <ProjectHealthScorecard
@@ -292,6 +304,24 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
         verificationStatus={profile.community.verificationStatus}
         commitActivityPromise={commitActivityPromise}
         contributorCountPromise={contributorCountPromise}
+        releasesPromise={releasesPromise}
+      />
+
+      <ProfileSources sources={profile.sources} thingsWeCouldntVerify={intelligenceReport.thingsWeCouldntVerify} />
+
+      <ProfileRecentHighlights entries={intelligenceReport.recentDevelopments} />
+
+      <ProfileActivityFeed
+        github={profile.github}
+        tvl={profile.tvl}
+        risk={profile.risk}
+        governance={profile.governance}
+        whaleEvents={whaleEvents}
+        signals={signals}
+        tokenSymbol={profile.market.symbol}
+        commitActivityPromise={commitActivityPromise}
+        tvlHistoryPromise={tvlHistoryPromise}
+        transfersPromise={transfersPromise}
         releasesPromise={releasesPromise}
       />
 
@@ -319,15 +349,17 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
         transfersPromise={transfersPromise}
         tokenSymbol={profile.market.symbol}
         finality={finality}
+        githubConfigured={githubConfigured}
       />
 
-      <ProfileIntelligence
-        narrative={profile.narrative}
-        risk={profile.risk}
-        health={profile.health}
-        confidence={profile.confidence}
-        governance={profile.governance}
+      <ProfileCommunityMetrics
+        github={profile.github}
+        community={profile.community}
+        contributorCountPromise={contributorCountPromise}
+        githubConfigured={githubConfigured}
       />
+
+      <ProfileIntelligence narrative={profile.narrative} risk={profile.risk} health={profile.health} confidence={profile.confidence} />
 
       {aiIntelligence && (
         <ProfileIntelligencePanel
@@ -342,20 +374,6 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
       <ProfileContracts contracts={profile.contracts} chain={profile.chain} contractDetailsPromise={contractDetailsPromise} />
 
       <ProfileGovernance governance={profile.governance} governanceUrl={profile.community.governanceUrl} />
-
-      <ProfileActivityFeed
-        github={profile.github}
-        tvl={profile.tvl}
-        risk={profile.risk}
-        governance={profile.governance}
-        whaleEvents={whaleEvents}
-        signals={signals}
-        tokenSymbol={profile.market.symbol}
-        commitActivityPromise={commitActivityPromise}
-        tvlHistoryPromise={tvlHistoryPromise}
-        transfersPromise={transfersPromise}
-        releasesPromise={releasesPromise}
-      />
     </div>
   );
 }

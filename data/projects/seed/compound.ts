@@ -12,7 +12,14 @@ export const compound: Project = {
   tags: ["cross-chain", "real-yield"],
   status: "live",
   chains: ["base", "ethereum", "arbitrum", "polygon"],
-  contracts: [],
+  contracts: [
+    {
+      chain: "base",
+      address: "0x9e1028f5f1d5ede59748ffcee5532509976840e0",
+      type: "token",
+      label: "COMP token (Base)",
+    },
+  ],
   github: {
     owner: "compound-finance",
     repo: "comet",
@@ -28,6 +35,8 @@ export const compound: Project = {
   providerIds: {
     coingeckoId: "compound-governance-token",
     defillamaSlug: "compound-v3",
+    // PR-051 — verified via CoinGecko's own "Contract" panel / Basescan link.
+    blockscoutAddress: "0x9e1028f5f1d5ede59748ffcee5532509976840e0",
   },
   governance: {
     snapshotSpace: "comp-vote.eth",

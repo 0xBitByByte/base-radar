@@ -7,15 +7,19 @@ import { useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 const SECTIONS = [
-  { id: "overview", label: "Overview" },
-  { id: "community", label: "Community" },
+  { id: "summary", label: "Summary" },
+  { id: "why-it-matters", label: "Why It Matters" },
+  { id: "overview", label: "Health & Trust" },
+  { id: "sources", label: "Sources" },
+  { id: "recent-highlights", label: "Highlights" },
+  { id: "timeline", label: "Timeline" },
   { id: "price", label: "Price" },
   { id: "tvl", label: "TVL" },
   { id: "network", label: "Network" },
   { id: "developer", label: "Engineering" },
+  { id: "community", label: "Community" },
   { id: "contracts", label: "Contracts" },
   { id: "governance", label: "Governance" },
-  { id: "timeline", label: "Timeline" },
 ] as const;
 
 /**

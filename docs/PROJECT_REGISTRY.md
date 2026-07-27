@@ -31,6 +31,8 @@ data/projects/
   helpers.ts       Read/query helpers (getProject, searchProjects, ...)
   metrics.ts       Registry Metrics model + computeRegistryMetrics() (PR-037)
   quality-score.ts Quality Score weighting + computeMetadataCompletenessFactor() (PR-037)
+  validation.ts    Registry Validation Utility — validateRegistry() (PR-051 final polish)
+  coverage.ts      Registry/Provider Coverage Report — computeRegistryCoverage() (PR-051 final polish)
   index.ts         Public barrel export — import from here
   seed/
     index.ts       Aggregates every seed file into SEED_PROJECTS
@@ -395,13 +397,6 @@ a value for a factor it wasn't given.
 - **Export name**: camelCase version of the file name — `export const aerodromeFinance`.
 - **`id` and `slug`**: kebab-case, identical to the file name, and stable forever once shipped (other parts of the app may reference a project by this string).
 
-## How to add a project
-
-1. Create `data/projects/seed/<slug>.ts` exporting a single `const <camelCaseSlug>: Project = { ... }`.
-2. Fill in every required field. Leave optional fields (`logoUrl`, `github`, `contracts`, provider IDs, and the PR-037 `lifecycle`/`verificationLevel`/`qualityScore` fields) out entirely rather than guessing.
-3. Register the new project in `data/projects/seed/index.ts`: add the import and append the const to the `SEED_PROJECTS` array.
-4. Run `npx tsc --noEmit` to confirm the shape is valid.
-
 ### Contracts policy
 
 `contracts` defaults to `[]`. Only add an entry when the address is a
@@ -415,27 +410,212 @@ out and note the gap instead.
 - `twitter` and `github` are populated on a best-effort basis — low stakes if a handle is slightly stale, and easy to correct later.
 - `discord` and `telegram` are intentionally omitted for every seed project. Invite links rotate and expire, so a hardcoded link is likely to go dead; they're left out entirely rather than shipped with a broken value.
 
-## How provider IDs work
+---
 
-`providerIds` holds the lookup keys that a **future** live-data provider layer
-will use to fetch market/chain data. Nothing in `data/projects/` calls any of
-these APIs — this is pure, static metadata that prepares the registry for
-that integration.
+## Field Reference
 
-| Field                     | Used by     | Notes                                              |
-| ------------------------- | ----------- | --------------------------------------------------- |
-| `coingeckoId`              | CoinGecko   | The `id` slug from CoinGecko's `/coins/list`.        |
-| `dexscreenerChainId`       | DexScreener | Chain identifier (e.g. `"base"`).                    |
-| `dexscreenerPairAddresses` | DexScreener | Known pair addresses to query directly, if any.      |
-| `defillamaSlug`            | DefiLlama   | Protocol slug from DefiLlama's protocol list.        |
-| `blockscoutAddress`        | Blockscout  | Primary contract address to look up on Base Blockscout. |
-| `baseRpcAddress`           | Base RPC    | Address for direct on-chain reads via Base RPC.       |
+Every field on `Project`, what it's *for*, which provider(s) actually
+consume it (via `lib/intelligence/sources.ts`'s `matchX` functions), whether
+it's required, its expected format, and a real example drawn from the
+current registry. "Consumed by" names the real matching function — if a
+field isn't named there, nothing in the Provider Layer reads it yet (it may
+still be used for display, search, or a future provider).
 
-A project may leave any of these `undefined` if the corresponding provider
-doesn't track it (e.g. a naming service like Basenames has no CoinGecko
-listing). GitHub metadata (`github.owner`/`github.repo`) doubles as the
-identifier the future GitHub activity provider will use — no separate field
-is needed for it.
+### Identity & copy
+
+| Field | Purpose | Required? | Format | Example |
+| --- | --- | --- | --- | --- |
+| `id` | Stable internal identifier. Never renamed once shipped — Alert Engine, Timeline, and Watchlist references all key off this string. | Required | kebab-case | `"aerodrome-finance"` |
+| `slug` | URL-facing identifier. Kept as a separate field so routing could diverge from `id` in principle, but by convention always identical to it (see "Naming conventions"). | Required | kebab-case, matches `id` | `"aerodrome-finance"` |
+| `name` | Display name shown everywhere in the UI. | Required | Free text | `"Aerodrome Finance"` |
+| `shortDescription` | One sentence (~≤80 chars), used in cards/lists/search results. | Required | Free text, one sentence | `"The central liquidity hub and ve(3,3) AMM for Base."` |
+| `description` | A few sentences of neutral, factual detail, used on the Project Profile. | Required | Free text, 2-4 sentences | See any seed file |
+| `logoUrl` | Project logo/icon. Not yet populated for any seed project — the UI falls back to a generated avatar. | Optional | Absolute image URL | *(unset today)* |
+| `websiteUrl` | Official site link. | Required | `https://` URL | `"https://aerodrome.finance"` |
+
+### Classification
+
+| Field | Purpose | Required? | Format | Example |
+| --- | --- | --- | --- | --- |
+| `categories` | Primary sector taxonomy — drives Explorer filtering. See "Category taxonomy" below. Must be non-empty. | Required (≥1) | `ProjectCategory[]` | `["dex", "yield"]` |
+| `tags` | Narrower, narrative descriptors layered on top of categories. May be empty. | Optional | `ProjectTag[]` | `["base-native", "real-yield"]` |
+| `status` | The real-world product's operational state (`live`/`beta`/`development`/`deprecated`/`sunset`). | Required | `ProjectStatus` | `"live"` |
+| `chains` | Every chain the project is deployed on. Any `contracts[].chain` must appear here too (enforced by `validateRegistry`). | Required (≥1) | `Chain[]` | `["base"]` |
+
+### On-chain data
+
+| Field | Purpose | Consumed by | Required? | Format | Example |
+| --- | --- | --- | --- | --- | --- |
+| `contracts` | Registered on-chain contracts. Feeds the Contracts section, the widened Blockscout verification match (PR-051), and — for a `type: "token"` entry on `chain: "base"` — the direct DexScreener pair lookup (PR-051). Defaults to `[]`; only add an entry you're highly confident is the canonical, publicly-published deployment (see "Contracts policy"). | Blockscout (`matchVerifiedContract`), DexScreener (`matchTrading`) | Optional (defaults `[]`) | `{chain, address, type, label?}[]` | `{chain: "base", address: "0x9401...8631", type: "token", label: "AERO token (Base)"}` |
+| `contracts[].chain` | Which chain this specific contract lives on. | — | Required per entry | One of `Chain` | `"base"` |
+| `contracts[].address` | The contract's address. | — | Required per entry | `0x` + 40 hex chars | `"0x940181a94a35a4569e4529a3cdfb74e38fd98631"` |
+| `contracts[].type` | What kind of contract this is. | — | Required per entry | One of `ContractType` | `"token"` |
+| `contracts[].label` | Human-readable label shown next to the address. | — | Optional | Free text | `"AERO token (Base)"` |
+
+### GitHub
+
+| Field | Purpose | Consumed by | Required? | Format | Example |
+| --- | --- | --- | --- | --- | --- |
+| `github` | Repo reference for real engineering-activity data — stars, forks, releases, commit activity, contributors. **A `repo` is required for any of this to resolve** — `matchGithub` explicitly refuses an org-only reference (`{owner}` with no `repo`), a real gap PR-051 found on half the registry's GitHub-configured projects and fixed by resolving each to a specific repo. | GitHub (`matchGithub`) | Optional | `{owner, repo?, url}` | `{owner: "aerodrome-finance", repo: "contracts", url: "https://github.com/aerodrome-finance/contracts"}` |
+| `github.owner` | GitHub org or username. | — | Required if `github` is set | GitHub username/org rules (alphanumeric, single hyphens) | `"aerodrome-finance"` |
+| `github.repo` | Specific repo name. **Omitting this makes the whole reference non-functional for live data** — only do so if you genuinely can't identify one confident, official repo. | — | Optional, but functionally required | GitHub repo-name rules | `"contracts"` |
+| `github.url` | Full URL, must match `owner`/`repo` exactly (`https://github.com/{owner}` or `https://github.com/{owner}/{repo}`). | — | Required if `github` is set | `https://github.com/...` URL | `"https://github.com/aerodrome-finance/contracts"` |
+
+### Social
+
+| Field | Purpose | Required? | Format | Notes |
+| --- | --- | --- | --- | --- |
+| `social.twitter` | X/Twitter profile link. | Optional | `https://` URL | Best-effort; low stakes if stale. |
+| `social.discord`, `social.telegram` | Community invite links. | Optional | `https://` URL | **Intentionally omitted for every current seed project** — invite links rotate/expire; a hardcoded one is likely to go dead. Leave unset rather than ship a broken link. |
+| `social.farcaster`, `.docs`, `.blog`, `.forum`, `.medium`, `.mirror`, `.linkedin` | Additional official links, when known. | Optional | `https://` URL | Populate only when confirmed official. |
+
+### Verification & registry state
+
+| Field | Purpose | Required? | Format | Example |
+| --- | --- | --- | --- | --- |
+| `verification` | Base Radar's own editorial trust in this entry's *metadata* — unrelated to on-chain "verified contract" status. | Required | `{status, verifiedAt?, source?, notes?}` | `{status: "verified", source: "Base Radar review"}` |
+| `verification.status` | `"verified"` \| `"community"` \| `"unverified"` \| `"flagged"` — see "Verification status" above. | Required | `VerificationStatus` | `"verified"` |
+| `lifecycle` | **PR-037.** Registry-record lifecycle, independent of `status`/`verification` — see "PR-037 — Project Lifecycle". Omitted entirely for a normal active entry. | Optional | `ProjectLifecycle` | *(unset for every current seed project)* |
+| `verificationLevel` | **PR-037.** Pipeline progress toward full live-data coverage — see "PR-037 — Verification Levels". | Optional | `ProjectVerificationLevel` | *(unset for every current seed project)* |
+| `qualityScore` | **PR-037.** Composite 0-100 score. Always computed, never hand-authored — never set this by hand in a seed file. | Optional, computed only | `ProjectQualityScore` | *(unset for every current seed project)* |
+
+### `providerIds` — live-data lookup keys
+
+`providerIds` holds the identifiers `lib/intelligence/sources.ts` uses to
+join a registry entry against a live provider response. Every field is
+optional — a project leaves one `undefined` when the corresponding provider
+genuinely doesn't track it (e.g. Basenames has no CoinGecko listing), never
+when it's simply unverified yet (in that case, verify it, per "How to
+verify an identifier" below, or leave it out and note the gap).
+
+| Field | Used by | Purpose | Format | Example |
+| --- | --- | --- | --- | --- |
+| `coingeckoId` | Price, 24h/7d/30d change, Market Cap, FDV, Volume (fallback), Supply, ATH/ATL, genesis date | The coin's real REST API `id` — **not necessarily the same as the URL slug on coingecko.com** (Moonwell's URL is `/coins/moonwell` but its real API id is `moonwell-artemis`; see docs/PR-051_REGISTRY_COMPLETION_REPORT.md §3 for the bug this caused before it was caught). Always confirm the id shown directly on the coin's own page, not the URL. | Lowercase kebab-case | `"aerodrome-finance"` |
+| `defillamaSlug` | TVL, TVL 7d/30d change, protocol category | DefiLlama's protocol slug. | Lowercase kebab-case | `"aerodrome-finance"` |
+| `dexscreenerChainId` | DexScreener trading-pair chain filter | Which chain to filter DexScreener results to (defaults to `"base"` if unset). Only meaningful when this project also has a `contracts[chain=base,type=token]` entry or `dexscreenerPairAddresses` — otherwise it has nothing to filter (`validateRegistry` flags this as `dexscreener-chain-id-without-target`). | Chain identifier string | `"base"` |
+| `dexscreenerPairAddresses` | Liquidity, Volume 24h, DEX pool list (legacy path) | Specific LP pair addresses to search for directly. Superseded in practice by registering a `contracts[type=token]` entry instead (PR-051's direct token-address lookup is more reliable — it isn't limited to "currently trending" pairs the way this keyword-search-based path is), but still supported for a project with a known pair and no clean token-contract mapping. | `0x` + 40 hex chars, array | `["0xabc...123"]` |
+| `blockscoutAddress` | Contract verification (heuristic match) | Primary address to check against Blockscout's bulk "most-recently-verified-on-Base" result. Should match one of `contracts[]`'s addresses when both are set. | `0x` + 40 hex chars | `"0x940181a94a35a4569e4529a3cdfb74e38fd98631"` |
+| `baseRpcAddress` | *(reserved — not read by any matcher today)* | Documented, real future use: a direct Base RPC read (e.g. `eth_getBalance`) for a metric not yet built. See docs/PR-051_REGISTRY_COMPLETION_REPORT.md §6/§10. Do not populate speculatively — wait until a real consumer exists. | `0x` + 40 hex chars | *(unset on every current seed project)* |
+
+### Governance
+
+| Field | Purpose | Consumed by | Required? | Format | Example |
+| --- | --- | --- | --- | --- | --- |
+| `governance` | Real Snapshot governance space, if one exists. Omit entirely rather than guess — `lib/governance` skips a project with no `governance` field rather than fabricating proposal data. | Snapshot (`lib/governance`) | Optional | `{snapshotSpace?, governanceType?, governanceUrl?}` | `{snapshotSpace: "aave.eth", governanceType: "snapshot", governanceUrl: "https://snapshot.org/#/aave.eth"}` |
+| `governance.snapshotSpace` | Real, verified Snapshot.org space id. **Always verify with a live query before adding** (see "How to verify an identifier") — a plausible-looking guess (e.g. `"projectname.eth"`) is often wrong or belongs to an unrelated space. | Governance, Proposals, Voting | Required if `governance` is set | Snapshot space id (usually ENS-style) | `"aave.eth"` |
+| `governance.governanceType` | Always `"snapshot"` today — the only implemented governance provider. Should be set whenever `snapshotSpace` is. | — | Required if `snapshotSpace` is set | Literal `"snapshot"` | `"snapshot"` |
+| `governance.governanceUrl` | Direct link to the space. | — | Optional | `https://` URL | `"https://snapshot.org/#/aave.eth"` |
+
+---
+
+## Registry Validation & Coverage Tools
+
+Two pure, static-analysis modules exist specifically so a bad registry edit
+is caught mechanically instead of silently shipping (see
+docs/PR-051_REGISTRY_COMPLETION_REPORT.md's own real example: an undetected
+`coingeckoId` typo that could never have matched CoinGecko's actual API).
+Neither makes a network call — both operate purely on the `Project[]`
+already compiled into the app.
+
+### `data/projects/validation.ts` — `validateRegistry(projects)`
+
+Runs every seed project (and, if you want to check a candidate before
+adding it, any project list you pass in) through a fixed set of checks and
+returns a `RegistryValidationReport`:
+
+```ts
+type RegistryValidationReport = {
+  issues: ValidationIssue[];
+  errors: ValidationIssue[];    // must be empty for the registry to be considered valid
+  warnings: ValidationIssue[];  // real, worth a look, never blocking
+  valid: boolean;               // errors.length === 0
+};
+```
+
+What it checks:
+
+- **Duplicates** (error): `id`, `slug`, `coingeckoId`, `defillamaSlug`, `snapshotSpace`, GitHub `owner/repo`, contract addresses (any type), and token-typed contract addresses specifically.
+- **Format** (error/warning): GitHub owner/repo/url consistency, CoinGecko/DefiLlama id casing, Snapshot space characters, `0x` + 40-hex address shape (contracts, `blockscoutAddress`, `baseRpcAddress`, `dexscreenerPairAddresses`), every URL field (`websiteUrl`, `github.url`, `social.*`, `governance.governanceUrl`), `contracts[].chain`/`contracts[].type` against the real enums.
+- **Missing required data** (error): empty `name`/`shortDescription`/`description`, empty `categories`/`chains`.
+- **Orphaned config** (warning): a `dexscreenerChainId` with no pair addresses or token contract to filter; a `blockscoutAddress` that doesn't match any registered contract.
+- **Conflicting metadata** (error/warning): `lifecycle.state: "duplicate"`/`"migrated"` without its required target field; `governance.governanceType: "snapshot"` without a `snapshotSpace` (or vice versa); a `contracts[].chain` not present in the project's own `chains`; `verificationLevel.level` at `"verified"`/`"intelligence-ready"` while `verification.status` is `"unverified"`/`"flagged"` (a real signal worth a re-review per "PR-037 — Verification Levels" above, not a hard error).
+
+Run it directly:
+
+```bash
+npm run registry:validate
+```
+
+This runs `tests/data/projects/validation.test.ts`, which asserts
+`report.errors` is empty against the real registry and prints the full
+human-readable report (`formatValidationReport`) either way. It also runs
+as part of `npm test`/CI like any other test — a broken seed-file edit
+fails the build the same way a broken component would.
+
+### `data/projects/coverage.ts` — `computeRegistryCoverage(projects)`
+
+Computes, per project, how many of 8 real coverage dimensions are actually
+configured — **not** whether the live provider currently responds (that
+requires a network call this pure module never makes), but whether the
+registry has given the Provider Layer enough to *try*:
+
+| Dimension | True when |
+| --- | --- |
+| GitHub | `github.repo` is set (an org-only reference doesn't count — mirrors `matchGithub`'s own rule) |
+| CoinGecko | `providerIds.coingeckoId` is set |
+| DefiLlama | `providerIds.defillamaSlug` is set |
+| DexScreener | a `contracts[chain=base,type=token]` entry exists, or `dexscreenerPairAddresses` is set — mirrors `matchTrading`'s two real paths |
+| Snapshot | `governance.snapshotSpace` is set |
+| Contracts | `contracts.length > 0` |
+| Token Address | at least one `contracts[].type === "token"` entry exists |
+| Blockscout | `providerIds.blockscoutAddress` is set, or any `contracts[chain=base]` entry exists — mirrors the PR-051-widened `matchVerifiedContract` |
+
+`computeProjectCoverage(project)` returns one project's `coveragePct`
+(0-100, rounded); `computeRegistryCoverage(projects)` returns every
+project's coverage plus registry-wide statistics (`averageCoveragePct`,
+`highest`, `lowest`, `dimensionAvailabilityPct`); `computeProviderCoverage(report)`
+reshapes the same data provider-by-provider (configured/missing count and
+coverage % per dimension, plus Base RPC — always 100% today, since
+`matchNetwork` only requires `"base"` in `chains`, no separate identifier).
+
+Run it directly:
+
+```bash
+npm run registry:coverage
+```
+
+This runs `tests/data/projects/coverage.test.ts`, printing both the
+per-project report (`formatCoverageReport`) and the provider-centric
+summary (`formatProviderCoverageReport`) — reproducible on demand any time
+registry data changes, never a stale, hand-maintained snapshot.
+
+---
+
+## Adding a New Project — Checklist
+
+1. **Required fields** — fill in `id`, `slug` (identical to `id`), `name`, `shortDescription`, `description`, `websiteUrl`, `categories` (≥1), `status`, `chains` (≥1), `contracts` (may be `[]`), `social` (may be `{}`), `verification.status`, `providerIds` (may be `{}`).
+2. **Optional fields** — leave `logoUrl`, `github`, non-empty `contracts`, any `providerIds` key, `governance`, `lifecycle`, `verificationLevel`, and `qualityScore` out entirely rather than guessing a plausible-looking value. An absent field is an honest "we don't know"; a wrong one is actively worse than that.
+3. **How to verify an identifier** (never guess — confirm against the real, live source immediately before writing it):
+   - **CoinGecko**: open `coingecko.com/en/coins/<candidate-id>` and read the page's own "API ID" field (shown in the Info panel) — this is what `/coins/markets` actually returns as `id`, and it is **not always the same as the URL slug**. Also confirm the "About" text genuinely describes this project (a ticker or slug can collide with a completely unrelated coin — see Clanker's seed file for a real example that was caught this way).
+   - **DefiLlama**: confirm the protocol appears at `defillama.com/protocol/<candidate-slug>` and the TVL figures make sense for this project.
+   - **GitHub**: visit `github.com/<owner>` and pick the org's real, pinned/most-starred repo that actually contains the contracts/protocol code — never leave `repo` unset if a specific one can be identified (an org-only reference is functionally inert, see the `github` field reference above).
+   - **Snapshot**: query `hub.snapshot.org/graphql` directly for the candidate space id and confirm it returns real, on-topic, recently-created proposals — a space existing with a plausible name is not sufficient confirmation on its own.
+   - **Contract addresses**: cross-reference at least two independent sources (e.g. CoinGecko's own "Contract" panel *and* its linked block-explorer page) before adding an entry to `contracts` or `providerIds.blockscoutAddress`.
+4. **Accepted data sources**: official project documentation, the project's official GitHub, the project's official website, the relevant chain's official explorer (Basescan/Blockscout), Snapshot's own GraphQL API, CoinGecko, DefiLlama, and the Base ecosystem's own official references. Third-party aggregators, social-media claims, or "looks right" pattern-matching are not sufficient on their own.
+5. **Common mistakes** (all real, all caught during PR-050/PR-051):
+   - Using a CoinGecko URL slug instead of its real API `id` (Moonwell — see the `coingeckoId` field reference above).
+   - Assuming a plausible ticker/slug match is the right project without reading its actual description (Clanker's CoinGecko id collided with an unrelated Solana meme token).
+   - Adding a `github` reference with only `owner` set — this can never resolve any live data; always find the specific `repo`.
+   - Setting `dexscreenerChainId` without also registering a `contracts[type=token]` entry or `dexscreenerPairAddresses` — the field then has nothing to filter (`validateRegistry` catches this).
+   - Letting `github.url` drift out of sync with `github.owner`/`github.repo` after an edit.
+   - Guessing a Snapshot space name pattern (`projectname.eth`) instead of confirming it resolves to real proposals for *this* project.
+6. **Validation workflow**:
+   1. Create `data/projects/seed/<slug>.ts` exporting a single `const <camelCaseSlug>: Project = { ... }`.
+   2. Register it in `data/projects/seed/index.ts` (import + append to `SEED_PROJECTS`).
+   3. Run `npx tsc --noEmit` to confirm the shape compiles.
+   4. Run `npm run registry:validate` — must show zero errors before the change is considered done. Review any warnings; fix or knowingly accept each one.
+   5. Run `npm run registry:coverage` to see the new project's coverage breakdown and confirm it matches what you actually configured.
+   6. Run `npm run lint`, `npx tsc --noEmit`, and `npm run build` one more time (per this repo's standard PR validation gate).
 
 ## Helpers (`data/projects/helpers.ts`)
 
@@ -451,6 +631,11 @@ is needed for it.
 - `computeRegistryMetrics(projects, now?)` (`data/projects/metrics.ts`) — derives `RegistryMetrics` from real data; see "Registry Metrics" above.
 - `computeMetadataCompletenessFactor(project)` (`data/projects/quality-score.ts`) — the one quality factor computable today; see "Quality Score" above.
 - `computeQualityScore(factors, now?)` (`data/projects/quality-score.ts`) — weighted composite from a fully-supplied factor set.
+
+### PR-051 additions (final polish)
+
+- `validateRegistry(projects)` / `formatValidationReport(report)` (`data/projects/validation.ts`) — see "Registry Validation & Coverage Tools" above.
+- `computeProjectCoverage(project)` / `computeRegistryCoverage(projects)` / `computeProviderCoverage(report)` / `formatCoverageReport(report)` / `formatProviderCoverageReport(report, projects)` (`data/projects/coverage.ts`) — see "Registry Validation & Coverage Tools" above.
 
 ## Explicitly out of scope for this layer
 

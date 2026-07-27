@@ -1,7 +1,20 @@
-import type { ProjectIntelligence, Health, Confidence, Sources } from "@/lib/intelligence/types";
+import type { MetricResolution, ProjectIntelligence, Health, Confidence, Sources } from "@/lib/intelligence/types";
 import type { Chain, ProjectCategory, ProjectTag, VerificationStatus } from "@/data/projects/enums";
 import type { ProviderName } from "@/lib/providers/common/types";
 import { buildNarrativeSignals, buildProjectSummary, buildRiskAnalysis } from "@/lib/intelligence-engine";
+
+/** This landing page never calls the real Provider Layer (see the module comment below), so there's no real resolution path to report — an empty, honest "no provider configured" resolution for every illustrative numeric field. */
+function emptyResolution<T>(): MetricResolution<T> {
+  return {
+    value: null,
+    provider: null,
+    attemptedProviders: [],
+    fallbackUsed: false,
+    lastUpdated: null,
+    confidence: null,
+    failureReason: "This marketing preview doesn't call the live Provider Layer.",
+  };
+}
 
 /**
  * "Featured Base Ecosystem Projects" (PR9.2 landing section) reuses the real
@@ -117,6 +130,7 @@ function buildFeaturedProject(spec: FeaturedProjectSpec): ProjectIntelligence {
       atlDate: null,
       sparkline7d: [],
       genesisDate: null,
+      priceResolution: emptyResolution<number>(),
     },
     trading: {
       available: false,
@@ -128,6 +142,8 @@ function buildFeaturedProject(spec: FeaturedProjectSpec): ProjectIntelligence {
       pairCount: 0,
       pools: [],
       largestPool: null,
+      volumeResolution: emptyResolution<number>(),
+      liquidityResolution: emptyResolution<number>(),
     },
     tvl: {
       available: spec.tvlUsd != null,
@@ -136,6 +152,7 @@ function buildFeaturedProject(spec: FeaturedProjectSpec): ProjectIntelligence {
       changePct7d: null,
       changePct30d: null,
       defillamaCategory: null,
+      tvlResolution: emptyResolution<number>(),
     },
     contracts: { count: 0, items: [] },
     github: {

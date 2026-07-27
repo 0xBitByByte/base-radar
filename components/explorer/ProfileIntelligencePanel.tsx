@@ -5,6 +5,8 @@ import { VerificationLevelBadge } from "@/components/explorer/VerificationLevelB
 import { LifecycleBadge } from "@/components/explorer/LifecycleBadge";
 import { formatLabel } from "@/components/explorer/format";
 import { GlowBadge, type GlowBadgeColor } from "@/components/ui/GlowBadge";
+import { RichTooltip } from "@/components/ui/RichTooltip";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { formatRelativeTime } from "@/lib/data/format";
 import { cn } from "@/lib/utils";
 import type { DiscoverySource, RegistryLifecycleState, VerificationLevel } from "@/data/projects/enums";
@@ -73,7 +75,18 @@ export function ProfileIntelligencePanel({
             <GlowBadge color="muted">Discovered via {formatLabel(registry.discoverySource)}</GlowBadge>
           )}
           {registry.qualityScore !== undefined && (
-            <GlowBadge color="muted">Quality Score {Math.round(registry.qualityScore)}/100</GlowBadge>
+            <Tooltip
+              content={
+                <RichTooltip
+                  title="Registry Quality Score"
+                  description="A 0-100 composite of metadata completeness, security signals, development activity, liquidity, community reach, and documentation — not a price or investment signal."
+                />
+              }
+            >
+              <GlowBadge color="muted" tabIndex={0} className="cursor-default outline-none focus-visible:ring-2 focus-visible:ring-radar-primary/50">
+                Quality Score {Math.round(registry.qualityScore)}/100
+              </GlowBadge>
+            </Tooltip>
           )}
         </div>
       )}
