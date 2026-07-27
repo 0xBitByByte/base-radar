@@ -1,5 +1,16 @@
 # Discovery Engine
 
+**PR-053 update:** this document originally covered only PR-039's
+foundation (Discovery Sources → Normalization → Duplicate Detection →
+Queue). PR-053 — the **Live Project Discovery Engine** — extends the same
+directory with the rest of the pipeline the brief's architecture diagram
+calls for: Deduplication (cross-candidate, before registry matching),
+Registry Matching (a richer 6-way classification), Provider Enrichment,
+Classification, Confidence Scoring, and the final `DiscoveryProject`
+model. See "PR-053 — Live Project Discovery Engine" at the bottom of this
+document for the new stages; everything above that section (PR-039's
+original content) is unchanged and still accurate.
+
 **PR-039 — Registry Discovery Engine.** This document covers `lib/discovery/`
 — the infrastructure that finds candidate Base ecosystem projects from
 multiple sources and prepares them for human review. It does **not**
@@ -190,3 +201,169 @@ review status." Turning an *accepted* `DiscoveryQueueEntry` into a real
 
 None of this exists today, and this PR does not fabricate a shortcut
 around it.
+
+---
+
+## PR-053 — Live Project Discovery Engine
+
+Extends the pipeline above with the remaining stages, none of which
+existed in PR-039:
+
+```
+ DiscoveryProvider.discover() → CandidateProject[]     (PR-039, unchanged)
+        │
+        ▼
+ dedupeCandidates()                                     lib/discovery/dedupe.ts
+   groups raw candidates from different sources that
+   refer to the same real-world project (shared
+   coingeckoId/defillamaSlug/contract/website/handle —
+   never a bare name match) into one DeduplicatedCandidate
+        │
+        ▼
+ matchAgainstRegistry()                                  lib/discovery/registryMatch.ts
+   classifies the group against data/projects/ into
+   exactly one of: new | duplicate | updated | renamed |
+   alias | needs-review
+        │
+        ▼
+ enrichCandidate()                                        lib/discovery/enrich.ts
+   real market/TVL evidence already sitting in
+   providerMetadata, plus (only for a matched project with
+   a known repo) real GitHub commit-activity evidence
+        │
+        ▼
+ classifyCandidate()                                      lib/discovery/classify.ts
+   deterministic ProjectCategory — DefiLlama's own
+   category string first, a fixed name-keyword table
+   second, "other" otherwise. No AI, no fuzzy matching.
+        │
+        ▼
+ computeDiscoveryConfidence()                             lib/discovery/confidence.ts
+   evidence-weighted 0-100 score
+        │
+        ▼
+ computeDiscoveryStatus()                                 lib/discovery/status.ts
+   evidence-based DiscoveryStatus
+        │
+        ▼
+ DiscoveryProject                                          lib/discovery/project.ts
+   the final, reusable per-project model
+```
+
+`runDiscoveryPipeline(existingProjects, providers?)` (`lib/discovery/project.ts`)
+ties every stage together; `runDiscoveryPipelineAgainstRegistry()` is the
+real-usage convenience wrapper defaulting to the live registry. Neither is
+called from any route, page, or cron job yet — same "nothing wired in"
+scope PR-039 established, extended rather than broken.
+
+### Registry field additions
+
+`CandidateProject` (`lib/discovery/types.ts`) gained two structured,
+optional fields so matching never has to reach into untyped
+`providerMetadata`:
+
+- `coingeckoId?: string` — the real CoinGecko API id, set by the
+  `coingecko` source (it already had this value as `externalId`).
+- `defillamaSlug?: string` — a **best-effort, name-derived** slug (via
+  `slugify()`, `lib/discovery/normalize.ts`), set by the `defillama`
+  source. DefiLlama's typed `Protocol` wrapper carries no real slug field
+  (see this doc's "Provider Contracts" section above), so this is
+  deliberately weighted lower than `coingeckoId` everywhere it's used as
+  evidence — never treated as an exact identifier.
+
+`data/projects/enums.ts`'s `PROJECT_CATEGORIES` gained two values —
+`"meme"` and `"payments"` — both real, distinct Base-ecosystem verticals
+the prior 20-category taxonomy had no bucket for, additive per that file's
+own documented policy.
+
+### Deduplication (`dedupe.ts`)
+
+Groups raw candidates from a single discovery run using the same
+"never rely on name alone" discipline as PR-039's own duplicate detection
+— two candidates only merge when they share a `coingeckoId`,
+`defillamaSlug`, contract address, normalized website, or normalized
+social handle. This is the concrete mechanism behind Task 6's "multiple
+provider agreement" confidence signal: a `DeduplicatedCandidate.sources`
+with more than one entry means two+ independent providers corroborated
+the same real project in the same run.
+
+### Registry Matching (`registryMatch.ts`)
+
+Builds directly on `duplicates.ts`'s `findDuplicateMatches()` (which
+PR-053 also extended with two more signals — `coingeckoId` at weight 45,
+`defillamaSlug` at weight 25, alongside the original contract/GitHub/
+website/Twitter/name weights) rather than re-implementing comparison
+logic. Classifies the strongest match into:
+
+| Type | Real evidence required |
+| --- | --- |
+| `new` | No match on any signal. |
+| `duplicate` | A unique identifier (contract/coingeckoId/GitHub) **and** the name both match, with nothing new in the candidate. |
+| `updated` | Same as `duplicate`, but the candidate carries a real field (website/GitHub/social/contract) the registry record doesn't have yet. |
+| `renamed` | A unique identifier matches, but the reported name differs — likely a rebrand. |
+| `alias` | Only a secondary signal (website/Twitter/fuzzy DefiLlama slug) matches, with a different name — plausible, not confirmed. |
+| `needs-review` | Only a bare name match, or a match too weak to trust alone. |
+
+A name-only match can **only ever** produce `new` or `needs-review` —
+structurally enforced, never a shortcut to a stronger classification.
+
+### Provider Enrichment (`enrich.ts`)
+
+Two real evidence sources, zero new provider integrations:
+
+1. Market/TVL fields already present in `providerMetadata` (the
+   `coingecko`/`defillama` discovery sources already fetch these as part
+   of their bulk listing call) — read synchronously, no network call.
+2. GitHub commit-activity (`github.getCommitActivity()`,
+   `lib/providers/github/service.ts`) — but **only** when Registry
+   Matching already found an existing project with a real `github.repo`.
+   Never called for the bulk of brand-new/unmatched candidates, which
+   have no repo to check — this is what answers "which have active
+   development?"/"which are abandoned?" for already-tracked projects
+   being rediscovered, without an unbounded GitHub call fan-out.
+
+### Classification (`classify.ts`)
+
+Deterministic, two real signals, no AI: DefiLlama's own `category` string
+(mapped onto the existing `ProjectCategory` enum) when available, a fixed
+name-keyword table otherwise, `"other"` when neither produces a confident
+match. See the module's own `DEFILLAMA_CATEGORY_MAP`/`NAME_KEYWORD_RULES`
+for the exact, auditable mapping — nothing here infers meaning beyond
+those two fixed tables.
+
+### Confidence Model (`confidence.ts`)
+
+Starts from the existing `SOURCE_CONFIDENCE` baseline (PR-039, unchanged)
+and adds a fixed point value per real evidence signal actually present
+(official website, real CoinGecko id, GitHub reference, on-chain contract,
+Snapshot space, multiple-provider agreement, an existing registry match,
+live market/TVL data), clamped 0-100. `Snapshot` is included in the model
+(per the brief's own example list) but is honestly always absent today —
+no discovery source surfaces governance data — documented in the module
+itself, not silently omitted.
+
+### Discovery Status (`status.ts`)
+
+Distinct from `DiscoveryQueueStatus` (queue.ts's human-review workflow
+state) — this is an evidence-based read of what kind of project this is:
+`verified` / `tracked` / `discovered` / `new` / `recently-updated` /
+`upcoming` / `announced` / `deprecated` / `inactive` / `needs-review` /
+`unknown`. Every rule cites its real evidence in a `reason` string. Two
+statuses (`upcoming`/`announced`) are real, evidence-gated rules that
+cannot currently fire against any of the three real discovery sources
+(`coingecko`/`defillama`/`blockscout` only ever surface already-live
+projects) — they activate automatically once the `community`/
+`base-ecosystem` placeholder sources gain a real integration, with zero
+code change needed here.
+
+### Future Projects Page Integration
+
+`DiscoveryProject` (`lib/discovery/project.ts`) already carries every
+field a future Projects page needs without this engine changing shape
+again: `status` → Verified/New/Recently Updated/Upcoming filter buckets;
+`category` → Categories filter; `confidence` → a trust/quality sort;
+`sources` → provenance display and a "Trending" candidate signal (a
+project corroborated by multiple sources, or one enrichment later
+confirms real volume growth); `displayName`/`normalizedName`/`website`/
+`github` → Search. None of this is wired into any UI yet — per this PR's
+explicit "backend/data layer only" scope.

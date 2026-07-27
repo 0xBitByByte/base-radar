@@ -37,6 +37,9 @@ export const coingeckoDiscoveryProvider: DiscoveryProvider = {
       externalId: market.id,
       normalizedName: normalizeName(market.name),
       displayName: market.name,
+      // PR-053 — the real CoinGecko API id, already fetched as `externalId`;
+      // surfaced as its own structured field for registry matching.
+      coingeckoId: market.id,
       socials: {},
       contracts: [],
       discoveredAt: fetchedAt,

@@ -15,7 +15,7 @@
 
 import { getBaseProtocols } from "@/lib/providers/defillama/service";
 import { recordDiscoveryFailure, recordDiscoverySuccess } from "@/lib/discovery/health";
-import { normalizeName, SOURCE_CONFIDENCE } from "@/lib/discovery/normalize";
+import { normalizeName, slugify, SOURCE_CONFIDENCE } from "@/lib/discovery/normalize";
 import type { DiscoveryProvider, DiscoveryResult } from "@/lib/discovery/provider";
 import type { CandidateProject } from "@/lib/discovery/types";
 
@@ -38,6 +38,11 @@ export const defillamaDiscoveryProvider: DiscoveryProvider = {
       externalId: protocol.name,
       normalizedName: normalizeName(protocol.name),
       displayName: protocol.name,
+      // PR-053 — a real slug isn't available from this codebase's typed
+      // `Protocol` wrapper (see this file's own header comment), so this is
+      // a best-effort, name-derived approximation — treated as fuzzy
+      // evidence by `registryMatch.ts`, never an exact identifier.
+      defillamaSlug: slugify(protocol.name),
       socials: {},
       contracts: [],
       discoveredAt: fetchedAt,

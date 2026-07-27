@@ -243,10 +243,14 @@ none of which contradicts any other.
 ## PR-037 — Category taxonomy
 
 `PROJECT_CATEGORIES` (`data/projects/enums.ts`) is the standardized,
-top-level sector taxonomy. Audited for this PR against every category
+top-level sector taxonomy. Audited for PR-037 against every category
 already in use across the 20 seed projects — no duplicates or overlapping
-names were found, so the existing 20 values are confirmed as the canonical
-taxonomy, unchanged:
+names were found, so those 20 values were confirmed as canonical at the
+time. **PR-053** (Live Project Discovery Engine) added two more —
+`meme`/`payments` — both real, distinct Base-ecosystem verticals live
+discovery data surfaces regularly that the original 20 had no bucket for;
+additive per this section's own policy, not a retroactive change to any
+existing seed project's classification:
 
 | Category | Scope |
 | --- | --- |
@@ -269,6 +273,8 @@ taxonomy, unchanged:
 | `launchpad` | Token/project launch platforms. |
 | `analytics` | Dashboards, data, and analytics tooling (distinct from Base Radar's own domain — third-party analytics products). |
 | `security` | Auditing, monitoring, and security tooling. |
+| `meme` | **(PR-053)** Community/narrative-driven tokens with no other primary utility. |
+| `payments` | **(PR-053)** Payment rails/checkout infrastructure, distinct from `stablecoin` (the asset) and `wallet` (custody). |
 | `other` | Genuinely uncategorizable — used sparingly. |
 
 **Categories vs. tags:** `categories` are the mutually-legible top-level
