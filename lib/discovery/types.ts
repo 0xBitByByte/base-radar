@@ -40,6 +40,27 @@ export type CandidateProject = {
   socials: CandidateSocials;
   /** Known contracts, if the source surfaced any. Usually empty — most sources don't carry on-chain addresses. */
   contracts: CandidateContract[];
+  /**
+   * PR-053 — CoinGecko's real API `id` (`/coins/markets`'s own `id` field),
+   * set only by the `coingecko` discovery source, which already fetches it
+   * as `externalId`. Kept as its own named, structured field (rather than
+   * reaching into `providerMetadata`) so `lib/discovery/registryMatch.ts`
+   * can compare it directly against a registry project's
+   * `providerIds.coingeckoId` — see docs/PR-051_REGISTRY_COMPLETION_REPORT.md
+   * for why a URL-slug/API-id mismatch here is a real, previously-seen bug
+   * class this structured comparison avoids.
+   */
+  coingeckoId?: string;
+  /**
+   * PR-053 — best-effort slug derived from the candidate's own display name
+   * via `slugify()` (`lib/discovery/normalize.ts`), set only by the
+   * `defillama` discovery source. DefiLlama's typed `Protocol` wrapper
+   * (`lib/providers/defillama/mapper.ts`) carries no real slug field (see
+   * docs/DISCOVERY_ENGINE.md), so this is deliberately a fuzzy,
+   * name-derived approximation — matching logic must treat it as weaker
+   * evidence than `coingeckoId`, never as an exact identifier.
+   */
+  defillamaSlug?: string;
   /** ISO timestamp of this discovery run, not the project's real-world launch date. */
   discoveredAt: string;
   /**

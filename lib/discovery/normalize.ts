@@ -59,3 +59,19 @@ export function normalizeHandle(handle: string | undefined | null): string | nul
   if (!trimmed) return null;
   return trimmed.toLowerCase();
 }
+
+/**
+ * PR-053 — best-effort slugification, identical in behavior to
+ * `lib/intelligence/helpers.ts`'s `slugify` (kept as its own copy rather
+ * than a cross-layer import — the Discovery Engine has never imported from
+ * `lib/intelligence/`, and this one function isn't worth breaking that
+ * boundary for). Used only to derive `CandidateProject.defillamaSlug`, a
+ * fuzzy approximation — see that field's own doc comment in `types.ts`.
+ */
+export function slugify(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}

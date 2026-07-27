@@ -30,6 +30,10 @@ export const PROJECT_CATEGORIES = [
   "launchpad",
   "analytics",
   "security",
+  /** PR-053 — a real, distinct, high-volume category of Base tokens the Discovery Engine's live provider feeds surface constantly; `PROJECT_TAGS` already has `"memecoin"` as a narrative descriptor, but tags aren't a substitute for primary classification. Additive per this file's own documented policy (see docs/PROJECT_REGISTRY.md "Category taxonomy"). */
+  "meme",
+  /** PR-053 — payment rails/checkout infrastructure (e.g. Coinbase Commerce-style flows), distinct from `stablecoin` (the asset) and `wallet` (custody) — a named vertical in Base's own ecosystem messaging that the prior 20-category taxonomy had no bucket for. */
+  "payments",
   "other",
 ] as const;
 export type ProjectCategory = (typeof PROJECT_CATEGORIES)[number];
