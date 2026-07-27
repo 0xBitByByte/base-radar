@@ -36,6 +36,23 @@ import type { NetworkStatus } from "@/lib/providers/base/service";
 import type { ProviderName } from "@/lib/providers/common/types";
 import type { NarrativeSignal, RiskContributor, RiskLevel } from "@/lib/intelligence-engine";
 import type { GovernanceEvent } from "@/lib/governance";
+/**
+ * PR-052 — the Provider Resolution Engine's own vocabulary now lives in
+ * `lib/providers/common/resolution.ts` (shared with `lib/data/aggregate.ts`)
+ * rather than being defined here. Imported normally (for use within this
+ * file, e.g. `Market.priceResolution` below) and re-exported at the bottom
+ * of this file so every existing `@/lib/intelligence/types` import
+ * elsewhere in the codebase keeps working unchanged. See that file's doc
+ * comment for why the move happened, and
+ * docs/PR-052_UNIFIED_INTELLIGENCE_LAYER.md for the full audit.
+ */
+import type {
+  MetricConfidence,
+  MetricResolution,
+  ProviderAttempt,
+  SourceAttribution,
+  SourceStatus,
+} from "@/lib/providers/common/resolution";
 
 // ---------------------------------------------------------------------------
 // Output sections
@@ -192,45 +209,8 @@ export type Health = {
   factors: string[];
 };
 
-export type SourceStatus = "live" | "unavailable" | "not_configured";
-
-export type SourceAttribution = {
-  provider: ProviderName;
-  status: SourceStatus;
-  fetchedAt: string | null;
-  /** Why the status is what it is, e.g. "No coingeckoId configured" or a provider error message. */
-  detail: string | null;
-};
-
-/**
- * PR-050 provider-resolution — the centralized multi-provider metric
- * resolution contract (`resolveMetric`, `lib/intelligence/resolution.ts`).
- * Defined here (not in `resolution.ts`) purely to avoid a circular import:
- * `Market`/`Trading`/`Tvl` below embed a `MetricResolution<T>` field, and
- * `resolution.ts` in turn imports `SourceAttribution` from this file — the
- * function body that builds these values still lives in `resolution.ts`.
- */
-export type MetricConfidence = "high" | "medium" | "low";
-
-export type ProviderAttempt = {
-  provider: ProviderName;
-  /** `"success"` when this provider actually supplied the value; otherwise its real `SourceAttribution` status. */
-  status: SourceStatus | "success";
-  /** Real reason this provider didn't supply the value — `null` when `status === "success"`. */
-  detail: string | null;
-};
-
-export type MetricResolution<T> = {
-  value: T | null;
-  provider: ProviderName | null;
-  attemptedProviders: ProviderAttempt[];
-  /** `true` when the winning provider wasn't the first candidate tried. */
-  fallbackUsed: boolean;
-  lastUpdated: string | null;
-  confidence: MetricConfidence | null;
-  /** Set only when every candidate failed — a real, specific explanation, never a bare "unavailable." */
-  failureReason: string | null;
-};
+/** Re-exported for every existing `@/lib/intelligence/types` import site — see the PR-052 import comment above for where these are actually defined now. */
+export type { SourceStatus, SourceAttribution, MetricConfidence, ProviderAttempt, MetricResolution };
 
 /** One attribution entry per provider this engine knows how to consult. */
 export type Sources = Record<ProviderName, SourceAttribution>;

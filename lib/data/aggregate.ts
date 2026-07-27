@@ -26,6 +26,7 @@ import * as defillama from "@/lib/providers/defillama/service";
 import * as dexscreener from "@/lib/providers/dexscreener/service";
 import * as github from "@/lib/providers/github/service";
 import type { ProviderResult } from "@/lib/providers/common/types";
+import { attributionFromProviderResult, resolveMetric, type MetricResolution } from "@/lib/providers/common/resolution";
 import { getWhaleProvider, type WatchedToken, type WhaleEvent as WhaleDetectionEvent } from "@/lib/whale";
 import { getGovernanceProvider, type GovernanceProjectRef } from "@/lib/governance";
 import { getIntelligenceProvider, type NarrativeCategorySample } from "@/lib/intelligence-engine";
@@ -129,7 +130,7 @@ function trendOf(deltaPct: number | undefined): Trend {
   return "flat";
 }
 
-function patchKpi(items: Kpi[], id: KpiId, value: number, deltaPct?: number) {
+function patchKpi(items: Kpi[], id: KpiId, value: number, deltaPct?: number, resolution?: MetricResolution<number>) {
   const idx = items.findIndex((k) => k.id === id);
   if (idx === -1) return;
   items[idx] = {
@@ -137,6 +138,7 @@ function patchKpi(items: Kpi[], id: KpiId, value: number, deltaPct?: number) {
     value,
     deltaPct: deltaPct ?? items[idx].deltaPct,
     trend: deltaPct === undefined ? items[idx].trend : trendOf(deltaPct),
+    resolution: resolution ?? items[idx].resolution,
   };
 }
 
@@ -144,7 +146,7 @@ async function getKpisImpl(): Promise<WithSource<{ items: Kpi[] }>> {
   const items = MOCK_KPIS.map((k) => ({ ...k }));
   let liveHits = 0;
 
-  const [tvlRes, stableRes, protocolsRes, netRes, marketsRes, chainStatsRes] =
+  const [tvlRes, stableRes, protocolsRes, netRes, marketsRes, chainStatsRes, pairsRes] =
     await Promise.allSettled([
       defillama.getBaseChainTvl(),
       defillama.getBaseStablecoinMcap(),
@@ -152,14 +154,19 @@ async function getKpisImpl(): Promise<WithSource<{ items: Kpi[] }>> {
       baseRpc.getBaseNetworkStatus(),
       coingecko.getBaseEcosystemMarkets(100),
       blockscout.getChainStats(),
+      dexscreener.getBaseTrendingPairs(),
     ]);
+
+  const marketsResult = marketsRes.status === "fulfilled" ? marketsRes.value : null;
+  const pairsResult = pairsRes.status === "fulfilled" ? pairsRes.value : null;
 
   const tvl = tvlRes.status === "fulfilled" ? unwrap(tvlRes.value) : null;
   const stable = stableRes.status === "fulfilled" ? unwrap(stableRes.value) : null;
   const protocols = protocolsRes.status === "fulfilled" ? unwrap(protocolsRes.value) : null;
   const net = netRes.status === "fulfilled" ? unwrap(netRes.value) : null;
-  const markets = marketsRes.status === "fulfilled" ? unwrap(marketsRes.value) : null;
+  const markets = marketsResult ? unwrap(marketsResult) : null;
   const chainStats = chainStatsRes.status === "fulfilled" ? unwrap(chainStatsRes.value) : null;
+  const pairs = pairsResult ? unwrap(pairsResult) : null;
 
   if (tvl) {
     patchKpi(items, "tvl", tvl.tvlUsd, tvl.changePct24h);
@@ -178,9 +185,30 @@ async function getKpisImpl(): Promise<WithSource<{ items: Kpi[] }>> {
     liveHits++;
   }
   if (markets) {
-    const dexVolume = markets.reduce((sum, m) => sum + (m.volume24hUsd ?? 0), 0);
-    if (dexVolume > 0) {
-      patchKpi(items, "dexVolume24h", dexVolume);
+    // PR-052 — Provider Resolution Engine, not a bare `??`: CoinGecko's
+    // Base-ecosystem markets sum is the primary candidate, DexScreener's
+    // own trending-pairs sum (already fetched for `getSignalsImpl`/
+    // `getActivityFeedImpl` elsewhere in this file) is a real, if
+    // narrower-scoped, fallback — the same `resolveMetric` engine
+    // `lib/intelligence/merge.ts` uses for a single project's volume,
+    // applied here at the ecosystem level.
+    const coingeckoVolume = markets.reduce((sum, m) => sum + (m.volume24hUsd ?? 0), 0);
+    const dexscreenerVolume = pairs ? pairs.reduce((sum, p) => sum + (p.volume24hUsd ?? 0), 0) : null;
+    const dexVolumeResolution = resolveMetric<number>([
+      {
+        provider: "coingecko",
+        value: coingeckoVolume > 0 ? coingeckoVolume : null,
+        attribution: attributionFromProviderResult("coingecko", marketsResult),
+      },
+      {
+        provider: "dexscreener",
+        value: dexscreenerVolume && dexscreenerVolume > 0 ? dexscreenerVolume : null,
+        attribution: attributionFromProviderResult("dexscreener", pairsResult),
+        confidence: "medium",
+      },
+    ]);
+    if (dexVolumeResolution.value !== null) {
+      patchKpi(items, "dexVolume24h", dexVolumeResolution.value, undefined, dexVolumeResolution);
       liveHits++;
     }
     const aiCount = markets.filter((m) => looksLikeAIProject(m.name)).length;
@@ -497,15 +525,37 @@ export const getSignals = cache(getSignalsImpl);
 
 async function getProjectSpotlightImpl(): Promise<WithSource<ProjectSpotlight>> {
   try {
-    const top = unwrap(await defillama.getTopBaseProtocol());
+    const topResult = await defillama.getTopBaseProtocol();
+    const top = unwrap(topResult);
     if (!top) return { ...MOCK_PROJECT_SPOTLIGHT, source: "mock" };
 
-    const markets = unwrap(await coingecko.getBaseEcosystemMarkets(150));
+    const marketsResult = await coingecko.getBaseEcosystemMarkets(150);
+    const markets = unwrap(marketsResult);
     const match = markets?.find(
       (m) => m.symbol.toLowerCase() === top.symbol?.toLowerCase() || m.name === top.name
     );
 
-    const change24hPct = match?.changePct24h ?? top.changePct24h ?? 0;
+    // PR-052 — this was a bare, unattributed `match?.changePct24h ?? top.changePct24h ?? 0`
+    // fallback chain — the exact "duplicated fallback logic" the Provider
+    // Resolution Engine exists to replace. CoinGecko's matched-market
+    // change is the primary candidate (asset-specific, high confidence);
+    // DefiLlama's own protocol-level change is a real fallback for a
+    // protocol CoinGecko didn't match, at medium confidence since it's a
+    // coarser, non-token-specific figure.
+    const changeResolution = resolveMetric<number>([
+      {
+        provider: "coingecko",
+        value: match?.changePct24h ?? null,
+        attribution: attributionFromProviderResult("coingecko", marketsResult),
+      },
+      {
+        provider: "defillama",
+        value: top.changePct24h ?? null,
+        attribution: attributionFromProviderResult("defillama", topResult),
+        confidence: "medium",
+      },
+    ]);
+    const change24hPct = changeResolution.value ?? 0;
     const category = top.category ?? "DeFi";
 
     const repoSlug = KNOWN_PROTOCOL_REPOS[top.name.toLowerCase()];
@@ -541,6 +591,7 @@ async function getProjectSpotlightImpl(): Promise<WithSource<ProjectSpotlight>> 
       aiScore,
       healthScore,
       communityScore: Math.min(99, Math.round(Math.log10(Math.max(top.tvlUsd, 10)) * 10)),
+      changeResolution,
       source: "live",
     };
   } catch {
@@ -1030,18 +1081,42 @@ async function getLiveTickerImpl(): Promise<WithSource<LiveTicker>> {
     blockscout.getChainStats(),
   ]);
 
+  const pricesResult = pricesRes.status === "fulfilled" ? pricesRes.value : null;
+  const chainStatsResult = chainStatsRes.status === "fulfilled" ? chainStatsRes.value : null;
+
   const net = netRes.status === "fulfilled" ? unwrap(netRes.value) : null;
-  const prices = pricesRes.status === "fulfilled" ? unwrap(pricesRes.value) : null;
+  const prices = pricesResult ? unwrap(pricesResult) : null;
   const tvl = tvlRes.status === "fulfilled" ? unwrap(tvlRes.value) : null;
-  const chainStats = chainStatsRes.status === "fulfilled" ? unwrap(chainStatsRes.value) : null;
+  const chainStats = chainStatsResult ? unwrap(chainStatsResult) : null;
 
   if (net) {
     ticker.blockHeight = net.blockHeight;
     ticker.gasGwei = net.gasGwei;
     liveHits++;
   }
+
+  // PR-052 — CoinGecko is the primary ETH price candidate (also supplies
+  // the 24h change, which Blockscout doesn't); Blockscout's own
+  // `ChainStats.ethPriceUsd` is a real, already-fetched-for-this-function
+  // fallback that was previously discarded entirely (see
+  // docs/PROVIDER_DATA_COVERAGE_AUDIT.md §6). BTC has no second candidate
+  // in this codebase's Provider Layer, so it stays a plain CoinGecko-only
+  // read, same as before.
+  const ethPriceResolution = resolveMetric<number>([
+    { provider: "coingecko", value: prices?.eth.usd ?? null, attribution: attributionFromProviderResult("coingecko", pricesResult) },
+    {
+      provider: "blockscout",
+      value: chainStats?.ethPriceUsd ?? null,
+      attribution: attributionFromProviderResult("blockscout", chainStatsResult),
+      confidence: "medium",
+    },
+  ]);
+  if (ethPriceResolution.value !== null) {
+    ticker.ethPriceUsd = ethPriceResolution.value;
+    ticker.ethPriceResolution = ethPriceResolution;
+    liveHits++;
+  }
   if (prices) {
-    ticker.ethPriceUsd = prices.eth.usd;
     ticker.ethChangePct24h = prices.eth.changePct24h;
     ticker.btcPriceUsd = prices.btc.usd;
     ticker.btcChangePct24h = prices.btc.changePct24h;
