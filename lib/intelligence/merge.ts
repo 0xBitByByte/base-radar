@@ -13,7 +13,7 @@
 
 import type { Project } from "@/data/projects/types";
 import { normalizeName, sumBy } from "@/lib/intelligence/helpers";
-import { resolveMetric } from "@/lib/intelligence/resolution";
+import { resolveMetric } from "@/lib/providers/common/resolution";
 import type {
   ChainInfo,
   Community,

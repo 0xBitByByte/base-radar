@@ -4,7 +4,18 @@
  * Every aggregate function in `lib/data/aggregate.ts` resolves to one of
  * these shapes regardless of which provider (or mock fallback) produced it,
  * so widgets never need to change when a provider is swapped later.
+ *
+ * PR-052 — a handful of fields below also carry an optional `*Resolution:
+ * MetricResolution<T>` (`lib/providers/common/resolution.ts`, the same
+ * Provider Resolution Engine `lib/intelligence/` uses for the Project
+ * Profile/Explorer) wherever `aggregate.ts` genuinely resolves that field
+ * from more than one real candidate provider. These are additive — no
+ * widget currently renders them, exactly like PR-037's `lifecycle`/
+ * `verificationLevel` fields on `Project` — real provenance is available
+ * in the data now, ready for a future UI pass to surface it, without any
+ * change to what's rendered today.
  */
+import type { MetricResolution } from "@/lib/providers/common/resolution";
 
 export type DataSource = "live" | "mock";
 
@@ -35,6 +46,8 @@ export type Kpi = {
   deltaPct?: number;
   trend?: Trend;
   tooltip: string;
+  /** PR-052 — set only for `dexVolume24h`, the one KPI resolved from more than one real candidate provider (CoinGecko primary, DexScreener fallback). `undefined` for every single-candidate KPI. */
+  resolution?: MetricResolution<number>;
 };
 
 export type MarketOverview = {
@@ -117,6 +130,8 @@ export type ProjectSpotlight = {
   aiScore: number;
   healthScore: number;
   communityScore: number;
+  /** PR-052 — how `change24hPct` above was resolved: CoinGecko's matched-market change first, DefiLlama's own protocol-level change as a real fallback (previously an unattributed `??` chain). */
+  changeResolution?: MetricResolution<number>;
 };
 
 export type RepoStats = {
@@ -209,4 +224,6 @@ export type LiveTicker = {
   btcChangePct24h: number;
   tvlUsd: number;
   transactionsToday: number;
+  /** PR-052 — how `ethPriceUsd` above was resolved: CoinGecko primary, Blockscout's own `ChainStats.ethPriceUsd` (previously fetched and discarded) as a real fallback. */
+  ethPriceResolution?: MetricResolution<number>;
 };
