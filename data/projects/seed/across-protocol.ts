@@ -15,7 +15,11 @@ export const acrossProtocol: Project = {
   contracts: [],
   github: {
     owner: "across-protocol",
-    url: "https://github.com/across-protocol",
+    // PR-051 — resolved to the org's real, pinned, most-starred smart
+    // contracts repo (previously org-only, so `matchGithub` never had a
+    // specific repo to query for this project).
+    repo: "contracts",
+    url: "https://github.com/across-protocol/contracts",
   },
   social: {
     twitter: "https://twitter.com/AcrossProtocol",

@@ -75,6 +75,8 @@ export type Market = {
   sparkline7d: number[];
   /** CoinGecko's genesis/launch date — `null` when not on record, fetched only on the Project Profile page (per-coin endpoint, too heavy for the bulk ecosystem list). */
   genesisDate: string | null;
+  /** PR-050 provider-resolution — how `priceUsd` above was resolved: CoinGecko first, DexScreener's own pair price as a real fallback when CoinGecko has no listing. See `lib/intelligence/resolution.ts`. */
+  priceResolution: MetricResolution<number>;
 };
 
 export type TradingPool = {
@@ -98,6 +100,10 @@ export type Trading = {
   /** Matched pools, sorted by liquidity descending — real per-pool DexScreener data, not fabricated. */
   pools: TradingPool[];
   largestPool: TradingPool | null;
+  /** PR-050 provider-resolution — how `volume24hUsd` above was resolved: DexScreener's on-chain pair volume first, CoinGecko's exchange-wide `total_volume` as a real (if broader-scoped) fallback. See `lib/intelligence/resolution.ts`. */
+  volumeResolution: MetricResolution<number>;
+  /** PR-050 provider-resolution — DexScreener is the only DEX-liquidity-depth provider this Engine integrates; formalized into the same resolution shape as `volumeResolution`/`priceResolution` for a consistent UI contract, even though there is currently only one real candidate. */
+  liquidityResolution: MetricResolution<number>;
 };
 
 export type Tvl = {
@@ -108,6 +114,8 @@ export type Tvl = {
   changePct7d: number | null;
   changePct30d: number | null;
   defillamaCategory: string | null;
+  /** PR-050 provider-resolution — DefiLlama is the only protocol-TVL provider this Engine integrates (CoinGecko's API doesn't expose per-protocol TVL, and no on-chain TVL aggregator is implemented). Formalized into the same resolution shape for a consistent UI contract. */
+  tvlResolution: MetricResolution<number>;
 };
 
 export type ContractInfo = {
@@ -192,6 +200,36 @@ export type SourceAttribution = {
   fetchedAt: string | null;
   /** Why the status is what it is, e.g. "No coingeckoId configured" or a provider error message. */
   detail: string | null;
+};
+
+/**
+ * PR-050 provider-resolution — the centralized multi-provider metric
+ * resolution contract (`resolveMetric`, `lib/intelligence/resolution.ts`).
+ * Defined here (not in `resolution.ts`) purely to avoid a circular import:
+ * `Market`/`Trading`/`Tvl` below embed a `MetricResolution<T>` field, and
+ * `resolution.ts` in turn imports `SourceAttribution` from this file — the
+ * function body that builds these values still lives in `resolution.ts`.
+ */
+export type MetricConfidence = "high" | "medium" | "low";
+
+export type ProviderAttempt = {
+  provider: ProviderName;
+  /** `"success"` when this provider actually supplied the value; otherwise its real `SourceAttribution` status. */
+  status: SourceStatus | "success";
+  /** Real reason this provider didn't supply the value — `null` when `status === "success"`. */
+  detail: string | null;
+};
+
+export type MetricResolution<T> = {
+  value: T | null;
+  provider: ProviderName | null;
+  attemptedProviders: ProviderAttempt[];
+  /** `true` when the winning provider wasn't the first candidate tried. */
+  fallbackUsed: boolean;
+  lastUpdated: string | null;
+  confidence: MetricConfidence | null;
+  /** Set only when every candidate failed — a real, specific explanation, never a bare "unavailable." */
+  failureReason: string | null;
 };
 
 /** One attribution entry per provider this engine knows how to consult. */

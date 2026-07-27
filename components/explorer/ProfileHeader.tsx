@@ -6,6 +6,7 @@ import { ProfileQuickActions } from "@/components/explorer/ProfileQuickActions";
 import { ProjectCategoryChips } from "@/components/explorer/ProjectCategoryChips";
 import { VerificationBadge } from "@/components/explorer/VerificationBadge";
 import { GlowBadge, type GlowBadgeColor } from "@/components/ui/GlowBadge";
+import { RichTooltip } from "@/components/ui/RichTooltip";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { getExplorerLink } from "@/lib/branding/explorerLink";
 import { SOCIAL_BRANDING } from "@/lib/branding/socials";
@@ -63,13 +64,14 @@ const ICON_SLOT_ORDER: SocialPlatform[] = [
   "x",
   "discord",
   "telegram",
+  "farcaster",
   "github",
   "medium",
+  "mirror",
   "docs",
   "coingecko",
   "defillama",
   "explorer",
-  "mirror",
   "reddit",
   "linkedin",
   "youtube",
@@ -264,18 +266,70 @@ export function ProfileHeader({
 
       <div className="flex flex-wrap items-center gap-1.5 border-t border-radar-light-border pt-4 dark:border-white/10">
         <VerificationBadge status={community.verificationStatus} compact hideAlternates />
-        <GlowBadge color={HEALTH_BADGE_COLOR[health.label]} className={cn("gap-1 px-1.5 py-0.5 text-[10px]", "transition-transform duration-150 hover:scale-105")}>
-          <HeartPulse className="size-2.5 shrink-0" aria-hidden="true" />
-          Health: {health.score}/100
-        </GlowBadge>
-        <GlowBadge color={CONFIDENCE_BADGE_COLOR[confidence.level]} className={cn("gap-1 px-1.5 py-0.5 text-[10px]", "transition-transform duration-150 hover:scale-105")}>
-          <Brain className="size-2.5 shrink-0" aria-hidden="true" />
-          Confidence: {confidence.score}/100
-        </GlowBadge>
-        <GlowBadge color={RISK_BADGE_COLOR[risk.level]} className={cn("gap-1 px-1.5 py-0.5 text-[10px]", "transition-transform duration-150 hover:scale-105")}>
-          <ShieldAlert className="size-2.5 shrink-0" aria-hidden="true" />
-          {risk.level[0].toUpperCase() + risk.level.slice(1)} Risk
-        </GlowBadge>
+        <Tooltip
+          content={
+            <RichTooltip title="Health Score" description={`Overall score: ${health.label[0].toUpperCase() + health.label.slice(1)} (${health.score}/100)`}>
+              {health.factors.length > 0 && (
+                <>
+                  <p className="text-radar-light-muted dark:text-radar-muted">Calculated from:</p>
+                  <ul className="mt-1 flex flex-col gap-0.5">
+                    {health.factors.map((factor) => (
+                      <li key={factor}>✓ {factor}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </RichTooltip>
+          }
+        >
+          <GlowBadge
+            color={HEALTH_BADGE_COLOR[health.label]}
+            tabIndex={0}
+            className={cn("gap-1 px-1.5 py-0.5 text-[10px] outline-none", "transition-transform duration-150 hover:scale-105 focus-visible:ring-2 focus-visible:ring-radar-primary/50")}
+          >
+            <HeartPulse className="size-2.5 shrink-0" aria-hidden="true" />
+            Health: {health.score}/100
+          </GlowBadge>
+        </Tooltip>
+        <Tooltip
+          content={
+            <RichTooltip title="Confidence Score" description={`How much of this profile comes from live provider data vs. registry defaults: ${confidence.level} (${confidence.score}/100)`}>
+              {confidence.factors.length > 0 && (
+                <>
+                  <p className="text-radar-light-muted dark:text-radar-muted">Calculated from:</p>
+                  <ul className="mt-1 flex flex-col gap-0.5">
+                    {confidence.factors.map((factor) => (
+                      <li key={factor}>✓ {factor}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </RichTooltip>
+          }
+        >
+          <GlowBadge
+            color={CONFIDENCE_BADGE_COLOR[confidence.level]}
+            tabIndex={0}
+            className={cn("gap-1 px-1.5 py-0.5 text-[10px] outline-none", "transition-transform duration-150 hover:scale-105 focus-visible:ring-2 focus-visible:ring-radar-primary/50")}
+          >
+            <Brain className="size-2.5 shrink-0" aria-hidden="true" />
+            Confidence: {confidence.score}/100
+          </GlowBadge>
+        </Tooltip>
+        <Tooltip
+          content={
+            <RichTooltip title="Risk Level" description={risk.explanation} />
+          }
+        >
+          <GlowBadge
+            color={RISK_BADGE_COLOR[risk.level]}
+            tabIndex={0}
+            className={cn("gap-1 px-1.5 py-0.5 text-[10px] outline-none", "transition-transform duration-150 hover:scale-105 focus-visible:ring-2 focus-visible:ring-radar-primary/50")}
+          >
+            <ShieldAlert className="size-2.5 shrink-0" aria-hidden="true" />
+            {risk.level[0].toUpperCase() + risk.level.slice(1)} Risk
+          </GlowBadge>
+        </Tooltip>
       </div>
     </div>
   );

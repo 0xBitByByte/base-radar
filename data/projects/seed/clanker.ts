@@ -21,5 +21,13 @@ export const clanker: Project = {
     source: "Base ecosystem directory",
     notes: "recently added, pending review",
   },
+  // PR-051 — checked, not just left unset: CoinGecko does list a coin with
+  // the id "clanker", but it is a distinct, unrelated Solana-ecosystem meme
+  // token (ticker CLANKER, contract on Solana, Solscan explorer) — not this
+  // project. Attaching that id here would have silently mixed a different
+  // project's market data into this one, which would have been worse than
+  // leaving it empty. No GitHub reference either: this registry entry never
+  // had one, and no single official Clanker repo could be confidently
+  // identified within this pass. Left empty rather than guessed.
   providerIds: {},
 };

@@ -25,3 +25,16 @@ export async function fetchSearchPairs(query: string): Promise<RawSearchResponse
   const url = `https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(query)}`;
   return fetchJson<RawSearchResponse>("dexscreener", url);
 }
+
+/**
+ * Direct lookup by token contract address — up to 30 comma-separated
+ * addresses per call, free, no key. Unlike `fetchSearchPairs` (a keyword
+ * search over currently-trending pairs), this resolves a specific, stable
+ * token address regardless of whether its pair is "trending" right now —
+ * see docs/PROVIDER_DATA_COVERAGE_AUDIT.md §5.2 for the limitation this
+ * fixes.
+ */
+export async function fetchPairsByTokenAddresses(addresses: string[]): Promise<RawSearchResponse> {
+  const url = `https://api.dexscreener.com/latest/dex/tokens/${addresses.join(",")}`;
+  return fetchJson<RawSearchResponse>("dexscreener", url);
+}

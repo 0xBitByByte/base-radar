@@ -35,3 +35,14 @@ export function mapBasePairs(rawPairs: RawDexScreenerPair[] | null): Pair[] {
   const pairs = (rawPairs ?? []).filter((p) => p.chainId === "base").map(mapPair);
   return pairs.sort((a, b) => (b.volume24hUsd ?? 0) - (a.volume24hUsd ?? 0));
 }
+
+/**
+ * Every pair returned for a set of looked-up token addresses, across
+ * whichever chains DexScreener has them on — deliberately not filtered to
+ * Base here (unlike `mapBasePairs`), since a token-address lookup can
+ * legitimately return pairs on other chains too. Callers filter by each
+ * project's own `chainId` (see `matchTrading`, `lib/intelligence/sources.ts`).
+ */
+export function mapTokenPairs(rawPairs: RawDexScreenerPair[] | null): Pair[] {
+  return (rawPairs ?? []).map(mapPair);
+}

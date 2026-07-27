@@ -12,7 +12,14 @@ export const virtualsProtocol: Project = {
   tags: ["ai-agents", "base-native"],
   status: "live",
   chains: ["base"],
-  contracts: [],
+  contracts: [
+    {
+      chain: "base",
+      address: "0x0b3e328455c4059eeb9e3f84b5543f74e24e7e1b",
+      type: "token",
+      label: "VIRTUAL token (Base)",
+    },
+  ],
   social: {
     twitter: "https://twitter.com/virtuals_io",
   },
@@ -22,5 +29,11 @@ export const virtualsProtocol: Project = {
   },
   providerIds: {
     coingeckoId: "virtual-protocol",
+    // PR-051 — verified via CoinGecko's own "Contract" panel / Basescan link.
+    blockscoutAddress: "0x0b3e328455c4059eeb9e3f84b5543f74e24e7e1b",
   },
+  // PR-051 — no GitHub reference added: this registry entry never had one,
+  // and no single, unambiguous official Virtuals Protocol contracts/SDK
+  // repo could be confidently identified within this pass. Left empty
+  // rather than guessed.
 };

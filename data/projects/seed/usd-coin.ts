@@ -22,7 +22,11 @@ export const usdCoin: Project = {
   ],
   github: {
     owner: "circlefin",
-    url: "https://github.com/circlefin",
+    // PR-051 — resolved to the org's real, most-starred repo containing
+    // USDC's actual EVM smart contracts (previously org-only, so
+    // `matchGithub` never had a specific repo to query for this project).
+    repo: "stablecoin-evm",
+    url: "https://github.com/circlefin/stablecoin-evm",
   },
   social: {
     twitter: "https://twitter.com/circle",
@@ -34,5 +38,10 @@ export const usdCoin: Project = {
   },
   providerIds: {
     coingeckoId: "usd-coin",
+    // Same address as the `contracts` entry above (Circle's own published
+    // canonical native USDC deployment on Base) — populated here too since
+    // this field also feeds the separate Blockscout verification-heuristic
+    // match (`matchVerifiedContract`), not just the Contracts section.
+    blockscoutAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bda02913",
   },
 };

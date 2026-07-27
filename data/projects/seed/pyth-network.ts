@@ -15,7 +15,12 @@ export const pythNetwork: Project = {
   contracts: [],
   github: {
     owner: "pyth-network",
-    url: "https://github.com/pyth-network",
+    // PR-051 — resolved to the org's real, most-active cross-chain
+    // programs/utilities repo, the piece most relevant to Pyth's Base
+    // deployment (previously org-only, so `matchGithub` never had a
+    // specific repo to query for this project).
+    repo: "pyth-crosschain",
+    url: "https://github.com/pyth-network/pyth-crosschain",
   },
   social: {
     twitter: "https://twitter.com/PythNetwork",

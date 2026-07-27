@@ -12,10 +12,21 @@ export const curveFinance: Project = {
   tags: ["cross-chain", "real-yield"],
   status: "live",
   chains: ["base", "ethereum", "arbitrum", "optimism", "polygon"],
-  contracts: [],
+  contracts: [
+    {
+      chain: "base",
+      address: "0x8Ee73c484A26e0A5df2Ee2a4960B789967dd0415",
+      type: "token",
+      label: "CRV token (Base)",
+    },
+  ],
   github: {
     owner: "curvefi",
-    url: "https://github.com/curvefi",
+    // PR-051 — resolved to the org's real, most-starred, actively
+    // maintained repo (previously org-only, so `matchGithub` never had a
+    // specific repo to query for this project).
+    repo: "curve-stablecoin",
+    url: "https://github.com/curvefi/curve-stablecoin",
   },
   social: {
     twitter: "https://twitter.com/curvefinance",
@@ -27,5 +38,7 @@ export const curveFinance: Project = {
   providerIds: {
     coingeckoId: "curve-dao-token",
     defillamaSlug: "curve-dex",
+    // PR-051 — verified via CoinGecko's own "Contract" panel / Basescan link.
+    blockscoutAddress: "0x8Ee73c484A26e0A5df2Ee2a4960B789967dd0415",
   },
 };

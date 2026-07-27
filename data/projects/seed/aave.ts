@@ -12,7 +12,14 @@ export const aave: Project = {
   tags: ["cross-chain", "real-yield"],
   status: "live",
   chains: ["base", "ethereum", "arbitrum", "optimism", "polygon", "avalanche"],
-  contracts: [],
+  contracts: [
+    {
+      chain: "base",
+      address: "0x63706e401c06ac8513145b7687a14804d17f814b",
+      type: "token",
+      label: "AAVE token (Base)",
+    },
+  ],
   github: {
     owner: "aave",
     repo: "aave-v3-core",
@@ -28,6 +35,12 @@ export const aave: Project = {
   providerIds: {
     coingeckoId: "aave",
     defillamaSlug: "aave-v3",
+    // PR-051 — same AAVE token address as `contracts` above, verified via
+    // CoinGecko's own "Contract" panel (cross-checked against its Basescan
+    // link) — populated here too since this field feeds the separate
+    // Blockscout verification-heuristic match (`matchVerifiedContract`),
+    // not just the Contracts section display.
+    blockscoutAddress: "0x63706e401c06ac8513145b7687a14804d17f814b",
   },
   governance: {
     snapshotSpace: "aave.eth",

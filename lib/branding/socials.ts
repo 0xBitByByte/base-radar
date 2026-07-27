@@ -1,20 +1,34 @@
-import { BookOpen, Briefcase, Compass, FileText, Globe, Landmark, LineChart, MessageCircle, MessagesSquare, Newspaper, PenLine, Rss, Send, Video, Vote } from "lucide-react";
+import { BookOpen, Briefcase, Compass, Globe, MessagesSquare, Newspaper, Vote } from "lucide-react";
 
-import { DiscordMark, GithubMark, LinktreeMark, XMark } from "@/components/ui/BrandIcons";
+import {
+  CoinGeckoMark,
+  DefiLlamaMark,
+  DiscordMark,
+  FarcasterMark,
+  GithubMark,
+  LinktreeMark,
+  MediumMark,
+  MirrorMark,
+  RedditMark,
+  TelegramMark,
+  XMark,
+  YoutubeMark,
+} from "@/components/ui/BrandIcons";
 import { SITE } from "@/constants/site";
 import type { BrandIconComponent, SocialBrand, SocialPlatform } from "@/lib/branding/types";
 
 /**
  * Display metadata for every external link platform this registry supports.
- * Real brand marks are used where this codebase already has one
- * (`BrandIcons`: GitHub, Discord, X, Linktree); everything else gets a
- * generic, representative icon rather than a fabricated logo — the same
- * choice this codebase already made for Telegram (lucide's `Send`) before
- * this registry existed. Farcaster isn't in PR8A's named platform list but
- * is real, existing project data (`Community.socials.farcaster`) that
- * `QuickViewCommunity` already rendered pre-PR8A — included so that link
- * has a home here too, instead of staying on a separate, un-migrated path.
- * Linktree is Base Radar's own site-wide community link (`constants/site.ts`
+ * Every platform with a real, recognizable brand mark uses one (`BrandIcons`)
+ * rather than a generic lucide substitute (PR-050 Req 2 — "never use a
+ * generic globe/link icon when a platform-specific icon exists"). Only
+ * `website`/`docs`/`blog`/`forum`/`governance` stay on generic icons, since
+ * none of those name a specific branded platform to draw a mark for.
+ * Farcaster isn't in PR8A's named platform list but is real, existing
+ * project data (`Community.socials.farcaster`) that `QuickViewCommunity`
+ * already rendered pre-PR8A — included so that link has a home here too,
+ * instead of staying on a separate, un-migrated path. Linktree is Base
+ * Radar's own site-wide community link (`constants/site.ts`
  * `SITE.social.linktree`) — not a per-project social field, but the same
  * "one place per platform" principle applies.
  *
@@ -30,30 +44,29 @@ import type { BrandIconComponent, SocialBrand, SocialPlatform } from "@/lib/bran
  * platforms — they're data-source/explorer links the Project Profile Hero
  * renders in the same icon row. `reddit`/`youtube` have no `SocialLinks`
  * schema field at all (no project in the registry has ever populated one)
- * — both get a generic representative icon, same convention as Telegram's
- * `Send`, and the Hero always renders them disabled ("Not available")
- * rather than omitting them, per Goal 1's "never hide icons" rule.
+ * — the Hero always renders them disabled ("Not available") rather than
+ * omitting them, per Goal 1's "never hide icons" rule.
  */
 export const SOCIAL_BRANDING: Record<SocialPlatform, SocialBrand> = {
   website: { label: "Website", Icon: Globe },
   docs: { label: "Docs", Icon: BookOpen },
   github: { label: "GitHub", Icon: GithubMark },
   discord: { label: "Discord", Icon: DiscordMark, hoverClassName: "hover:bg-[#5865F2]/10 hover:text-[#5865F2]" },
-  telegram: { label: "Telegram", Icon: Send, hoverClassName: "hover:bg-[#26A5E4]/10 hover:text-[#26A5E4]" },
+  telegram: { label: "Telegram", Icon: TelegramMark, hoverClassName: "hover:bg-[#26A5E4]/10 hover:text-[#26A5E4]" },
   x: { label: "X (Twitter)", Icon: XMark, hoverClassName: "hover:bg-[#1DA1F2]/10 hover:text-[#1DA1F2]" },
-  medium: { label: "Medium", Icon: FileText },
-  mirror: { label: "Mirror", Icon: PenLine },
-  farcaster: { label: "Farcaster", Icon: MessageCircle, hoverClassName: "hover:bg-[#8A63D2]/10 hover:text-[#8A63D2]" },
+  medium: { label: "Medium", Icon: MediumMark },
+  mirror: { label: "Mirror", Icon: MirrorMark },
+  farcaster: { label: "Farcaster", Icon: FarcasterMark, hoverClassName: "hover:bg-[#8A63D2]/10 hover:text-[#8A63D2]" },
   linktree: { label: "Linktree", Icon: LinktreeMark, hoverClassName: "hover:bg-[#43E660]/10 hover:text-[#43E660]" },
   blog: { label: "Blog", Icon: Newspaper },
   forum: { label: "Forum", Icon: MessagesSquare },
   linkedin: { label: "LinkedIn", Icon: Briefcase, hoverClassName: "hover:bg-[#0A66C2]/10 hover:text-[#0A66C2]" },
   governance: { label: "Governance", Icon: Vote },
-  coingecko: { label: "CoinGecko", Icon: LineChart },
-  defillama: { label: "DefiLlama", Icon: Landmark },
+  coingecko: { label: "CoinGecko", Icon: CoinGeckoMark, hoverClassName: "hover:bg-[#8DC63F]/10 hover:text-[#8DC63F]" },
+  defillama: { label: "DefiLlama", Icon: DefiLlamaMark },
   explorer: { label: "BaseScan", Icon: Compass },
-  reddit: { label: "Reddit", Icon: Rss },
-  youtube: { label: "YouTube", Icon: Video },
+  reddit: { label: "Reddit", Icon: RedditMark, hoverClassName: "hover:bg-[#FF4500]/10 hover:text-[#FF4500]" },
+  youtube: { label: "YouTube", Icon: YoutubeMark, hoverClassName: "hover:bg-[#FF0000]/10 hover:text-[#FF0000]" },
 };
 
 export type SocialNavLink = {
@@ -99,7 +112,7 @@ export function buildSocialNavLinks(neutralHoverClassName: string): SocialNavLin
       label: "Telegram",
       ariaLabel: "Join Base Radar Telegram",
       href: SITE.social.telegram,
-      Icon: Send,
+      Icon: TelegramMark,
       hoverClassName: SOCIAL_BRANDING.telegram.hoverClassName ?? "",
     },
     {

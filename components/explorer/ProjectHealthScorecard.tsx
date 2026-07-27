@@ -3,8 +3,6 @@ import { BadgeCheck, Code2, Droplets, Gauge, HeartPulse, Landmark, ShieldAlert, 
 
 import { ProfileDeveloperTileAsync } from "@/components/explorer/ProfileDeveloperTileAsync";
 import { ProfileSectionCard } from "@/components/explorer/ProfileSectionCard";
-import { RichTooltip } from "@/components/ui/RichTooltip";
-import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";
 import type { ScorecardSeverity, ScorecardTile } from "@/lib/intelligence/scorecard";
 import type { Confidence, Health, Risk } from "@/lib/intelligence/types";
@@ -102,55 +100,121 @@ const TILE_ICON: Record<string, LucideIcon> = {
 };
 
 /**
- * PR13.4 Goal 3 — the compact tile grid (PR13.3) is redesigned into the
- * spec's exact 8-card set: Health, Confidence, Risk, Verification (the same
- * real, already-computed top-level `ProjectIntelligence` fields the Profile
- * Header's badges already show — reused here, not recalculated) alongside
- * four of the Health Scorecard's own tiles (Developer, Community, Liquidity,
- * Governance — `buildHealthScorecard()`, unchanged). 4 columns × 2 rows on
- * desktop, every card the same compact icon/title/value/helper-text shape.
+ * PR-050 final pass — static, factual "what/why" copy per metric. Never
+ * data-dependent (no numbers, no per-project facts) — that real evidence
+ * comes from each tile's own `tooltip` (== `ScorecardTile.detail`), shown
+ * separately below. This pair of sentences answers the two questions a
+ * bare percentage can't: what is actually being measured, and why a reader
+ * should care whether it's High, Medium, or Low.
  */
-/** One card's markup — shared by every synchronous card and the async-swapped Developer card (`ProfileDeveloperTileAsync`, a Client Component, imports this directly rather than receiving it as a render-prop, since functions can't cross the Server→Client boundary as props), so a streamed-in evidence tile renders through the exact same recipe as every other tile. */
+const SCORECARD_EXPLANATION: Record<string, { measures: string; matters: string }> = {
+  health: {
+    measures: "Base Radar's overall fundamentals score, blending TVL, GitHub activity, and price momentum.",
+    matters: "A quick, transparent read on how strong this project's core signals are right now.",
+  },
+  confidence: {
+    measures: "How much of this report is backed by live provider data versus registry defaults.",
+    matters: "Tells you how much weight to put on the rest of this page's numbers.",
+  },
+  risk: {
+    measures: "How many of the 7 assessed risk factors currently show a real concern.",
+    matters: "Flags projects worth a closer look before relying on their numbers.",
+  },
+  verification: {
+    measures: "Base Radar's own editorial review status for this project's identity and links.",
+    matters: "Distinguishes reviewed, trusted listings from unverified or community-submitted ones.",
+  },
+  developer: {
+    measures: "Recent GitHub commit activity, releases, and contributor count.",
+    matters: "Active development is a strong signal a project is still being built and maintained.",
+  },
+  liquidity: {
+    measures: "Aggregated DEX liquidity depth across this project's tracked trading pairs.",
+    matters: "Deeper liquidity means large trades move the price less.",
+  },
+  governance: {
+    measures: "On-chain governance participation via Snapshot proposals.",
+    matters: "Active governance shows a real, engaged token-holder base, not just a listed contract.",
+  },
+  community: {
+    measures: "Share of official/community links (docs, socials, governance forum) configured in the registry.",
+    matters: "A fuller profile suggests a more established, more discoverable, more accountable project.",
+  },
+};
+
+/**
+ * PR-050 final pass — redesigned from a dense, tooltip-driven 4-column tile
+ * grid into a taller, self-explanatory 2-column card. Every card now states,
+ * always visible (never hover-only): what this measures, why it matters, and
+ * the real evidence (or, for `severity === "unknown"`, what evidence is
+ * missing) behind the number — so "Medium" or a bare score never appears
+ * without a reason a reader can act on. Shared by every synchronous card and
+ * the async-swapped Developer card (`ProfileDeveloperTileAsync`, a Client
+ * Component, imports this directly rather than receiving it as a render-prop,
+ * since functions can't cross the Server→Client boundary as props).
+ */
 export function ScorecardCardView({ card }: { card: MetaCard }) {
+  const explanation = SCORECARD_EXPLANATION[card.id];
+  const isUnassessed = card.severity === "unknown";
+
   return (
-    <Tooltip className="block h-full" content={<RichTooltip title={card.title} description={card.tooltip} />}>
-      <div
-        role="listitem"
-        tabIndex={0}
-        className="flex h-full cursor-default flex-col gap-2.5 rounded-xl border border-radar-light-border bg-radar-light-surface p-3.5 outline-none transition-all duration-200 hover:-translate-y-0.5 hover:border-radar-primary/30 hover:bg-radar-light-card hover:shadow-md focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-radar-primary/50 motion-reduce:hover:translate-y-0 dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-radar-accent/30 dark:hover:bg-white/[0.04]"
-      >
-        <div className="flex items-center justify-between">
-          <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg", SEVERITY_ICON_BG[card.severity])}>
-            <card.icon className={cn("size-4 shrink-0", SEVERITY_CLASS[card.severity])} aria-hidden="true" />
-          </span>
-        </div>
-
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <span className="truncate text-[10.5px] font-semibold tracking-wide text-radar-light-muted uppercase dark:text-radar-muted">
-            {card.title}
-          </span>
-          <span className={cn("truncate text-lg font-bold tabular-nums", SEVERITY_CLASS[card.severity])}>{card.value}</span>
-        </div>
-
-        {card.progress !== null && (
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-radar-light-border dark:bg-white/10">
-            <div
-              className={cn("h-full rounded-full transition-[width] duration-700 ease-out motion-reduce:transition-none", SEVERITY_BAR_GRADIENT[card.severity])}
-              style={{ width: `${card.progress}%` }}
-            />
-          </div>
-        )}
-
-        <span className="w-fit rounded-full bg-radar-light-border/60 px-1.5 py-0.5 text-[10px] font-medium text-radar-light-muted dark:bg-white/5 dark:text-radar-muted">
-          {card.helper}
+    <div
+      role="listitem"
+      className="flex flex-col gap-3 rounded-xl border border-radar-light-border bg-radar-light-surface p-4 dark:border-white/10 dark:bg-white/[0.02]"
+    >
+      <div className="flex items-start gap-3">
+        <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg", SEVERITY_ICON_BG[card.severity])}>
+          <card.icon className={cn("size-4.5 shrink-0", SEVERITY_CLASS[card.severity])} aria-hidden="true" />
         </span>
-
-        {/* Goal 6 — every tile explains itself inline, not only on hover; `title` carries the full sentence for anything the single line truncates. */}
-        <p className="truncate text-[10.5px] leading-snug text-radar-light-muted dark:text-radar-muted" title={card.tooltip}>
-          {card.tooltip}
-        </p>
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+            <span className="text-[10.5px] font-semibold tracking-wide text-radar-light-muted uppercase dark:text-radar-muted">
+              {card.title}
+            </span>
+            <span className="shrink-0 rounded-full bg-radar-light-border/60 px-1.5 py-0.5 text-[10px] font-medium text-radar-light-muted dark:bg-white/5 dark:text-radar-muted">
+              {card.helper}
+            </span>
+          </div>
+          <span className={cn("truncate text-xl font-bold tabular-nums", SEVERITY_CLASS[card.severity])}>{card.value}</span>
+        </div>
       </div>
-    </Tooltip>
+
+      {card.progress !== null && (
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-radar-light-border dark:bg-white/10">
+          <div
+            className={cn("h-full rounded-full transition-[width] duration-700 ease-out motion-reduce:transition-none", SEVERITY_BAR_GRADIENT[card.severity])}
+            style={{ width: `${card.progress}%` }}
+          />
+        </div>
+      )}
+
+      {explanation && (
+        <div className="flex flex-col gap-1.5 border-t border-radar-light-border pt-2.5 text-[11.5px] leading-relaxed dark:border-white/10">
+          <p className="text-radar-light-muted dark:text-radar-muted">
+            <span className="font-semibold text-radar-light-text dark:text-radar-white">Measures: </span>
+            {explanation.measures}
+          </p>
+          <p className="text-radar-light-muted dark:text-radar-muted">
+            <span className="font-semibold text-radar-light-text dark:text-radar-white">Why it matters: </span>
+            {explanation.matters}
+          </p>
+        </div>
+      )}
+
+      <p
+        className={cn(
+          "rounded-lg border p-2 text-[11.5px] leading-relaxed",
+          isUnassessed
+            ? "border-dashed border-radar-light-border text-radar-light-muted dark:border-white/10 dark:text-radar-muted"
+            : "border-radar-light-border bg-radar-light-card text-radar-light-text dark:border-white/10 dark:bg-white/[0.03] dark:text-radar-white"
+        )}
+      >
+        <span className={cn("font-semibold", isUnassessed ? "text-radar-light-muted dark:text-radar-muted" : SEVERITY_CLASS[card.severity])}>
+          {isUnassessed ? "What's missing: " : "Evidence: "}
+        </span>
+        {card.tooltip}
+      </p>
+    </div>
   );
 }
 
@@ -189,7 +253,10 @@ export function ProjectHealthScorecard({
       helper: health.label[0].toUpperCase() + health.label.slice(1),
       severity: HEALTH_SEVERITY[health.label],
       progress: health.score,
-      tooltip: "Base Radar's transparent Health score — see the Header badge and AI Intelligence section for the full factor breakdown.",
+      tooltip:
+        health.factors.length > 0
+          ? health.factors.join(", ")
+          : "No live signals (TVL, GitHub activity, or price momentum) are available to assess health yet.",
     },
     {
       id: "confidence",
@@ -199,7 +266,10 @@ export function ProjectHealthScorecard({
       helper: confidence.level[0].toUpperCase() + confidence.level.slice(1),
       severity: CONFIDENCE_SEVERITY[confidence.level],
       progress: confidence.score,
-      tooltip: "How much live data backed this analysis — see the AI Intelligence section for the full factor breakdown.",
+      tooltip:
+        confidence.factors.length > 0
+          ? confidence.factors.join(", ")
+          : "No live provider sources are currently backing this report.",
     },
     {
       id: "risk",
@@ -219,7 +289,7 @@ export function ProjectHealthScorecard({
       helper: "Registry status",
       severity: VERIFICATION_SEVERITY[verificationStatus],
       progress: null,
-      tooltip: "Base Radar's own editorial trust signal — see docs/PROJECT_REGISTRY.md.",
+      tooltip: "Base Radar's own editorial review — see docs/PROJECT_REGISTRY.md for what verification requires.",
     },
   ];
 
@@ -229,8 +299,12 @@ export function ProjectHealthScorecard({
   );
 
   return (
-    <ProfileSectionCard title="Project Health Scorecard" icon={Gauge}>
-      <div role="list" aria-label="Project health score matrix" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <ProfileSectionCard title="Project Health Scorecard" icon={Gauge} className="gap-4">
+      <p className="text-xs leading-relaxed text-radar-light-muted dark:text-radar-muted">
+        Eight independent scores, each with what it measures, why it matters, and the real evidence (or missing evidence)
+        behind it — nothing here is an unexplained percentage.
+      </p>
+      <div role="list" aria-label="Project health score matrix" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {metaCards.map((card) => (
           <ScorecardCardView key={card.id} card={card} />
         ))}
