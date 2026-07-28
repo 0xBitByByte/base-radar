@@ -107,7 +107,7 @@ export function IntelligenceBrief({ data, evidenceSummary, sources, className }:
           aria-label="Refresh Intelligence Brief"
           className="flex shrink-0 items-center gap-1.5 rounded-lg border border-radar-light-border px-2 py-1 text-[11px] font-medium text-radar-light-muted outline-none transition-colors hover:bg-radar-light-surface hover:text-radar-light-text disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:border-white/10 dark:text-radar-muted dark:hover:bg-white/5 dark:hover:text-radar-white"
         >
-          <RefreshCw className={cn("size-3.5", isPending && "animate-spin")} aria-hidden="true" />
+          <RefreshCw className={cn("size-3.5", isPending && "animate-spin motion-reduce:animate-none")} aria-hidden="true" />
           Refresh
         </button>
       </div>
