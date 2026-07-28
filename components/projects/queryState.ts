@@ -17,7 +17,8 @@
 
 import { PROJECT_CATEGORIES, VERIFICATION_STATUSES, type ProjectCategory, type VerificationStatus } from "@/data/projects/enums";
 import { DISCOVERY_STATUSES, type DiscoveryStatus } from "@/lib/discovery/status";
-import { SORT_FIELDS, type SortField, type SortOrder } from "@/lib/projects/types";
+import { FINANCIAL_RANGES } from "@/lib/projects/financial";
+import { SORT_FIELDS, type FinancialMetric, type FinancialRangeId, type SortField, type SortOrder } from "@/lib/projects/types";
 
 /** The one route every href/navigation on this page targets — avoids hardcoding the path string in every server-rendered `<Link>`. */
 export const PROJECTS_PATH = "/dashboard/projects";
@@ -99,6 +100,7 @@ const FIELD_LABELS: Record<SortField, string> = {
   marketCap: "Market Cap",
   tvl: "TVL",
   volume: "Volume 24h",
+  liquidity: "Liquidity",
   activity: "GitHub Activity",
   alphabetical: "Name",
   discoveryDate: "Discovery Date",
@@ -150,6 +152,11 @@ export type ProjectsQueryState = {
   hasVolume: boolean;
   discoveryStatuses: DiscoveryStatus[];
   verificationStatuses: VerificationStatus[];
+  /** PR-063 — one active range per financial metric; `null` means "no constraint." Ranges within a metric are mutually exclusive (a project can't be both "< $1M" and "$1M–10M" TVL), so each is a single value, not an array. */
+  tvlRange: FinancialRangeId | null;
+  liquidityRange: FinancialRangeId | null;
+  marketCapRange: FinancialRangeId | null;
+  volumeRange: FinancialRangeId | null;
   sortField: SortField;
   sortOrder: SortOrder;
   /** `true` when the URL itself named a sort — lets the page distinguish "the user picked this" from "this is just the view's own default." */
@@ -166,6 +173,10 @@ export const DEFAULT_QUERY_STATE: ProjectsQueryState = {
   hasVolume: false,
   discoveryStatuses: [],
   verificationStatuses: [],
+  tvlRange: null,
+  liquidityRange: null,
+  marketCapRange: null,
+  volumeRange: null,
   sortField: "confidence",
   sortOrder: "desc",
   sortExplicit: false,
@@ -190,6 +201,14 @@ function parseList<T extends string>(value: string | string[] | undefined, valid
     .filter((item): item is T => set.has(item));
 }
 
+/** An unrecognized or malformed range id for `metric` falls back to `null` ("no constraint") rather than throwing. */
+function parseFinancialRange(value: string | string[] | undefined, metric: FinancialMetric): FinancialRangeId | null {
+  const raw = first(value);
+  if (!raw) return null;
+  const match = FINANCIAL_RANGES[metric].find((def) => def.id === raw);
+  return match ? match.id : null;
+}
+
 /** Parses Next's raw `searchParams` into typed, validated state — an unrecognized or malformed value always falls back to its default rather than throwing. */
 export function parseProjectsQueryState(searchParams: RawSearchParams): ProjectsQueryState {
   const rawView = first(searchParams.view);
@@ -211,6 +230,10 @@ export function parseProjectsQueryState(searchParams: RawSearchParams): Projects
     hasVolume: first(searchParams.hasVolume) === "true",
     discoveryStatuses: parseList(searchParams.discoveryStatus, DISCOVERY_STATUSES),
     verificationStatuses: parseList(searchParams.verificationStatus, VERIFICATION_STATUSES),
+    tvlRange: parseFinancialRange(searchParams.tvlRange, "tvl"),
+    liquidityRange: parseFinancialRange(searchParams.liquidityRange, "liquidity"),
+    marketCapRange: parseFinancialRange(searchParams.marketCapRange, "marketCap"),
+    volumeRange: parseFinancialRange(searchParams.volumeRange, "volume"),
     sortField,
     sortOrder,
     sortExplicit,
@@ -233,6 +256,10 @@ const PAGE_RESETTING_KEYS: (keyof ProjectsQueryState)[] = [
   "hasVolume",
   "discoveryStatuses",
   "verificationStatuses",
+  "tvlRange",
+  "liquidityRange",
+  "marketCapRange",
+  "volumeRange",
   "view",
 ];
 
@@ -259,6 +286,10 @@ export function buildProjectsQuery(state: ProjectsQueryState, overrides: Partial
   if (next.hasVolume) params.set("hasVolume", "true");
   if (next.discoveryStatuses.length > 0) params.set("discoveryStatus", next.discoveryStatuses.join(","));
   if (next.verificationStatuses.length > 0) params.set("verificationStatus", next.verificationStatuses.join(","));
+  if (next.tvlRange) params.set("tvlRange", next.tvlRange);
+  if (next.liquidityRange) params.set("liquidityRange", next.liquidityRange);
+  if (next.marketCapRange) params.set("marketCapRange", next.marketCapRange);
+  if (next.volumeRange) params.set("volumeRange", next.volumeRange);
 
   const viewDefaultSort = defaultSortForView(next.view);
   const sortIsDefault = next.sortField === viewDefaultSort.field && next.sortOrder === viewDefaultSort.order;
@@ -279,7 +310,11 @@ export function hasActiveFilters(state: ProjectsQueryState): boolean {
     state.highConfidence ||
     state.hasVolume ||
     state.discoveryStatuses.length > 0 ||
-    state.verificationStatuses.length > 0
+    state.verificationStatuses.length > 0 ||
+    state.tvlRange !== null ||
+    state.liquidityRange !== null ||
+    state.marketCapRange !== null ||
+    state.volumeRange !== null
   );
 }
 
@@ -290,6 +325,10 @@ export function countActiveFilters(state: ProjectsQueryState): number {
     (state.highConfidence ? 1 : 0) +
     (state.hasVolume ? 1 : 0) +
     state.discoveryStatuses.length +
-    state.verificationStatuses.length
+    state.verificationStatuses.length +
+    (state.tvlRange ? 1 : 0) +
+    (state.liquidityRange ? 1 : 0) +
+    (state.marketCapRange ? 1 : 0) +
+    (state.volumeRange ? 1 : 0)
   );
 }

@@ -24,11 +24,21 @@ import {
   type RawSearchParams,
 } from "@/components/projects/queryState";
 import { PROJECTS_VIEW_META } from "@/components/projects/viewMeta";
+import { computeFinancialSummary, financialRangeDef } from "@/lib/projects/financial";
 import { filterLiveProjects } from "@/lib/projects/filter";
 import { paginateLiveProjects } from "@/lib/projects/pagination";
 import { buildProjectSearchIndex, searchLiveProjects } from "@/lib/projects/search";
 import { sortLiveProjects } from "@/lib/projects/sort";
-import type { FilterOptions, LiveProject, LiveProjectCollections, PaginatedResult } from "@/lib/projects/types";
+import {
+  FINANCIAL_METRICS,
+  FINANCIAL_METRIC_LABELS,
+  type FilterOptions,
+  type FinancialMetric,
+  type FinancialRangeId,
+  type LiveProject,
+  type LiveProjectCollections,
+  type PaginatedResult,
+} from "@/lib/projects/types";
 import type { ProjectsLeaderboards, SmartViewLists } from "@/components/projects/loadProjectsData";
 
 export const DIRECTORY_PAGE_SIZE = 24;
@@ -69,6 +79,60 @@ export function baseListForView(
   }
 }
 
+/** The one active range per financial metric, read off `state` — the single place both the filter pipeline and the Financial Summary bar build this shape from. */
+function activeFinancialRanges(state: ProjectsQueryState): Partial<Record<FinancialMetric, FinancialRangeId>> {
+  const ranges: Partial<Record<FinancialMetric, FinancialRangeId>> = {};
+  if (state.tvlRange) ranges.tvl = state.tvlRange;
+  if (state.liquidityRange) ranges.liquidity = state.liquidityRange;
+  if (state.marketCapRange) ranges.marketCap = state.marketCapRange;
+  if (state.volumeRange) ranges.volume = state.volumeRange;
+  return ranges;
+}
+
+/** Task 4 — one contextual stats card per active financial metric. */
+export type FinancialSummaryEntry = {
+  metric: FinancialMetric;
+  rangeLabel: string;
+  count: number;
+  highest: number;
+  average: number;
+  total: number;
+};
+
+/**
+ * Task 4 — computed only from `filtered` (the currently-visible set, after
+ * every other active facet already narrowed it down) and only for metrics
+ * with an active range — never the full registry, never a fabricated stat.
+ */
+function buildFinancialSummary(filtered: LiveProject[], ranges: Partial<Record<FinancialMetric, FinancialRangeId>>): FinancialSummaryEntry[] {
+  return FINANCIAL_METRICS.flatMap((metric) => {
+    const rangeId = ranges[metric];
+    if (!rangeId) return [];
+    const def = financialRangeDef(rangeId);
+    const summary = computeFinancialSummary(filtered, metric);
+    if (!def || !summary) return [];
+    return [{ metric, rangeLabel: def.label, count: summary.count, highest: summary.highest, average: summary.average, total: summary.total }];
+  });
+}
+
+/** Task 6 — a specific, real sentence when the active financial filter(s) are the reason nothing matched, e.g. "No verified projects currently match TVL > $100M." Falls back to the generic message when no financial range is active. */
+function buildFiltersEmptyDescription(state: ProjectsQueryState, ranges: Partial<Record<FinancialMetric, FinancialRangeId>>): string {
+  const activeMetrics = FINANCIAL_METRICS.filter((metric) => ranges[metric]);
+  if (activeMetrics.length === 0) {
+    return "Try removing a filter — the combination currently selected has no real matches.";
+  }
+
+  const financialPhrase = activeMetrics
+    .map((metric) => {
+      const def = financialRangeDef(ranges[metric] as FinancialRangeId);
+      return `${FINANCIAL_METRIC_LABELS[metric]} ${def?.label ?? ""}`.trim();
+    })
+    .join(" and ");
+
+  const subject = state.verified ? "verified projects" : "projects";
+  return `No ${subject} currently match ${financialPhrase}.`;
+}
+
 /** One real sentence of "why these results" — never a generic label. Omitted entirely when browsing everything with nothing active. */
 function buildDirectorySubtitle(state: ProjectsQueryState, isSearching: boolean): string | undefined {
   const parts: string[] = [];
@@ -95,6 +159,8 @@ export type DirectoryPipelineResult = {
   directoryTitle: string;
   directorySubtitle: string | undefined;
   emptyState: DirectoryEmptyStateProps;
+  /** PR-063 — Task 4: one contextual stats card per active financial metric, computed from the filtered set. Empty when no financial filter is active. */
+  financialSummary: FinancialSummaryEntry[];
 };
 
 export type BuildDirectoryPipelineInput = {
@@ -122,6 +188,7 @@ export function buildDirectoryPipeline({
 
   const base = baseListForView(state.view, projects, collections, leaderboards, smartViewLists);
 
+  const financialRanges = activeFinancialRanges(state);
   const filterOptions: FilterOptions = {
     category: state.categories.length > 0 ? state.categories : undefined,
     verified: state.verified ? true : undefined,
@@ -129,8 +196,10 @@ export function buildDirectoryPipeline({
     minConfidence: state.highConfidence ? 70 : undefined,
     discoveryStatus: state.discoveryStatuses.length > 0 ? state.discoveryStatuses : undefined,
     verificationStatus: state.verificationStatuses.length > 0 ? state.verificationStatuses : undefined,
+    financialRanges: Object.keys(financialRanges).length > 0 ? financialRanges : undefined,
   };
   const filtered = filterLiveProjects(base, filterOptions);
+  const financialSummary = buildFinancialSummary(filtered, financialRanges);
 
   const isSearching = state.search.length > 0;
   const ranked = isSearching
@@ -147,6 +216,8 @@ export function buildDirectoryPipeline({
     : hasActiveFilters(state)
       ? {
           reason: "filters",
+          description: buildFiltersEmptyDescription(state, financialRanges),
+          browseAllHref: PROJECTS_PATH,
           clearHref: `${PROJECTS_PATH}${buildProjectsQuery(state, {
             categories: [],
             verified: false,
@@ -154,6 +225,10 @@ export function buildDirectoryPipeline({
             hasVolume: false,
             discoveryStatuses: [],
             verificationStatuses: [],
+            tvlRange: null,
+            liquidityRange: null,
+            marketCapRange: null,
+            volumeRange: null,
           })}`,
         }
       : state.view === "all"
@@ -164,5 +239,5 @@ export function buildDirectoryPipeline({
             description: PROJECTS_VIEW_META[state.view].emptyDescription,
           };
 
-  return { state, directoryPage, directoryTitle, directorySubtitle, emptyState };
+  return { state, directoryPage, directoryTitle, directorySubtitle, emptyState, financialSummary };
 }

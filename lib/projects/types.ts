@@ -185,6 +185,8 @@ export const SORT_FIELDS = [
   "marketCap",
   "tvl",
   "volume",
+  /** PR-063 — `market.liquidityUsd`. Distinct from `volume`/`tvl`: DEX liquidity depth, not trading throughput or locked-value. */
+  "liquidity",
   "activity",
   "alphabetical",
   "discoveryDate",
@@ -236,6 +238,67 @@ export type FilterOptions = {
    * "verified" lives in exactly one place.
    */
   verified?: boolean;
+  /**
+   * PR-063 — one active range per financial metric. Every metric present
+   * combines as AND with every other facet here, exactly like the rest of
+   * `FilterOptions`. A project with no real value for a given metric never
+   * matches any range for it — a `null` is "no data," never treated as
+   * "below every threshold."
+   */
+  financialRanges?: Partial<Record<FinancialMetric, FinancialRangeId>>;
+};
+
+// ---------------------------------------------------------------------------
+// Financial filtering (PR-063)
+// ---------------------------------------------------------------------------
+
+/**
+ * The four financial dimensions this app can filter/sort by — each backed
+ * by exactly one provider (`lib/projects/financial.ts`'s
+ * `FINANCIAL_METRIC_PROVIDER`), never a value blended across providers.
+ */
+export const FINANCIAL_METRICS = ["tvl", "liquidity", "marketCap", "volume"] as const;
+export type FinancialMetric = (typeof FINANCIAL_METRICS)[number];
+
+export const FINANCIAL_METRIC_LABELS: Record<FinancialMetric, string> = {
+  tvl: "TVL",
+  liquidity: "Liquidity",
+  marketCap: "Market Cap",
+  volume: "24H Volume",
+};
+
+/**
+ * Every real bucket id across every metric's range picker. Ranges are fixed,
+ * hand-chosen thresholds (defined once in `lib/projects/financial.ts`) —
+ * never derived from which specific projects happen to exist today.
+ * Matching a project against one is always a live numeric comparison at
+ * request time, so membership is always computed dynamically (Task 2), never
+ * a hardcoded per-project list.
+ */
+export type FinancialRangeId =
+  | "tvl-under-1m"
+  | "tvl-1m-10m"
+  | "tvl-10m-100m"
+  | "tvl-over-100m"
+  | "liquidity-under-500k"
+  | "liquidity-500k-5m"
+  | "liquidity-over-5m"
+  | "marketCap-small"
+  | "marketCap-mid"
+  | "marketCap-large"
+  | "volume-low"
+  | "volume-medium"
+  | "volume-high";
+
+export type FinancialRangeDef = {
+  id: FinancialRangeId;
+  metric: FinancialMetric;
+  /** Human-readable, e.g. `"> $100M"` or `"Large (> $1B)"`. */
+  label: string;
+  /** Inclusive lower bound; `null` means no lower bound. */
+  min: number | null;
+  /** Exclusive upper bound; `null` means no upper bound. */
+  max: number | null;
 };
 
 // ---------------------------------------------------------------------------

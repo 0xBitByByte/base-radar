@@ -10,13 +10,25 @@ import { FilterChip } from "@/components/explorer/FilterChip";
 import { FilterGroup } from "@/components/explorer/FilterGroup";
 import { formatLabel } from "@/components/explorer/format";
 import { verificationStatusLabel } from "@/components/explorer/VerificationBadge";
+import { FinancialRangeGroup } from "@/components/projects/FinancialRangeGroup";
 import { buildProjectsQuery, countActiveFilters, hasActiveFilters, type ProjectsQueryState } from "@/components/projects/queryState";
 import { PROJECT_CATEGORIES, type ProjectCategory, type VerificationStatus } from "@/data/projects/enums";
 import { CATEGORY_BRANDING } from "@/lib/branding/categories";
+import { PROVIDER_BRANDING } from "@/lib/branding/providers";
 import type { DiscoveryStatus } from "@/lib/discovery/status";
+import { FINANCIAL_METRIC_PROVIDER, FINANCIAL_RANGES } from "@/lib/projects/financial";
+import { FINANCIAL_METRICS, FINANCIAL_METRIC_LABELS, type FinancialMetric, type FinancialRangeDef, type FinancialRangeId } from "@/lib/projects/types";
 import { cn } from "@/lib/utils";
 
 const FILTER_PANEL_ID = "projects-filter-panel";
+
+/** Maps each financial metric to the `ProjectsQueryState` field that holds its active range — the one place that association is spelled out. */
+const FINANCIAL_METRIC_STATE_KEY: Record<FinancialMetric, "tvlRange" | "liquidityRange" | "marketCapRange" | "volumeRange"> = {
+  tvl: "tvlRange",
+  liquidity: "liquidityRange",
+  marketCap: "marketCapRange",
+  volume: "volumeRange",
+};
 
 type QuickFilterKey = "verified" | "highConfidence" | "hasVolume";
 const QUICK_FILTER_OPTIONS: QuickFilterKey[] = ["verified", "highConfidence", "hasVolume"];
@@ -31,6 +43,8 @@ type ProjectsFilterBarProps = {
   /** Every facet option is computed server-side over the full, unfiltered registry (`components/projects/filterOptions.ts`) — never recomputed here. */
   availableDiscoveryStatuses: DiscoveryStatus[];
   availableVerificationStatuses: VerificationStatus[];
+  /** PR-063 — Task 1/2: per-metric range options, already narrowed to real, non-empty buckets server-side. An empty array for a metric means "hide this filter entirely" — no reliable provider data exists for it right now. */
+  financialRangeOptions: Record<FinancialMetric, FinancialRangeDef[]>;
 };
 
 /**
@@ -42,7 +56,12 @@ type ProjectsFilterBarProps = {
  * call here (that runs once, server-side, in `app/dashboard/projects/page.tsx`).
  * Every control below only ever calls `buildProjectsQuery()` and navigates.
  */
-export function ProjectsFilterBar({ state, availableDiscoveryStatuses, availableVerificationStatuses }: ProjectsFilterBarProps) {
+export function ProjectsFilterBar({
+  state,
+  availableDiscoveryStatuses,
+  availableVerificationStatuses,
+  financialRangeOptions,
+}: ProjectsFilterBarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [expanded, setExpanded] = useState(false);
@@ -93,6 +112,10 @@ export function ProjectsFilterBar({ state, availableDiscoveryStatuses, available
     navigate({ verificationStatuses: next });
   }
 
+  function handleFinancialRangeChange(metric: FinancialMetric, next: FinancialRangeId | null) {
+    navigate({ [FINANCIAL_METRIC_STATE_KEY[metric]]: next });
+  }
+
   function handleClearFilters() {
     navigate({
       categories: [],
@@ -101,8 +124,14 @@ export function ProjectsFilterBar({ state, availableDiscoveryStatuses, available
       hasVolume: false,
       discoveryStatuses: [],
       verificationStatuses: [],
+      tvlRange: null,
+      liquidityRange: null,
+      marketCapRange: null,
+      volumeRange: null,
     });
   }
+
+  const activeFinancialMetrics = FINANCIAL_METRICS.filter((metric) => financialRangeOptions[metric].length > 0);
 
   const chips: { key: string; label: string; onRemove: () => void }[] = [
     ...selectedQuickFilters.map((key) => ({
@@ -125,6 +154,15 @@ export function ProjectsFilterBar({ state, availableDiscoveryStatuses, available
       label: `Verification: ${verificationStatusLabel(status)}`,
       onRemove: () => handleVerificationStatusesChange(state.verificationStatuses.filter((item) => item !== status)),
     })),
+    ...FINANCIAL_METRICS.filter((metric) => state[FINANCIAL_METRIC_STATE_KEY[metric]]).map((metric) => {
+      const rangeId = state[FINANCIAL_METRIC_STATE_KEY[metric]] as FinancialRangeId;
+      const def = FINANCIAL_RANGES[metric].find((range) => range.id === rangeId);
+      return {
+        key: `financial-${metric}`,
+        label: `${FINANCIAL_METRIC_LABELS[metric]}: ${def?.label ?? rangeId}`,
+        onRemove: () => handleFinancialRangeChange(metric, null),
+      };
+    }),
   ];
 
   return (
@@ -198,6 +236,21 @@ export function ProjectsFilterBar({ state, availableDiscoveryStatuses, available
                 onChange={handleVerificationStatusesChange}
                 formatOption={(value) => verificationStatusLabel(value)}
               />
+
+              {activeFinancialMetrics.length > 0 && (
+                <div className="flex flex-col gap-4 border-t border-radar-light-border/70 pt-4 dark:border-white/[0.06]">
+                  <span className="text-xs font-semibold text-radar-light-text dark:text-radar-white">Financial Filters</span>
+                  {activeFinancialMetrics.map((metric) => (
+                    <FinancialRangeGroup
+                      key={metric}
+                      label={`${FINANCIAL_METRIC_LABELS[metric]} · via ${PROVIDER_BRANDING[FINANCIAL_METRIC_PROVIDER[metric]].label}`}
+                      ranges={financialRangeOptions[metric]}
+                      selected={state[FINANCIAL_METRIC_STATE_KEY[metric]]}
+                      onChange={(next) => handleFinancialRangeChange(metric, next)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </motion.div>
         )}

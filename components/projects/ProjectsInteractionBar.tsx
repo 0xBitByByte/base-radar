@@ -22,12 +22,15 @@ import { ProjectsSearchInput } from "@/components/projects/ProjectsSearchInput";
 import { ProjectsSortSelect } from "@/components/projects/ProjectsSortSelect";
 import type { ProjectsQueryState } from "@/components/projects/queryState";
 import type { DiscoveryStatus } from "@/lib/discovery/status";
+import type { FinancialMetric, FinancialRangeDef } from "@/lib/projects/types";
 
 type ProjectsInteractionBarProps = {
   state: ProjectsQueryState;
   resultCount: number;
   availableDiscoveryStatuses: DiscoveryStatus[];
   availableVerificationStatuses: VerificationStatus[];
+  /** PR-063 — Task 1/2: passed straight through to `ProjectsFilterBar`; see that component's own prop doc. */
+  financialRangeOptions: Record<FinancialMetric, FinancialRangeDef[]>;
 };
 
 export function ProjectsInteractionBar({
@@ -35,6 +38,7 @@ export function ProjectsInteractionBar({
   resultCount,
   availableDiscoveryStatuses,
   availableVerificationStatuses,
+  financialRangeOptions,
 }: ProjectsInteractionBarProps) {
   return (
     <div className="sticky top-16 z-20 -mx-4 flex flex-col gap-3 border-b border-radar-light-border bg-radar-light-card/90 px-4 py-4 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10 dark:border-white/10 dark:bg-radar-bg/90">
@@ -44,6 +48,7 @@ export function ProjectsInteractionBar({
           state={state}
           availableDiscoveryStatuses={availableDiscoveryStatuses}
           availableVerificationStatuses={availableVerificationStatuses}
+          financialRangeOptions={financialRangeOptions}
         />
         <ProjectsSortSelect state={state} />
       </div>

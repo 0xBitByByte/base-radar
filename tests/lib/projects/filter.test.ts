@@ -179,4 +179,33 @@ describe("filterLiveProjects", () => {
       expect(filterLiveProjects([zeroVolume], { hasVolume: true })).toEqual([zeroVolume]);
     });
   });
+
+  describe("financialRanges (PR-063)", () => {
+    it("matches a project whose real value falls in the selected range", () => {
+      const highTvl = liveProject({ id: "a", market: { ...liveProject().market, tvlUsd: 500_000_000 } });
+      const lowTvl = liveProject({ id: "b", market: { ...liveProject().market, tvlUsd: 500_000 } });
+      const result = filterLiveProjects([highTvl, lowTvl], { financialRanges: { tvl: "tvl-over-100m" } });
+      expect(result).toEqual([highTvl]);
+    });
+
+    it("ANDs across metrics — a project must satisfy every active range", () => {
+      const both = liveProject({
+        id: "a",
+        market: { ...liveProject().market, tvlUsd: 500_000_000, volume24hUsd: 50_000_000 },
+      });
+      const onlyTvl = liveProject({
+        id: "b",
+        market: { ...liveProject().market, tvlUsd: 500_000_000, volume24hUsd: 10_000 },
+      });
+      const result = filterLiveProjects([both, onlyTvl], {
+        financialRanges: { tvl: "tvl-over-100m", volume: "volume-high" },
+      });
+      expect(result).toEqual([both]);
+    });
+
+    it("excludes a project with no real value for the ranged metric", () => {
+      const noTvl = liveProject({ market: { ...liveProject().market, tvlUsd: null } });
+      expect(filterLiveProjects([noTvl], { financialRanges: { tvl: "tvl-over-100m" } })).toEqual([]);
+    });
+  });
 });
