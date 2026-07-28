@@ -1,12 +1,12 @@
-import { RouteLoading } from "@/components/dashboard/RouteLoading";
+import { ProjectsPageSkeleton } from "@/components/projects/ProjectsPageSkeleton";
 
 /**
- * Explorer's page still awaits `getAllProjectIntelligence()` fully before
- * rendering, so this fallback remains a real, meaningfully-used loading
- * state. Renders the same shared `RouteLoading` component
- * `app/dashboard/loading.tsx` uses (PR9.5.2) — one implementation, not two
- * independently-maintained copies.
+ * PR-057 — the Projects page still awaits `getLiveProjects()` fully before
+ * rendering, so this fallback is real and meaningfully shown. Shaped like
+ * the new page layout (header, search, KPI pulse, category rail, rails,
+ * directory grid) rather than the previous generic `RouteLoading` spinner,
+ * per Task 8's "skeleton loading" requirement.
  */
-export default function ExplorerLoading() {
-  return <RouteLoading />;
+export default function ProjectsLoading() {
+  return <ProjectsPageSkeleton />;
 }
