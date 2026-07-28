@@ -189,6 +189,10 @@ export const SORT_FIELDS = [
   "alphabetical",
   "discoveryDate",
   "updatedDate",
+  /** PR-056 — `engineering.stars`. Distinct from `"activity"` (`commitsLast7d`) — a star count and a commit-activity count are different signals and were conflated in PR-055's "Top GitHub" naming discussion; this field lets a consumer sort by either independently. */
+  "stars",
+  /** PR-056 — `verification.verifiedAt`. Powers an interactive "Recently Verified" sort on the Full Directory, distinct from the `recentlyVerified` collection's own fixed 30-day window. */
+  "verifiedDate",
 ] as const;
 export type SortField = (typeof SORT_FIELDS)[number];
 
@@ -198,18 +202,40 @@ export type SortOrder = "asc" | "desc";
 // Filtering
 // ---------------------------------------------------------------------------
 
+/**
+ * PR-056 — `category`/`status`/`discoveryStatus`/`verificationStatus` each
+ * accept either a single value (backward-compatible with every PR-054 call
+ * site) or an array for multi-select. An array is matched as OR — a project
+ * passes a facet if it matches *any* selected value — while every distinct
+ * facet in `FilterOptions` still combines as AND, exactly like Explorer's
+ * own established `ExplorerFilters` semantics
+ * (`components/explorer/filters.ts`). Example: `{category: ["dex",
+ * "lending"], verified: true}` matches a DEX-or-Lending project that is
+ * ALSO verified — never DEX-or-Lending-or-verified.
+ */
 export type FilterOptions = {
-  category?: ProjectCategory;
-  status?: ProjectStatus;
-  discoveryStatus?: DiscoveryStatus;
-  verificationStatus?: VerificationStatus;
+  category?: ProjectCategory | ProjectCategory[];
+  status?: ProjectStatus | ProjectStatus[];
+  discoveryStatus?: DiscoveryStatus | DiscoveryStatus[];
+  verificationStatus?: VerificationStatus | VerificationStatus[];
   /** `true` requires a resolved market read (`market.available`); `false` requires the opposite. */
   hasMarket?: boolean;
   hasTvl?: boolean;
+  /** PR-056 — mirrors `hasTvl` exactly: `true` requires a non-null `market.volume24hUsd`. */
+  hasVolume?: boolean;
   hasGithub?: boolean;
   hasGovernance?: boolean;
   hasContracts?: boolean;
   minConfidence?: number;
+  /**
+   * PR-056 — the composed "Verified" facet the PR-055 UX design calls for:
+   * `true` requires `verification.status === "verified"` OR
+   * `discoveryStatus === "verified"` — the exact same rule
+   * `collections.ts`'s `isVerified` already implements for the `verified`
+   * collection, reused here (not reimplemented) so the definition of
+   * "verified" lives in exactly one place.
+   */
+  verified?: boolean;
 };
 
 // ---------------------------------------------------------------------------

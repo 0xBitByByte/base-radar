@@ -12,7 +12,11 @@ import type { LiveProject, LiveProjectCollections } from "@/lib/projects/types";
 
 const TRENDING_CHANGE_PCT_THRESHOLD = 10;
 
-function isVerified(project: LiveProject): boolean {
+/**
+ * PR-056 — exported so `filter.ts`'s `verified` facet reuses this exact
+ * rule instead of redefining "verified" a second time.
+ */
+export function isVerified(project: LiveProject): boolean {
   return project.verification.status === "verified" || project.discoveryStatus === "verified";
 }
 

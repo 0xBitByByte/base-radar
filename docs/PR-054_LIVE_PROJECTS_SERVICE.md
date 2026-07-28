@@ -81,13 +81,15 @@ Every field a discovery-only project has no real evidence for is `null`/`false`/
 
 Indexed fields and weights: `name` (100) → `aliases` (80) → `symbol` (70) → `slug` (60) → `coingeckoId`/`defillamaSlug` (50) → `github` "owner/repo" (40) → `websiteUrl` (30) → `contractAddresses` (20). `aliases` is real evidence only — populated when a matched `DiscoveryProject`'s `displayName` differs from the registry project's name (a rename/alias signal), never a guessed variant. Empty/whitespace queries return no results. The UI is expected to consume `SearchResult[]` as-is — never re-tokenize or re-rank.
 
+**PR-056 update**: a project's `websiteUrl` is now also indexed by its bare, normalized hostname (weight 35, between `github` and the raw `website` URL) alongside the full URL — see `docs/PR-056_PROJECTS_SERVICE_ENHANCEMENTS.md` §4 for the full detail. The rest of this section is unchanged.
+
 ## 5. Sorting Rules (`lib/projects/sort.ts`)
 
-`sortLiveProjects(projects, field, order = "desc")`. Fields: `confidence`, `marketCap`, `tvl`, `volume`, `activity` (→ `engineering.commitsLast7d`), `alphabetical` (case-insensitive), `discoveryDate`, `updatedDate`. Two rules hold for every field: a `null` value always sorts last **regardless of direction** (a `null` isn't "smallest," it's "no data"), and ties break on `id` ascending so output is stable across repeated calls. Never mutates its input.
+`sortLiveProjects(projects, field, order = "desc")`. Fields: `confidence`, `marketCap`, `tvl`, `volume`, `activity` (→ `engineering.commitsLast7d`), `alphabetical` (case-insensitive), `discoveryDate`, `updatedDate`, **`stars`** (→ `engineering.stars`, PR-056), **`verifiedDate`** (→ `verification.verifiedAt`, PR-056). Two rules hold for every field: a `null` value always sorts last **regardless of direction** (a `null` isn't "smallest," it's "no data"), and ties break on `id` ascending so output is stable across repeated calls. Never mutates its input.
 
 ## 6. Filtering Rules (`lib/projects/filter.ts`)
 
-`filterLiveProjects(projects, options)`. Every `FilterOptions` field is optional and independent; present options AND together. Options: `category`, `status`, `discoveryStatus`, `verificationStatus`, `hasMarket`, `hasTvl`, `hasGithub`, `hasGovernance`, `hasContracts`, `minConfidence`. No UI logic — a page passes the options a user picked and gets the matching subset back.
+`filterLiveProjects(projects, options)`. Every `FilterOptions` field is optional and independent; present options AND together. Options: `category`, `status`, `discoveryStatus`, `verificationStatus` (each now accepting a single value **or an array for multi-select, OR-within-facet — PR-056**), `hasMarket`, `hasTvl`, **`hasVolume`** (PR-056), `hasGithub`, `hasGovernance`, `hasContracts`, `minConfidence`, **`verified`** (PR-056 — the composed `verification.status === "verified" || discoveryStatus === "verified"` rule, reusing `collections.ts`'s own `isVerified`). No UI logic — a page passes the options a user picked and gets the matching subset back. See `docs/PR-056_PROJECTS_SERVICE_ENHANCEMENTS.md` for the full rationale and test coverage.
 
 ## 7. Files Modified
 

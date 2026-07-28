@@ -63,4 +63,74 @@ describe("sortLiveProjects", () => {
     sortLiveProjects(projects, "alphabetical");
     expect(projects.map((p) => p.id)).toEqual(originalOrder);
   });
+
+  describe("stars (PR-056)", () => {
+    it("sorts by engineering.stars descending by default", () => {
+      const popular = liveProject({ id: "popular", engineering: { ...liveProject().engineering, stars: 5000 } });
+      const niche = liveProject({ id: "niche", engineering: { ...liveProject().engineering, stars: 12 } });
+      const result = sortLiveProjects([niche, popular], "stars");
+      expect(result.map((p) => p.id)).toEqual(["popular", "niche"]);
+    });
+
+    it("sorts ascending when requested", () => {
+      const popular = liveProject({ id: "popular", engineering: { ...liveProject().engineering, stars: 5000 } });
+      const niche = liveProject({ id: "niche", engineering: { ...liveProject().engineering, stars: 12 } });
+      const result = sortLiveProjects([popular, niche], "stars", "asc");
+      expect(result.map((p) => p.id)).toEqual(["niche", "popular"]);
+    });
+
+    it("sorts a project with no star count last, in either direction", () => {
+      const withStars = liveProject({ id: "with", engineering: { ...liveProject().engineering, stars: 100 } });
+      const withoutStars = liveProject({ id: "without", engineering: { ...liveProject().engineering, stars: null } });
+
+      expect(sortLiveProjects([withoutStars, withStars], "stars", "desc").map((p) => p.id)).toEqual(["with", "without"]);
+      expect(sortLiveProjects([withoutStars, withStars], "stars", "asc").map((p) => p.id)).toEqual(["with", "without"]);
+    });
+
+    it("distinguishes stars from activity — a project can rank high on one and low on the other", () => {
+      const starredButQuiet = liveProject({ id: "starred", engineering: { ...liveProject().engineering, stars: 9000, commitsLast7d: 0 } });
+      const activeButUnstarred = liveProject({ id: "active", engineering: { ...liveProject().engineering, stars: 5, commitsLast7d: 50 } });
+
+      expect(sortLiveProjects([activeButUnstarred, starredButQuiet], "stars").map((p) => p.id)).toEqual(["starred", "active"]);
+      expect(sortLiveProjects([starredButQuiet, activeButUnstarred], "activity").map((p) => p.id)).toEqual(["active", "starred"]);
+    });
+
+    it("breaks ties on id ascending", () => {
+      const a = liveProject({ id: "a", engineering: { ...liveProject().engineering, stars: 100 } });
+      const b = liveProject({ id: "b", engineering: { ...liveProject().engineering, stars: 100 } });
+      expect(sortLiveProjects([b, a], "stars").map((p) => p.id)).toEqual(["a", "b"]);
+    });
+  });
+
+  describe("verifiedDate (PR-056)", () => {
+    it("sorts by verification.verifiedAt descending by default (most recently verified first)", () => {
+      const older = liveProject({ id: "older", verification: { status: "verified", level: null, verifiedAt: "2024-01-01T00:00:00.000Z" } });
+      const newer = liveProject({ id: "newer", verification: { status: "verified", level: null, verifiedAt: "2026-01-01T00:00:00.000Z" } });
+      const result = sortLiveProjects([older, newer], "verifiedDate");
+      expect(result.map((p) => p.id)).toEqual(["newer", "older"]);
+    });
+
+    it("sorts ascending when requested (earliest verified first)", () => {
+      const older = liveProject({ id: "older", verification: { status: "verified", level: null, verifiedAt: "2024-01-01T00:00:00.000Z" } });
+      const newer = liveProject({ id: "newer", verification: { status: "verified", level: null, verifiedAt: "2026-01-01T00:00:00.000Z" } });
+      const result = sortLiveProjects([newer, older], "verifiedDate", "asc");
+      expect(result.map((p) => p.id)).toEqual(["older", "newer"]);
+    });
+
+    it("sorts a project with no verifiedAt last, in either direction — never errors on a null date", () => {
+      const verified = liveProject({ id: "verified", verification: { status: "verified", level: null, verifiedAt: "2025-06-01T00:00:00.000Z" } });
+      const unverified = liveProject({ id: "unverified", verification: { status: null, level: null, verifiedAt: null } });
+
+      expect(sortLiveProjects([unverified, verified], "verifiedDate", "desc").map((p) => p.id)).toEqual(["verified", "unverified"]);
+      expect(sortLiveProjects([unverified, verified], "verifiedDate", "asc").map((p) => p.id)).toEqual(["verified", "unverified"]);
+    });
+
+    it("sorts every project with no verifiedAt to the end together, tie-broken by id", () => {
+      const b = liveProject({ id: "b", verification: { status: null, level: null, verifiedAt: null } });
+      const a = liveProject({ id: "a", verification: { status: null, level: null, verifiedAt: null } });
+      const dated = liveProject({ id: "z-dated", verification: { status: "verified", level: null, verifiedAt: "2025-01-01T00:00:00.000Z" } });
+      const result = sortLiveProjects([b, a, dated], "verifiedDate");
+      expect(result.map((p) => p.id)).toEqual(["z-dated", "a", "b"]);
+    });
+  });
 });

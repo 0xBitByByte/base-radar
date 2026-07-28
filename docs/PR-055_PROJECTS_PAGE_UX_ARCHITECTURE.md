@@ -179,7 +179,7 @@ renders the top N after its fixed sort, plus the "View All" link.
 | **Upcoming / Announced** | Answers "what's upcoming" | `collections.upcoming` | alphabetical (no ranking signal exists pre-launch) | 10 | View All → Full Directory | **Honest, PR-053-grounded copy**: "No upcoming projects to show — none of today's live discovery sources (CoinGecko, DefiLlama, Blockscout) can surface a pre-launch project yet. This section activates automatically once a community-submission or ecosystem-directory source goes live." |
 | **Top TVL** | Answers "best Base projects" (capital angle) | `filter({hasTvl: true})` | `tvl` desc | 10 | View All → Full Directory, `hasTvl: true` + tvl sort | "No projects with tracked TVL yet." |
 | **Top Volume** | Answers "best Base projects" (trading angle) | `filter({hasMarket: true})` | `volume` desc | 10 | View All → Full Directory | "No projects with tracked trading volume yet." |
-| **Most Active Development** ("Top GitHub") | Answers "best Base projects" (engineering angle) | `filter({hasGithub: true})` | `activity` desc | 10 | View All → Full Directory | "No projects with recent GitHub activity yet." **Naming note**: framed as "Most Active Development" (commits/7d, already supported by `sort.ts`'s `activity` field) rather than a literal "Top GitHub by stars" — no `stars` `SortField` exists today (see §6's gap note). |
+| **Most Active Development** ("Top GitHub") | Answers "best Base projects" (engineering angle) | `filter({hasGithub: true})` | `activity` desc | 10 | View All → Full Directory | "No projects with recent GitHub activity yet." **Naming note**: framed as "Most Active Development" (commits/7d, `sort.ts`'s `activity` field) rather than "Top GitHub by stars" — the two are now both real, independent sort options (PR-056 added `stars`), so an implementation could add a second, separate "Most Starred" rail using `stars` desc if that distinct ranking is wanted; this rail itself stays activity-based. |
 | **Governance Active** | Answers "best Base projects" (governance angle) | `filter({hasGovernance: true})` | `governance.activeProposalCount` desc (rail-only; not a `SortField` — see §6) | 10 | View All → Full Directory, `hasGovernance: true` | "No projects have active governance proposals right now." |
 | **High Confidence** | Answers "what should I research next" | `collections.highConfidence` | `confidence` desc | 12 | View All → Full Directory, confidence sort | "No high-confidence projects yet." (Only possible on a near-empty registry.) |
 | **Recently Verified** | Answers "what's verified," recency angle | `collections.recentlyVerified` | `verification.verifiedAt` desc (rail-only; not a `SortField` — see §6) | 8 | View All → Full Directory | "No projects have been verified in the last 30 days — likely because `verifiedAt` isn't populated on most current registry entries yet, not because nothing was verified." Honest about the real, documented PR-054 limitation. |
@@ -282,45 +282,49 @@ already scores by field weight (name > alias > symbol > slug > provider ids
 
 **Backend**: `lib/projects/filter.ts`'s `filterLiveProjects(projects,
 options)` and its `FilterOptions` type. Most of the brief's requested facets
-map directly — several do not, and those gaps are named explicitly below
-rather than glossed over, since they directly affect what "Multi-select" can
-mean in v1.
+map directly. **Update (PR-056): every gap this section originally flagged
+has now been resolved in the backend** — `category`/`status`/
+`discoveryStatus`/`verificationStatus` accept arrays, and `verified`/
+`hasVolume` exist — see `docs/PR-056_PROJECTS_SERVICE_ENHANCEMENTS.md` for
+the implementation. The table below is left in its original,
+gap-identifying form for the historical record of what this UX-architecture
+pass found; the "Notes" column has been annotated with each resolution.
 
 ### Facet mapping
 
 | Brief's facet | PR-054 support today | Notes |
 | --- | --- | --- |
-| Category | `category?: ProjectCategory` — **single-value only** | Gap: needs widening to `ProjectCategory[]` for real multi-select (see below). |
-| Discovery Status | `discoveryStatus?: DiscoveryStatus` — **single-value only** | Same gap as Category. |
-| Verification Status | `verificationStatus?: VerificationStatus` — **single-value only** | Same gap. |
+| Category | `category?: ProjectCategory \| ProjectCategory[]` | **Resolved in PR-056** — widened to accept an array, OR-within-facet. |
+| Discovery Status | `discoveryStatus?: DiscoveryStatus \| DiscoveryStatus[]` | **Resolved in PR-056**, same as Category. |
+| Verification Status | `verificationStatus?: VerificationStatus \| VerificationStatus[]` | **Resolved in PR-056**, same as Category. |
 | Confidence | `minConfidence?: number` | Supported as-is — render as a slider/stepped control (High ≥70 / Medium ≥40 / Low ≥0, matching `DiscoveryConfidenceLevel`'s own thresholds), not free-text. |
 | Governance | `hasGovernance?: boolean` | Supported as-is. |
 | Contracts | `hasContracts?: boolean` | Supported as-is. |
 | GitHub | `hasGithub?: boolean` | Supported as-is. |
 | Has Token | `hasMarket?: boolean` | Supported — "Has Token" is the user-facing label for `market.available`. |
 | Has TVL | `hasTvl?: boolean` | Supported as-is. |
-| Has Volume | **Not in `FilterOptions` today** | Gap: trivially additive — mirrors `hasTvl` exactly (`market.volume24hUsd !== null`). |
-| Verified | **No single composed facet** | Gap: "Verified" as the brief means it (`verification.status === "verified" \|\| discoveryStatus === "verified"`, `collections.ts`'s own `isVerified` rule) isn't one `FilterOptions` field — needs either a UI-composed OR of two filter calls, or (recommended) a small additive `verified?: boolean` field on `FilterOptions` implementing the same rule `collections.ts` already has, so the logic lives in exactly one place. |
-| Provider Coverage | **Not represented** | Deferred — `LiveProject.providerAttribution` exists but no facet shape for "which/how many providers resolved" has been designed. Recommend deferring until there's a concrete UX need rather than guessing the right facet now. |
-| Recently Updated | Achievable via `discoveryStatus: "recently-updated"` | Reuses the existing single-value field once widened for multi-select. |
-| Recently Discovered | **Not a distinct facet** | `discoveryMetadata !== null` has no dedicated boolean today — minor gap, same shape as `hasVolume`. |
-| Multi-select | **Not supported for category/status/discoveryStatus/verificationStatus** | The concrete blocker — see below. |
+| Has Volume | `hasVolume?: boolean` | **Resolved in PR-056** — mirrors `hasTvl` exactly (`market.volume24hUsd !== null`). |
+| Verified | `verified?: boolean` | **Resolved in PR-056** — `verification.status === "verified" \|\| discoveryStatus === "verified"`, reusing `collections.ts`'s own `isVerified` rule rather than a second definition. |
+| Provider Coverage | **Not represented** | Still deferred — `LiveProject.providerAttribution` exists but no facet shape for "which/how many providers resolved" has been designed. Recommend deferring until there's a concrete UX need rather than guessing the right facet now. |
+| Recently Updated | Achievable via `discoveryStatus: ["recently-updated"]` | Now usable with the multi-select array form. |
+| Recently Discovered | **Not a distinct facet** | Still a minor gap — `discoveryMetadata !== null` has no dedicated boolean today. Left for a future PR since no current UX depends on it yet. |
+| Multi-select | **Supported for category/status/discoveryStatus/verificationStatus** | **Resolved in PR-056.** |
 | Clear All | Pure UI state reset (`options = {}`) | No backend involvement needed. |
 | Saved Filters | **Explicitly "(future)" in the brief** | Not designed for v1 beyond noting the shape: would need a `localStorage`-backed store mirroring `lib/personalization/`'s or `lib/search/preferences.ts`'s existing pattern — a real future PR, not attempted here. |
 
-### The multi-select gap, and the recommended fix
+### The multi-select gap — resolved in PR-056
 
 Explorer's own `ExplorerFilters` (`components/explorer/filters.ts`) already
-supports multi-select today (`categories: ProjectCategory[]`, OR-within-facet
-/ AND-across-facets) — the Projects page's filtering UX should behave
+supported multi-select (`categories: ProjectCategory[]`, OR-within-facet /
+AND-across-facets) — the Projects page's filtering UX should behave
 identically for consistency with the product's own established convention.
-PR-054's `FilterOptions`, however, was built with single values for
-`category`/`status`/`discoveryStatus`/`verificationStatus`. **Recommendation
-for the implementation PR**: widen those four fields to arrays
-(`category?: ProjectCategory[]`, etc.) with the same OR-within-facet
-semantics Explorer already uses — a small, additive, backward-compatible
-change to `lib/projects/filter.ts`, not a redesign. This document flags it
-here so it's fixed as a small prerequisite rather than discovered mid-build.
+PR-054's `FilterOptions` was originally built with single values for
+`category`/`status`/`discoveryStatus`/`verificationStatus`; **PR-056 widened
+all four to accept a single value or an array**, with a bare value
+normalized internally to a one-element array so every existing call site
+kept working unchanged (backward compatible) while new callers can pass
+arrays for real multi-select — the same OR-within-facet semantics Explorer
+already uses.
 
 ### Behavior
 
@@ -355,10 +359,10 @@ curated rails use their own fixed internal sort (§3).
 | TVL | `"tvl"` | ✓ |
 | Volume | `"volume"` | ✓ |
 | Activity | `"activity"` | ✓ (`engineering.commitsLast7d`) |
-| GitHub | **Not a distinct field** | `SORT_FIELDS` has no star-count field. Recommend labeling the existing `"activity"` option "GitHub Activity" for v1 (zero backend change) rather than promising literal star-ranking; only add a new `stars` `SortField` if the product later wants that as its own distinct, user-facing sort. |
+| GitHub | `"stars"` (`engineering.stars`) | **Resolved in PR-056** — added as its own distinct field from `"activity"`, since a star count and a commit-activity count are different signals. The Full Directory can now offer both "Most Active Development" (`activity`) and a literal "Top GitHub" by stars (`stars`) as separate sort options. |
 | Recently Updated | `"updatedDate"` | ✓ |
 | Discovery Date | `"discoveryDate"` | ✓ |
-| Recently Verified | **Not a distinct field** | No `verifiedDate` `SortField` exists. Fine as-is: the Recently Verified *rail* (§3) already sorts on this internally without needing a `SortField` entry; only add one if this needs to become an interactive Full Directory sort option too. |
+| Recently Verified | `"verifiedDate"` (`verification.verifiedAt`) | **Resolved in PR-056** — the Recently Verified *rail* (§3) still uses its own fixed internal sort, but this is now also available as an interactive Full Directory sort option. |
 
 ### Default sort
 
@@ -544,15 +548,7 @@ approaches four digits.
 
 ## 10. Recommended Implementation Order
 
-1. **Prerequisite backend gap-fixes** (small, additive, land before UI work
-   starts — all named in §5/§6 above):
-   - Widen `FilterOptions.category` / `.status` / `.discoveryStatus` /
-     `.verificationStatus` to arrays for real multi-select.
-   - Add `FilterOptions.hasVolume` (mirrors `hasTvl` exactly).
-   - Add a composed `FilterOptions.verified` matching `collections.ts`'s
-     own `isVerified` rule.
-   - (Optional, only if literal star-count ranking is wanted) add a
-     `stars` `SortField`.
+1. ~~**Prerequisite backend gap-fixes**~~ — **done, PR-056.** `FilterOptions.category`/`.status`/`.discoveryStatus`/`.verificationStatus` now accept arrays for real multi-select; `FilterOptions.hasVolume` and the composed `FilterOptions.verified` now exist; `SortField` gained `stars` and `verifiedDate`. See `docs/PR-056_PROJECTS_SERVICE_ENHANCEMENTS.md`. UI implementation can now start directly at step 2.
 2. **Page shell**: Header + KPI strip + Full Directory only (grid/table,
    adapting the existing `ExplorerGrid`/`ExplorerTable` patterns to
    `LiveProject`). Ships a working, if plain, page first and de-risks the
