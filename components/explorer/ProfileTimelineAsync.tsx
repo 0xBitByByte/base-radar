@@ -29,6 +29,10 @@ type ProfileTimelineAsyncProps = {
   transfersPromise: Promise<ProviderResult<TokenTransfer[]> | null>;
   /** PR13.7 Goal 13 — real recent releases, shared with the Scorecard's Developer evidence tile (same fetch, never duplicated). */
   releasesPromise: Promise<ProviderResult<ReleaseSummary[]> | null>;
+  /** PR-062 Task 5 — `Project.lifecycle` fields, already on the registry entry at fast-path time (no promise needed). */
+  registryUpdatedAt?: string | null;
+  discoveredAt?: string | null;
+  discoverySource?: string | null;
 };
 
 /**
@@ -53,6 +57,9 @@ export function ProfileTimelineAsync({
   tvlHistoryPromise,
   transfersPromise,
   releasesPromise,
+  registryUpdatedAt,
+  discoveredAt,
+  discoverySource,
 }: ProfileTimelineAsyncProps) {
   const commitResult = use(commitActivityPromise);
   const tvlHistoryResult = use(tvlHistoryPromise);
@@ -85,6 +92,9 @@ export function ProfileTimelineAsync({
     tokenTransfers,
     tokenSymbol,
     releases,
+    registryUpdatedAt,
+    discoveredAt,
+    discoverySource,
   });
 
   return <ProfileTimeline events={events} />;

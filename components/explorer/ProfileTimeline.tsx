@@ -1,4 +1,17 @@
-import { AlertTriangle, ArrowRightLeft, Fish, GitCommit, History, Landmark, Radio, Rocket, TrendingUp, type LucideIcon } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRightLeft,
+  Compass,
+  Fish,
+  GitCommit,
+  History,
+  Landmark,
+  Radio,
+  RefreshCw,
+  Rocket,
+  TrendingUp,
+  type LucideIcon,
+} from "lucide-react";
 
 import { QuickViewSectionLabel } from "@/components/explorer/QuickViewSectionLabel";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -40,6 +53,8 @@ const KIND_ICON: Record<TimelineEventKind, LucideIcon> = {
   "tvl-change": TrendingUp,
   "risk-alert": AlertTriangle,
   transfer: ArrowRightLeft,
+  "registry-update": RefreshCw,
+  discovery: Compass,
 };
 
 /**
@@ -58,6 +73,8 @@ const KIND_CATEGORY: Record<TimelineEventKind, string> = {
   "tvl-change": "Treasury",
   "risk-alert": "Risk",
   signal: "Signal",
+  "registry-update": "Registry",
+  discovery: "Discovery",
 };
 
 const KIND_SOURCE: Record<TimelineEventKind, string> = {
@@ -69,6 +86,8 @@ const KIND_SOURCE: Record<TimelineEventKind, string> = {
   "tvl-change": "DefiLlama",
   "risk-alert": "Base Radar",
   signal: "Base Radar",
+  "registry-update": "Base Radar Registry",
+  discovery: "Base Radar Discovery",
 };
 
 function TimelineEventRow({ event }: { event: TimelineEvent }) {
@@ -113,7 +132,7 @@ export function ProfileTimeline({ events }: ProfileTimelineProps) {
         <EmptyState
           icon={History}
           title="Recent project activity has not yet been detected"
-          description="No releases, commits, whale transfers, governance proposals, TVL swings, or risk alerts have been recorded for this project in the tracked window. Future updates may include new releases, governance proposals, whale transfers, and TVL changes as they're detected."
+          description="No releases, commits, whale transfers, governance proposals, TVL swings, registry updates, discovery events, or risk alerts have been recorded for this project in the tracked window. Future updates may include new releases, governance proposals, whale transfers, and TVL changes as they're detected."
           className="bg-radar-light-surface/60 dark:bg-white/[0.02]"
         />
       </section>

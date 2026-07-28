@@ -6,6 +6,9 @@ import { buildProjectIntelligence } from "@/lib/intelligence/engine";
 import { buildIntelligenceReport } from "@/lib/intelligence/report";
 import { buildHealthScorecard } from "@/lib/intelligence/scorecard";
 import { toLatestProjectHighlight, toRelatedProjectHighlights } from "@/lib/ai-intelligence/project-adapter";
+import { filterLiveProjects } from "@/lib/projects/filter";
+import { getLiveProjects } from "@/lib/projects/service";
+import { sortLiveProjects } from "@/lib/projects/sort";
 import * as base from "@/lib/providers/base/service";
 import * as blockscout from "@/lib/providers/blockscout/service";
 import * as coingecko from "@/lib/providers/coingecko/service";
@@ -25,9 +28,11 @@ import { ProfileGovernance } from "@/components/explorer/ProfileGovernance";
 import { ProfileQuickStats } from "@/components/explorer/ProfileQuickStats";
 import { ProfileRecentHighlights } from "@/components/explorer/ProfileRecentHighlights";
 import { ProfileRelatedIntelligence } from "@/components/explorer/ProfileRelatedIntelligence";
+import { ProfileRelatedProjects } from "@/components/explorer/ProfileRelatedProjects";
 import { ProfileSectionNav } from "@/components/explorer/ProfileSectionNav";
 import { ProfileSources } from "@/components/explorer/ProfileSources";
 import { ProfileSummary } from "@/components/explorer/ProfileSummary";
+import { ProfileTrustCenter } from "@/components/explorer/ProfileTrustCenter";
 import { ProfileWhyItMatters } from "@/components/explorer/ProfileWhyItMatters";
 import { ProjectHealthScorecard } from "@/components/explorer/ProjectHealthScorecard";
 import type { SparklinePoint } from "@/lib/data/types";
@@ -214,6 +219,39 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
   const communityLinkCount = communityLinkFields.filter(Boolean).length;
   const communityLinkTotal = communityLinkFields.length;
 
+  // PR-062 Task 1/2 — this project's real rank by TVL among its category
+  // peers, reusing the exact same `lib/projects` Live Projects Service the
+  // Projects list page already calls (`filterLiveProjects`/
+  // `sortLiveProjects`) — never a second ranking implementation. Only
+  // computed when this project itself has real TVL (a project with no TVL
+  // can't be a "leader" by TVL); any failure to load the comparison set
+  // degrades to `null`, never blocking the page or fabricating a rank.
+  let categoryTvlLeadership: { rank: number; totalInCategory: number } | null = null;
+  const primaryCategory = profile.identity.categories[0];
+  if (primaryCategory && profile.tvl.available && profile.tvl.tvlUsd !== null) {
+    try {
+      const liveProjects = await getLiveProjects();
+      const categoryPeers = sortLiveProjects(
+        filterLiveProjects(liveProjects, { category: primaryCategory, hasTvl: true }),
+        "tvl",
+        "desc"
+      );
+      const rankIndex = categoryPeers.findIndex((project) => project.id === registryProject.id);
+      if (rankIndex !== -1) {
+        categoryTvlLeadership = { rank: rankIndex + 1, totalInCategory: categoryPeers.length };
+      }
+    } catch {
+      categoryTvlLeadership = null;
+    }
+  }
+
+  // PR-062 Task 5 — real registry lifecycle timestamps, already on the
+  // static registry entry (`data/projects/types.ts`'s `ProjectLifecycle`),
+  // for the Timeline's "Registry updates"/"Discovery updates" events.
+  const registryUpdatedAt = registryProject.lifecycle?.updatedAt ?? null;
+  const discoveredAt = registryProject.lifecycle?.discoveredAt ?? null;
+  const discoverySource = registryProject.lifecycle?.discoverySource ?? null;
+
   const scorecardTiles = buildHealthScorecard({
     health: profile.health,
     confidence: profile.confidence,
@@ -249,6 +287,7 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
     defillamaSlug: registryProject.providerIds.defillamaSlug ?? null,
     contracts: profile.contracts,
     community: profile.community,
+    categoryTvlLeadership,
   });
 
   return (
@@ -267,6 +306,7 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
         risk={profile.risk}
         coingeckoId={registryProject.providerIds.coingeckoId ?? null}
         defillamaSlug={registryProject.providerIds.defillamaSlug ?? null}
+        categoryTvlLeadership={categoryTvlLeadership}
       />
 
       <ProfileRelatedIntelligence projectId={registryProject.id} />
@@ -289,6 +329,19 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
 
       <ProfileWhyItMatters highlights={intelligenceReport.highlights} />
 
+      <ProfileTrustCenter
+        verificationStatus={profile.community.verificationStatus}
+        confidence={profile.confidence}
+        contracts={profile.contracts}
+        sources={profile.sources}
+        github={profile.github}
+        githubConfigured={githubConfigured}
+        websiteUrl={profile.identity.websiteUrl}
+        docsUrl={profile.community.socials.docs ?? null}
+        communityLinkCount={communityLinkCount}
+        communityLinkTotal={communityLinkTotal}
+      />
+
       <ProfileExecutiveIntelligence
         report={intelligenceReport}
         freshness={profile.freshness}
@@ -305,6 +358,7 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
         commitActivityPromise={commitActivityPromise}
         contributorCountPromise={contributorCountPromise}
         releasesPromise={releasesPromise}
+        lastUpdated={profile.freshness.newestSourceAt}
       />
 
       <ProfileSources sources={profile.sources} thingsWeCouldntVerify={intelligenceReport.thingsWeCouldntVerify} />
@@ -323,6 +377,9 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
         tvlHistoryPromise={tvlHistoryPromise}
         transfersPromise={transfersPromise}
         releasesPromise={releasesPromise}
+        registryUpdatedAt={registryUpdatedAt}
+        discoveredAt={discoveredAt}
+        discoverySource={discoverySource}
       />
 
       <ProfileTokenAndPriceLive
@@ -374,6 +431,10 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
       <ProfileContracts contracts={profile.contracts} chain={profile.chain} contractDetailsPromise={contractDetailsPromise} />
 
       <ProfileGovernance governance={profile.governance} governanceUrl={profile.community.governanceUrl} />
+
+      {primaryCategory && (
+        <ProfileRelatedProjects currentProjectId={registryProject.id} category={primaryCategory} tags={profile.identity.tags} />
+      )}
     </div>
   );
 }

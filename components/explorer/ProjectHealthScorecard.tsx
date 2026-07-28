@@ -3,6 +3,7 @@ import { BadgeCheck, Code2, Droplets, Gauge, HeartPulse, Landmark, ShieldAlert, 
 
 import { ProfileDeveloperTileAsync } from "@/components/explorer/ProfileDeveloperTileAsync";
 import { ProfileSectionCard } from "@/components/explorer/ProfileSectionCard";
+import { formatRelativeTime } from "@/lib/data/format";
 import { cn } from "@/lib/utils";
 import type { ScorecardSeverity, ScorecardTile } from "@/lib/intelligence/scorecard";
 import type { Confidence, Health, Risk } from "@/lib/intelligence/types";
@@ -20,6 +21,8 @@ type ProjectHealthScorecardProps = {
   commitActivityPromise: Promise<ProviderResult<CommitActivity> | null>;
   contributorCountPromise: Promise<ProviderResult<ContributorCount> | null>;
   releasesPromise: Promise<ProviderResult<ReleaseSummary[]> | null>;
+  /** PR-062 Task 4 — real freshness timestamp (`profile.freshness.overall`, already computed by the Intelligence Engine from the newest live source's `fetchedAt`) — never a synthetic "just now." `null` only when no live source contributed at all. */
+  lastUpdated: string | null;
 };
 
 const SEVERITY_CLASS: Record<ScorecardSeverity, string> = {
@@ -241,6 +244,7 @@ export function ProjectHealthScorecard({
   commitActivityPromise,
   contributorCountPromise,
   releasesPromise,
+  lastUpdated,
 }: ProjectHealthScorecardProps) {
   const findTile = (id: string) => tiles.find((tile) => tile.id === id)!;
 
@@ -300,10 +304,16 @@ export function ProjectHealthScorecard({
 
   return (
     <ProfileSectionCard title="Project Health Scorecard" icon={Gauge} className="gap-4">
-      <p className="text-xs leading-relaxed text-radar-light-muted dark:text-radar-muted">
-        Eight independent scores, each with what it measures, why it matters, and the real evidence (or missing evidence)
-        behind it — nothing here is an unexplained percentage.
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs leading-relaxed text-radar-light-muted dark:text-radar-muted">
+          Eight independent scores, each with what it measures, why it matters, and the real evidence (or missing
+          evidence) behind it — nothing here is an unexplained percentage.
+        </p>
+        {/* PR-062 Task 4 — real freshness, so "Is it active?" also answers "as of when?" */}
+        <span className="shrink-0 text-[10.5px] font-medium whitespace-nowrap text-radar-light-muted/80 dark:text-radar-muted/70">
+          {lastUpdated ? `Updated ${formatRelativeTime(lastUpdated)}` : "Freshness not available"}
+        </span>
+      </div>
       <div role="list" aria-label="Project health score matrix" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {metaCards.map((card) => (
           <ScorecardCardView key={card.id} card={card} />

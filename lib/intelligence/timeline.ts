@@ -23,7 +23,9 @@ export type TimelineEventKind =
   | "commit-activity"
   | "tvl-change"
   | "risk-alert"
-  | "transfer";
+  | "transfer"
+  | "registry-update"
+  | "discovery";
 
 export type TimelineEvent = {
   id: string;
@@ -60,6 +62,18 @@ export function buildProjectTimeline(input: {
    * this function always produced before this goal.
    */
   releases?: ReleaseSummary[] | null;
+  /**
+   * PR-062 Task 5 — this project's real registry lifecycle timestamps
+   * (`Project.lifecycle`, `data/projects/types.ts`), already present on the
+   * static registry entry — never a new provider call. `registryUpdatedAt`
+   * is `Project.lifecycle.updatedAt`; `discoveredAt`/`discoverySource` are
+   * `Project.lifecycle.discoveredAt`/`.discoverySource`. All three are
+   * `undefined`/`null` for an ordinary registry entry with no recorded
+   * lifecycle history, in which case no event is generated for it.
+   */
+  registryUpdatedAt?: string | null;
+  discoveredAt?: string | null;
+  discoverySource?: string | null;
   now?: string;
 }): TimelineEvent[] {
   const now = input.now ?? new Date().toISOString();
@@ -120,6 +134,31 @@ export function buildProjectTimeline(input: {
       title: `${input.risk.level[0].toUpperCase()}${input.risk.level.slice(1)} risk flagged`,
       detail: input.risk.explanation,
       timestamp: now,
+    });
+  }
+
+  // PR-062 Task 5 — the two registry-native event kinds the task's own
+  // example list names ("Registry updates", "Discovery updates"), read
+  // straight from `Project.lifecycle` (already on the registry entry, no
+  // fetch). Skipped entirely for an ordinary entry with no recorded
+  // lifecycle history — never a fabricated "first tracked" date.
+  if (input.registryUpdatedAt) {
+    events.push({
+      id: "registry-update",
+      kind: "registry-update",
+      title: "Registry entry updated",
+      detail: "Project metadata reviewed and updated in the Base Radar registry.",
+      timestamp: input.registryUpdatedAt,
+    });
+  }
+
+  if (input.discoveredAt) {
+    events.push({
+      id: "discovery",
+      kind: "discovery",
+      title: "Surfaced by Discovery",
+      detail: input.discoverySource ? `First surfaced via ${input.discoverySource}.` : null,
+      timestamp: input.discoveredAt,
     });
   }
 

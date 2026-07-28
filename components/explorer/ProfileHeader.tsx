@@ -13,6 +13,7 @@ import { SOCIAL_BRANDING } from "@/lib/branding/socials";
 import type { SocialPlatform } from "@/lib/branding/types";
 import { formatDate } from "@/lib/data/format";
 import { cn } from "@/lib/utils";
+import type { ProjectCategory } from "@/data/projects/enums";
 import type { ChainInfo, Community, Confidence, Contracts, GithubIntel, Health, Identity, Market, Risk } from "@/lib/intelligence/types";
 
 type ProfileHeaderProps = {
@@ -28,7 +29,65 @@ type ProfileHeaderProps = {
   /** Registry provider ids — already fetched for Token & Price / TVL sourceLinks elsewhere on this page; reused here to build the CoinGecko/DefiLlama icon links, never a new lookup. */
   coingeckoId: string | null;
   defillamaSlug: string | null;
+  /**
+   * PR-062 Task 1 — this project's real rank by TVL among its category
+   * peers, computed once in `page.tsx` via the same `lib/projects` Live
+   * Projects Service `lib/intelligence/report.ts`'s `categoryTvlLeadership`
+   * reuses — never a second ranking implementation. `null`/omitted falls
+   * back to the registry's own `shortDescription` for the hero one-liner.
+   */
+  categoryTvlLeadership?: { rank: number; totalInCategory: number } | null;
 };
+
+/**
+ * PR-062 Task 1 — one deterministic, registry-driven phrase per category
+ * describing this project's role in the ecosystem (distinct from the plain
+ * taxonomy chip `ProjectCategoryChips` already renders). A presentation
+ * lookup only, same pattern as `CATEGORY_BRANDING` — never inferred or
+ * generated, always traceable to the project's own real `categories[0]`.
+ */
+const ECOSYSTEM_ROLE_LABEL: Record<ProjectCategory, string> = {
+  dex: "Decentralized Exchange",
+  lending: "Lending Protocol",
+  derivatives: "Derivatives Platform",
+  yield: "Yield Protocol",
+  stablecoin: "Stablecoin Issuer",
+  bridge: "Cross-Chain Bridge",
+  infrastructure: "Infrastructure Provider",
+  oracle: "Oracle Network",
+  wallet: "Wallet Provider",
+  identity: "Identity Infrastructure",
+  nft: "NFT Platform",
+  gaming: "Gaming Platform",
+  social: "Social Platform",
+  ai: "AI Protocol",
+  rwa: "Real-World Asset Platform",
+  dao: "DAO Tooling",
+  launchpad: "Launchpad",
+  analytics: "Analytics Platform",
+  security: "Security Provider",
+  meme: "Meme Token",
+  payments: "Payments Infrastructure",
+  other: "Ecosystem Project",
+};
+
+/**
+ * The hero's one-line summary — "Largest {role} on Base." when this
+ * project is the real, computed #1 by TVL among its category peers (an
+ * unambiguous, deterministic claim, never a guessed superlative);
+ * otherwise the registry's own hand-authored `shortDescription`. `null`
+ * when neither applies — hidden entirely, never a fabricated tagline.
+ */
+function buildHeroSummary(
+  shortDescription: string | null,
+  categoryLabel: string | undefined,
+  leadership: { rank: number; totalInCategory: number } | null | undefined
+): string | null {
+  if (leadership && leadership.rank === 1 && leadership.totalInCategory > 1 && categoryLabel) {
+    return `Largest ${categoryLabel} on Base.`;
+  }
+  return shortDescription || null;
+}
 
 const HEALTH_BADGE_COLOR: Record<Health["label"], GlowBadgeColor> = {
   excellent: "success",
@@ -164,8 +223,12 @@ export function ProfileHeader({
   risk,
   coingeckoId,
   defillamaSlug,
+  categoryTvlLeadership,
 }: ProfileHeaderProps) {
   const explorerLink = getExplorerLink(chain, contracts, identity);
+  const primaryCategory = identity.categories[0];
+  const ecosystemRole = primaryCategory ? ECOSYSTEM_ROLE_LABEL[primaryCategory] : null;
+  const heroSummary = buildHeroSummary(identity.shortDescription, ecosystemRole?.toLowerCase(), categoryTvlLeadership);
   const githubHref = github.available && github.fullName ? `https://github.com/${github.fullName}` : null;
   // Goal 1 — logo priority: the registry's own official logo first, then
   // CoinGecko's token image (already fetched for this page's Token & Price
@@ -237,6 +300,12 @@ export function ProfileHeader({
                 {marketStatus}
               </span>
             </div>
+            {/* PR-062 Task 1 — Ecosystem Role: a real, registry-driven phrase describing this project's role, distinct from the plain category taxonomy chip below. */}
+            {ecosystemRole && (
+              <span className="w-fit rounded-md bg-radar-primary/10 px-2 py-0.5 text-xs font-semibold text-radar-primary">
+                {ecosystemRole}
+              </span>
+            )}
             <div className="flex flex-wrap items-center gap-1.5">
               <ProjectCategoryChips categories={identity.categories} tags={identity.tags} />
               <ProfileChainDisplay chains={chain.chains} />
@@ -254,8 +323,9 @@ export function ProfileHeader({
         <ProfileQuickActions projectId={identity.id} projectName={identity.name} />
       </div>
 
-      {identity.shortDescription && (
-        <p className="max-w-3xl text-sm leading-relaxed text-radar-light-muted dark:text-radar-muted">{identity.shortDescription}</p>
+      {/* PR-062 Task 1 — the hero's concise, deterministic summary: a real category-TVL-leadership claim when this project is the computed #1 in its category, else the registry's own hand-authored `shortDescription`. Hidden entirely when neither is available — never a fabricated tagline. */}
+      {heroSummary && (
+        <p className="max-w-3xl text-base leading-relaxed font-medium text-radar-light-text dark:text-radar-white">{heroSummary}</p>
       )}
 
       <div className="flex flex-wrap items-center gap-2 border-t border-radar-light-border pt-4 dark:border-white/10">
