@@ -43,6 +43,13 @@ describe("sortLiveProjects", () => {
     expect(result.map((p) => p.id)).toEqual(["a", "b"]);
   });
 
+  it("sorts by liquidity using market.liquidityUsd (PR-063)", () => {
+    const deep = liveProject({ id: "deep", market: { ...liveProject().market, liquidityUsd: 5_000_000 } });
+    const shallow = liveProject({ id: "shallow", market: { ...liveProject().market, liquidityUsd: 10_000 } });
+    const result = sortLiveProjects([shallow, deep], "liquidity");
+    expect(result.map((p) => p.id)).toEqual(["deep", "shallow"]);
+  });
+
   it("sorts by activity using engineering.commitsLast7d", () => {
     const active = liveProject({ id: "active", engineering: { ...liveProject().engineering, commitsLast7d: 40 } });
     const quiet = liveProject({ id: "quiet", engineering: { ...liveProject().engineering, commitsLast7d: 2 } });

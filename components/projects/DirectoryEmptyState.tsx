@@ -13,7 +13,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 
 type DirectoryEmptyStateProps =
   | { reason: "search"; query: string; clearHref: string }
-  | { reason: "filters"; clearHref: string }
+  | { reason: "filters"; clearHref: string; browseAllHref: string; description?: string }
   | { reason: "collection"; title: string; description: string };
 
 function ClearLink({ href, label }: { href: string; label: string }) {
@@ -45,8 +45,13 @@ export function DirectoryEmptyState(props: DirectoryEmptyStateProps) {
       <EmptyState
         icon={FilterX}
         title="No projects match your filters"
-        description="Try removing a filter — the combination currently selected has no real matches."
-        action={<ClearLink href={props.clearHref} label="Clear filters" />}
+        description={props.description ?? "Try removing a filter — the combination currently selected has no real matches."}
+        action={
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <ClearLink href={props.clearHref} label="Clear filters" />
+            <ClearLink href={props.browseAllHref} label="Browse All Projects" />
+          </div>
+        }
       />
     );
   }

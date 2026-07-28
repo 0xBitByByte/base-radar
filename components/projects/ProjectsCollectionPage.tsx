@@ -14,7 +14,8 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
-import { availableDiscoveryStatuses, availableVerificationStatuses } from "@/components/projects/filterOptions";
+import { availableDiscoveryStatuses, availableVerificationStatuses, financialRangeOptions } from "@/components/projects/filterOptions";
+import { FinancialSummary } from "@/components/projects/FinancialSummary";
 import { ProjectsDirectory } from "@/components/projects/ProjectsDirectory";
 import { ProjectsInteractionBar } from "@/components/projects/ProjectsInteractionBar";
 import { PROJECTS_PATH, type ProjectsQueryState } from "@/components/projects/queryState";
@@ -22,6 +23,7 @@ import { PROJECTS_VIEW_META } from "@/components/projects/viewMeta";
 import { formatNumber } from "@/lib/data/format";
 import type { LiveProject, PaginatedResult } from "@/lib/projects/types";
 import type { DirectoryEmptyState } from "@/components/projects/DirectoryEmptyState";
+import type { FinancialSummaryEntry } from "@/components/projects/collectionPipeline";
 
 type ProjectsCollectionPageProps = {
   view: Exclude<ProjectsQueryState["view"], "all">;
@@ -30,6 +32,7 @@ type ProjectsCollectionPageProps = {
   directoryTitle: string;
   directorySubtitle: string | undefined;
   emptyState: Parameters<typeof DirectoryEmptyState>[0];
+  financialSummary: FinancialSummaryEntry[];
   allProjects: LiveProject[];
 };
 
@@ -40,6 +43,7 @@ export function ProjectsCollectionPage({
   directoryTitle,
   directorySubtitle,
   emptyState,
+  financialSummary,
   allProjects,
 }: ProjectsCollectionPageProps) {
   const meta = PROJECTS_VIEW_META[view];
@@ -76,8 +80,10 @@ export function ProjectsCollectionPage({
         resultCount={directoryPage.totalItems}
         availableDiscoveryStatuses={availableDiscoveryStatuses(allProjects)}
         availableVerificationStatuses={availableVerificationStatuses(allProjects)}
+        financialRangeOptions={financialRangeOptions(allProjects)}
       />
 
+      <FinancialSummary entries={financialSummary} />
       <ProjectsDirectory title={directoryTitle} subtitle={directorySubtitle} page={directoryPage} state={state} emptyState={emptyState} />
     </div>
   );

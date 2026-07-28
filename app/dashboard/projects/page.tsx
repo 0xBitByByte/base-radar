@@ -5,7 +5,8 @@ import { ExplorerErrorState } from "@/components/explorer/ExplorerErrorState";
 import { BaseTodayPanel } from "@/components/projects/BaseTodayPanel";
 import { buildDirectoryPipeline } from "@/components/projects/collectionPipeline";
 import { CategoryRail } from "@/components/projects/CategoryRail";
-import { availableDiscoveryStatuses, availableVerificationStatuses } from "@/components/projects/filterOptions";
+import { availableDiscoveryStatuses, availableVerificationStatuses, financialRangeOptions } from "@/components/projects/filterOptions";
+import { FinancialSummary } from "@/components/projects/FinancialSummary";
 import { loadProjectsPageData } from "@/components/projects/loadProjectsData";
 import { ProjectRail } from "@/components/projects/ProjectRail";
 import { ProjectsDirectory } from "@/components/projects/ProjectsDirectory";
@@ -81,7 +82,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
     return <ExplorerEmptyState />;
   }
 
-  const { state, directoryPage, directoryTitle, directorySubtitle, emptyState } = buildDirectoryPipeline({
+  const { state, directoryPage, directoryTitle, directorySubtitle, emptyState, financialSummary } = buildDirectoryPipeline({
     rawSearchParams,
     projects,
     collections,
@@ -105,6 +106,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
         resultCount={directoryPage.totalItems}
         availableDiscoveryStatuses={availableDiscoveryStatuses(projects)}
         availableVerificationStatuses={availableVerificationStatuses(projects)}
+        financialRangeOptions={financialRangeOptions(projects)}
       />
 
       <ProjectsKpiPulse
@@ -151,6 +153,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
         </div>
       </div>
 
+      <FinancialSummary entries={financialSummary} />
       <ProjectsDirectory title={directoryTitle} subtitle={directorySubtitle} page={directoryPage} state={state} emptyState={emptyState} />
     </div>
   );

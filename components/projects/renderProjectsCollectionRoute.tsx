@@ -29,7 +29,7 @@ export async function renderProjectsCollectionRoute(
     return <ExplorerEmptyState />;
   }
 
-  const { state, directoryPage, directoryTitle, directorySubtitle, emptyState } = buildDirectoryPipeline({
+  const { state, directoryPage, directoryTitle, directorySubtitle, emptyState, financialSummary } = buildDirectoryPipeline({
     rawSearchParams,
     projects: data.projects,
     collections: data.collections,
@@ -46,6 +46,7 @@ export async function renderProjectsCollectionRoute(
       directoryTitle={directoryTitle}
       directorySubtitle={directorySubtitle}
       emptyState={emptyState}
+      financialSummary={financialSummary}
       allProjects={data.projects}
     />
   );

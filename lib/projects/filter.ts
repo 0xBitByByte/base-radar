@@ -14,6 +14,7 @@
  */
 
 import { isVerified } from "@/lib/projects/collections";
+import { matchesFinancialRange } from "@/lib/projects/financial";
 import type { FilterOptions, LiveProject } from "@/lib/projects/types";
 
 function toArray<T>(value: T | T[] | undefined): T[] | undefined {
@@ -40,6 +41,11 @@ function matches(project: LiveProject, options: FilterOptions): boolean {
   if (options.hasContracts !== undefined && (project.contracts.count > 0) !== options.hasContracts) return false;
   if (options.minConfidence !== undefined && project.confidence.score < options.minConfidence) return false;
   if (options.verified !== undefined && isVerified(project) !== options.verified) return false;
+  if (options.financialRanges) {
+    for (const rangeId of Object.values(options.financialRanges)) {
+      if (rangeId && !matchesFinancialRange(project, rangeId)) return false;
+    }
+  }
   return true;
 }
 

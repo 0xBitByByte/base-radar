@@ -39,6 +39,8 @@ function valueForField(project: LiveProject, field: SortField): SortValue {
       return project.market.tvlUsd;
     case "volume":
       return project.market.volume24hUsd;
+    case "liquidity":
+      return project.market.liquidityUsd;
     case "activity":
       return project.engineering.commitsLast7d;
     case "alphabetical":
