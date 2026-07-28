@@ -192,6 +192,17 @@ export type IntelligenceReportInput = {
   contracts: Contracts;
   /** For scoping `thingsWeCouldntVerify` to sockets this project actually has configured (Discord/Telegram). */
   community: Community;
+  /**
+   * PR-062 Task 2 — this project's real rank by TVL among every other
+   * registry project sharing its primary category, computed once in
+   * `app/dashboard/projects/[slug]/page.tsx` from the same
+   * `lib/projects` Live Projects Service the Projects list page already
+   * uses (`filterLiveProjects`/`sortLiveProjects` — never a second ranking
+   * implementation). `null`/omitted when this project has no tracked TVL,
+   * or has no comparable peers, or the category-wide list couldn't be
+   * built for this request — `buildHighlights` simply skips the bullet.
+   */
+  categoryTvlLeadership?: { rank: number; totalInCategory: number } | null;
 };
 
 function tileExplanation(tile: ScorecardTile, meaning: string): MetricExplanation {
@@ -398,7 +409,26 @@ function buildThesis(input: IntelligenceReportInput): string {
 /** "Why Base Radar Highlights This Project" — 3-5 evidence-backed bullets, replacing PR13.8's audience-segmented `whyItMatters`. Every bullet traces to a real, already-computed signal; nothing here is a claim without underlying evidence. */
 function buildHighlights(input: IntelligenceReportInput): string[] {
   const findTile = (id: string) => input.scorecardTiles.find((t) => t.id === id);
+  // PR-062 Task 2 — TVL leadership, market position, and discovery
+  // confidence go first: the three signals this task explicitly asks for
+  // beyond what PR-050's original bullets already covered, so a project
+  // strong on all fronts never has one of these truncated out by the
+  // final `slice(0, 5)`.
   const bullets: string[] = [];
+
+  const leadership = input.categoryTvlLeadership;
+  if (leadership && leadership.rank === 1 && leadership.totalInCategory > 1) {
+    const category = input.identity.categories[0] ? formatCategoryLabel(input.identity.categories[0]) : "tracked";
+    bullets.push(`Highest TVL among ${leadership.totalInCategory} tracked ${category} projects on Base.`);
+  }
+
+  if (input.market.available && input.market.marketCapRank !== null) {
+    bullets.push(`Ranks #${input.market.marketCapRank} by market cap on CoinGecko.`);
+  }
+
+  if (input.confidence.level === "high") {
+    bullets.push("High-confidence profile, backed by live, verifiable data from multiple independent providers.");
+  }
 
   const developerTile = findTile("developer");
   if (developerTile && (developerTile.severity === "excellent" || developerTile.severity === "strong")) {

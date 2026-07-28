@@ -25,6 +25,9 @@ type ProfileActivityFeedProps = {
   tvlHistoryPromise: Promise<ProviderResult<SparklinePoint[]> | null>;
   transfersPromise: Promise<ProviderResult<TokenTransfer[]> | null>;
   releasesPromise: Promise<ProviderResult<ReleaseSummary[]> | null>;
+  registryUpdatedAt?: string | null;
+  discoveredAt?: string | null;
+  discoverySource?: string | null;
 };
 
 /**
@@ -49,12 +52,15 @@ export function ProfileActivityFeed({
   tvlHistoryPromise,
   transfersPromise,
   releasesPromise,
+  registryUpdatedAt,
+  discoveredAt,
+  discoverySource,
 }: ProfileActivityFeedProps) {
   return (
     <ProfileSectionCard title="Activity Feed" icon={Activity} className="gap-5">
       <p className="text-xs text-radar-light-muted dark:text-radar-muted">
-        Whale transfers, governance, GitHub releases and commits, TVL swings, risk alerts, and signals, merged into one
-        newest-first feed — no event type shown twice.
+        Whale transfers, governance, GitHub releases and commits, TVL swings, risk alerts, registry updates, discovery
+        events, and signals, merged into one newest-first feed — no event type shown twice.
       </p>
       <Suspense fallback={<WidgetSkeleton className="h-48 rounded-xl" />}>
         <ProfileTimelineAsync
@@ -69,6 +75,9 @@ export function ProfileActivityFeed({
           tvlHistoryPromise={tvlHistoryPromise}
           transfersPromise={transfersPromise}
           releasesPromise={releasesPromise}
+          registryUpdatedAt={registryUpdatedAt}
+          discoveredAt={discoveredAt}
+          discoverySource={discoverySource}
         />
       </Suspense>
     </ProfileSectionCard>
