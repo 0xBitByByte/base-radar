@@ -118,7 +118,7 @@ function collectBaseTokenAddresses(): string[] {
  */
 export async function fetchProviderBulkData(): Promise<ProviderBulkData> {
   const [markets, pairs, tokenPairs, protocols, verifiedContract, network] = await Promise.all([
-    coingecko.getBaseEcosystemMarkets(250),
+    coingecko.getBaseEcosystemMarkets(coingecko.BASE_ECOSYSTEM_MARKETS_PAGE_SIZE),
     dexscreener.getBaseTrendingPairs(),
     dexscreener.getPairsByTokenAddresses(collectBaseTokenAddresses()),
     defillama.getBaseProtocols(),

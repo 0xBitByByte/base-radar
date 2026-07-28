@@ -12,7 +12,7 @@
  * `contracts` stay unset rather than guessed.
  */
 
-import { getBaseEcosystemMarkets } from "@/lib/providers/coingecko/service";
+import { BASE_ECOSYSTEM_MARKETS_PAGE_SIZE, getBaseEcosystemMarkets } from "@/lib/providers/coingecko/service";
 import { recordDiscoveryFailure, recordDiscoverySuccess } from "@/lib/discovery/health";
 import { normalizeName, SOURCE_CONFIDENCE } from "@/lib/discovery/normalize";
 import type { DiscoveryProvider, DiscoveryResult } from "@/lib/discovery/provider";
@@ -25,7 +25,10 @@ export const coingeckoDiscoveryProvider: DiscoveryProvider = {
 
   async discover(): Promise<DiscoveryResult> {
     const fetchedAt = new Date().toISOString();
-    const result = await getBaseEcosystemMarkets();
+    // PR-054 — same page size `lib/intelligence/sources.ts`'s bulk fetch
+    // uses, so this call and that one share one cache entry (and, within
+    // the same request, one in-flight network call) instead of two.
+    const result = await getBaseEcosystemMarkets(BASE_ECOSYSTEM_MARKETS_PAGE_SIZE);
 
     if (!result.ok) {
       recordDiscoveryFailure(SOURCE, result.error.message);

@@ -25,6 +25,19 @@ const CACHE_TTL_MS = 90_000; // matches the window documented in docs/API.md
 // conservative in-process budget, not an authoritative published limit.
 const RATE_LIMIT: RateLimitConfig = { limit: 30, windowMs: 60_000 };
 
+/**
+ * PR-054 — the real page size `lib/intelligence/sources.ts`'s
+ * `fetchProviderBulkData()` already uses for its own bulk fetch. Every
+ * other caller of `getBaseEcosystemMarkets()` (the `coingecko` discovery
+ * source included) should pass this same constant rather than a different
+ * literal — the cache key below is keyed by `perPage`, so two call sites
+ * that want "the same bulk Base-ecosystem list" but pass different values
+ * silently defeat `getOrSet()`'s de-duplication and each pay for their own
+ * network round trip. See docs/PR-054_LIVE_PROJECTS_SERVICE.md's
+ * Performance section for the real duplicate-call this constant fixes.
+ */
+export const BASE_ECOSYSTEM_MARKETS_PAGE_SIZE = 250;
+
 export async function getBaseEcosystemMarkets(perPage = 20): Promise<ProviderResult<CoinMarket[]>> {
   return toProviderResult(PROVIDER, () =>
     getOrSet(`${PROVIDER}:markets:${perPage}`, CACHE_TTL_MS, async () => {
