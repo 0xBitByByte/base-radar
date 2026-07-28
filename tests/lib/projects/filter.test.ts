@@ -71,4 +71,112 @@ describe("filterLiveProjects", () => {
     filterLiveProjects(projects, { category: "dex" });
     expect(projects).toHaveLength(2);
   });
+
+  describe("multi-select (PR-056)", () => {
+    it("matches a bare single value exactly as before (backward compatibility)", () => {
+      const dex = liveProject({ id: "a", category: "dex" });
+      const lending = liveProject({ id: "b", category: "lending" });
+      expect(filterLiveProjects([dex, lending], { category: "dex" })).toEqual([dex]);
+    });
+
+    it("matches an array as OR within the same facet", () => {
+      const dex = liveProject({ id: "a", category: "dex" });
+      const lending = liveProject({ id: "b", category: "lending" });
+      const nft = liveProject({ id: "c", category: "nft" });
+      const result = filterLiveProjects([dex, lending, nft], { category: ["dex", "lending"] });
+      expect(result).toEqual(expect.arrayContaining([dex, lending]));
+      expect(result).not.toContain(nft);
+    });
+
+    it("treats an empty array as no constraint, matching everything", () => {
+      const projects = [liveProject({ id: "a", category: "dex" }), liveProject({ id: "b", category: "nft" })];
+      expect(filterLiveProjects(projects, { category: [] })).toHaveLength(2);
+    });
+
+    it("ANDs across facets while ORing within each — category (dex OR lending) AND verified", () => {
+      const dexVerified = liveProject({ id: "a", category: "dex", verification: { status: "verified", level: null, verifiedAt: null } });
+      const lendingVerified = liveProject({ id: "b", category: "lending", verification: { status: "verified", level: null, verifiedAt: null } });
+      const dexUnverified = liveProject({ id: "c", category: "dex", verification: { status: "unverified", level: null, verifiedAt: null } });
+      const nftVerified = liveProject({ id: "d", category: "nft", verification: { status: "verified", level: null, verifiedAt: null } });
+
+      const result = filterLiveProjects([dexVerified, lendingVerified, dexUnverified, nftVerified], {
+        category: ["dex", "lending"],
+        verified: true,
+      });
+
+      expect(result).toEqual(expect.arrayContaining([dexVerified, lendingVerified]));
+      expect(result).not.toContain(dexUnverified);
+      expect(result).not.toContain(nftVerified);
+      expect(result).toHaveLength(2);
+    });
+
+    it("supports multi-select on discoveryStatus", () => {
+      const verified = liveProject({ id: "a", discoveryStatus: "verified" });
+      const tracked = liveProject({ id: "b", discoveryStatus: "tracked" });
+      const needsReview = liveProject({ id: "c", discoveryStatus: "needs-review" });
+      const result = filterLiveProjects([verified, tracked, needsReview], { discoveryStatus: ["verified", "tracked"] });
+      expect(result).toEqual(expect.arrayContaining([verified, tracked]));
+      expect(result).not.toContain(needsReview);
+    });
+
+    it("supports multi-select on status", () => {
+      const live = liveProject({ id: "a", status: "live" });
+      const beta = liveProject({ id: "b", status: "beta" });
+      const deprecated = liveProject({ id: "c", status: "deprecated" });
+      const result = filterLiveProjects([live, beta, deprecated], { status: ["live", "beta"] });
+      expect(result).toEqual(expect.arrayContaining([live, beta]));
+      expect(result).not.toContain(deprecated);
+    });
+
+    it("supports multi-select on verificationStatus, matching a null status against nothing", () => {
+      const verified = liveProject({ id: "a", verification: { status: "verified", level: null, verifiedAt: null } });
+      const community = liveProject({ id: "b", verification: { status: "community", level: null, verifiedAt: null } });
+      const unset = liveProject({ id: "c", verification: { status: null, level: null, verifiedAt: null } });
+      const result = filterLiveProjects([verified, community, unset], { verificationStatus: ["verified", "community"] });
+      expect(result).toEqual(expect.arrayContaining([verified, community]));
+      expect(result).not.toContain(unset);
+    });
+  });
+
+  describe("verified filter (PR-056)", () => {
+    it("matches a registry-verified project", () => {
+      const project = liveProject({ verification: { status: "verified", level: null, verifiedAt: null } });
+      expect(filterLiveProjects([project], { verified: true })).toEqual([project]);
+    });
+
+    it("matches a discovery-verified project even with no registry verification status", () => {
+      const project = liveProject({ source: "discovery", verification: { status: null, level: null, verifiedAt: null }, discoveryStatus: "verified" });
+      expect(filterLiveProjects([project], { verified: true })).toEqual([project]);
+    });
+
+    it("excludes an unverified project when verified: true", () => {
+      const project = liveProject({ verification: { status: "unverified", level: null, verifiedAt: null } });
+      expect(filterLiveProjects([project], { verified: true })).toEqual([]);
+    });
+
+    it("with verified: false, returns only unverified projects", () => {
+      const verified = liveProject({ id: "a", verification: { status: "verified", level: null, verifiedAt: null } });
+      const unverified = liveProject({ id: "b", verification: { status: "unverified", level: null, verifiedAt: null } });
+      expect(filterLiveProjects([verified, unverified], { verified: false })).toEqual([unverified]);
+    });
+  });
+
+  describe("hasVolume filter (PR-056)", () => {
+    it("matches a project with a non-null volume24hUsd", () => {
+      const withVolume = liveProject({ id: "a", market: { ...liveProject().market, volume24hUsd: 1000 } });
+      const withoutVolume = liveProject({ id: "b", market: { ...liveProject().market, volume24hUsd: null } });
+      expect(filterLiveProjects([withVolume, withoutVolume], { hasVolume: true })).toEqual([withVolume]);
+    });
+
+    it("with hasVolume: false, returns only projects with no volume data", () => {
+      const withVolume = liveProject({ id: "a", market: { ...liveProject().market, volume24hUsd: 1000 } });
+      const withoutVolume = liveProject({ id: "b", market: { ...liveProject().market, volume24hUsd: null } });
+      expect(filterLiveProjects([withVolume, withoutVolume], { hasVolume: false })).toEqual([withoutVolume]);
+    });
+
+    it("treats a real zero volume as having volume data (not null)", () => {
+      const zeroVolume = liveProject({ market: { ...liveProject().market, volume24hUsd: 0 } });
+      expect(filterLiveProjects([zeroVolume], { hasVolume: true })).toEqual([zeroVolume]);
+    });
+  });
 });

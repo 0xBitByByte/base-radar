@@ -12,6 +12,11 @@
  * the bottom of an ascending one). Ties break on `id` ascending, so the
  * output is stable across repeated calls even when many projects share a
  * value (e.g. several projects all having `null` TVL).
+ *
+ * PR-056 — `"stars"` (`engineering.stars`) and `"verifiedDate"`
+ * (`verification.verifiedAt`) added. Both are ordinary `SortValue`s and
+ * fall through the exact same nulls-last/id-tie-break machinery as every
+ * other field — no special-casing needed.
  */
 
 import type { LiveProject, SortField, SortOrder } from "@/lib/projects/types";
@@ -42,6 +47,10 @@ function valueForField(project: LiveProject, field: SortField): SortValue {
       return toEpochMs(project.discoveryMetadata?.discoveredAt ?? null);
     case "updatedDate":
       return toEpochMs(project.lastUpdated);
+    case "stars":
+      return project.engineering.stars;
+    case "verifiedDate":
+      return toEpochMs(project.verification.verifiedAt);
     default:
       return null;
   }

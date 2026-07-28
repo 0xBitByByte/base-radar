@@ -5,9 +5,10 @@
  *
  * Indexed fields, all real and already on `LiveProject`: name, known
  * aliases, symbol, slug, CoinGecko id, DefiLlama slug, GitHub `owner/repo`,
- * website, and contract addresses. Nothing here is fuzzy — a token either
- * contains the (lowercased) query as a substring or it doesn't; ranking is
- * decided by which field matched, not by string-distance heuristics.
+ * website (both the full URL and its bare hostname — PR-056), and contract
+ * addresses. Nothing here is fuzzy — a token either contains the
+ * (lowercased) query as a substring or it doesn't; ranking is decided by
+ * which field matched, not by string-distance heuristics.
  */
 
 import type { LiveProject, ProjectSearchIndex, SearchIndexEntry, SearchResult } from "@/lib/projects/types";
@@ -21,11 +22,29 @@ const FIELD_WEIGHTS = {
   coingeckoId: 50,
   defillamaSlug: 50,
   github: 40,
+  /** PR-056 — ranks above the raw `website` URL: a bare domain match ("aerodrome.finance") is a cleaner identifier hit than a substring match somewhere inside a full URL's path/query string. */
+  websiteHostname: 35,
   website: 30,
   contract: 20,
 } as const;
 
 type FieldToken = { value: string; weight: number };
+
+/**
+ * PR-056 — deterministic hostname extraction, no `URL` API (which throws on
+ * a protocol-less input like `"aerodrome.finance"`, a real shape this
+ * codebase's `websiteUrl` values can take). Strips a leading protocol, cuts
+ * at the first `/`/`?`/`#`, then strips a leading `www.` — the same
+ * stripping rules `lib/discovery/normalize.ts`'s `normalizeWebsite()`
+ * already applies, isolated down to just the host component. Pure string
+ * manipulation, never a guess.
+ */
+function extractWebsiteHostname(url: string): string | null {
+  const withoutProtocol = url.trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");
+  const host = withoutProtocol.split(/[/?#]/)[0];
+  const withoutWww = host.replace(/^www\./i, "");
+  return withoutWww ? withoutWww.toLowerCase() : null;
+}
 
 function tokensForProject(project: LiveProject): FieldToken[] {
   const { identity, slug, searchIdentifiers } = project;
@@ -37,7 +56,11 @@ function tokensForProject(project: LiveProject): FieldToken[] {
   if (searchIdentifiers.coingeckoId) tokens.push({ value: searchIdentifiers.coingeckoId, weight: FIELD_WEIGHTS.coingeckoId });
   if (searchIdentifiers.defillamaSlug) tokens.push({ value: searchIdentifiers.defillamaSlug, weight: FIELD_WEIGHTS.defillamaSlug });
   if (searchIdentifiers.github) tokens.push({ value: searchIdentifiers.github, weight: FIELD_WEIGHTS.github });
-  if (identity.websiteUrl) tokens.push({ value: identity.websiteUrl, weight: FIELD_WEIGHTS.website });
+  if (identity.websiteUrl) {
+    tokens.push({ value: identity.websiteUrl, weight: FIELD_WEIGHTS.website });
+    const hostname = extractWebsiteHostname(identity.websiteUrl);
+    if (hostname) tokens.push({ value: hostname, weight: FIELD_WEIGHTS.websiteHostname });
+  }
   for (const address of searchIdentifiers.contractAddresses) tokens.push({ value: address, weight: FIELD_WEIGHTS.contract });
 
   return tokens;
