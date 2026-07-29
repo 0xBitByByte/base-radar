@@ -48,6 +48,8 @@ export function mapRecentlyVerifiedContract(raw: RawSmartContractsResponse): Ver
 
 export type TokenTransfer = {
   txHash: string;
+  /** Disambiguates multiple transfer events sharing one `txHash` (e.g. a swap) — see PR-068. */
+  logIndex: number;
   timestamp: string | null;
   from: string;
   to: string;
@@ -100,7 +102,8 @@ export function mapTokenTransfers(raw: RawTokenTransfersResponse): TokenTransfer
       const decimals = Number(item.total.decimals);
       const amount = Number(item.total.value) / 10 ** decimals;
       return {
-        txHash: item.tx_hash,
+        txHash: item.transaction_hash,
+        logIndex: item.log_index,
         timestamp: item.timestamp,
         from: item.from.hash,
         to: item.to.hash,

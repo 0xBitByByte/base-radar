@@ -22,7 +22,14 @@ export type RawSmartContractsResponse = {
 };
 
 export type RawTokenTransfer = {
-  tx_hash: string;
+  /**
+   * PR-068 — corrected from the previous (incorrect) `tx_hash` field name,
+   * which does not exist on this endpoint's real response and silently
+   * produced `undefined` for every transfer. Confirmed live against
+   * `base.blockscout.com` before this fix.
+   */
+  transaction_hash: string;
+  log_index: number;
   timestamp: string | null;
   from: { hash: string };
   to: { hash: string };
