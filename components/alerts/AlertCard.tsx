@@ -7,8 +7,8 @@ import { SeverityBadge } from "@/components/alerts/SeverityBadge";
 import { CATEGORY_ICON, CATEGORY_LABEL, SEVERITY_BORDER_CLASS } from "@/components/alerts/meta";
 import { ProjectLogo } from "@/components/branding/ProjectLogo";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { RelativeTime } from "@/components/shared/RelativeTime";
 import { getProject } from "@/data/projects/helpers";
-import { formatRelativeTime } from "@/lib/data/format";
 import type { Alert } from "@/lib/alerts/types";
 import { cn } from "@/lib/utils";
 
@@ -96,7 +96,7 @@ export function AlertCard({ alert, onOpen, onTogglePin }: AlertCardProps) {
 
           <div className="flex shrink-0 items-center gap-1.5">
             <span className="hidden text-[10.5px] whitespace-nowrap text-radar-light-muted sm:inline dark:text-radar-muted">
-              {formatRelativeTime(alert.timestamp)}
+              <RelativeTime iso={alert.timestamp} />
             </span>
             <Tooltip content={alert.pinned ? "Unpin" : "Pin to top"}>
               <button
@@ -134,7 +134,7 @@ export function AlertCard({ alert, onOpen, onTogglePin }: AlertCardProps) {
           </span>
           <span className="text-[10.5px] text-radar-light-muted dark:text-radar-muted">via {alert.source}</span>
           <span className="text-[10.5px] text-radar-light-muted sm:hidden dark:text-radar-muted">
-            · {formatRelativeTime(alert.timestamp)}
+            · <RelativeTime iso={alert.timestamp} />
           </span>
         </div>
       </div>

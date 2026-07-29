@@ -5,7 +5,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Activity, ListChecks, ShieldAlert } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { formatRelativeTime } from "@/lib/data/format";
+import { RelativeTime } from "@/components/shared/RelativeTime";
 import { useSyncStatus } from "@/lib/hooks/useSyncStatus";
 import { useSyncDiagnostics } from "@/lib/hooks/useSyncDiagnostics";
 import { SYNC_STATE_DISPLAY } from "@/components/sync/meta";
@@ -92,7 +92,7 @@ export function SyncStatusCard({ open, onOpenChange }: SyncStatusCardProps) {
               </div>
               <div className={ROW_CLASS}>
                 <span className={LABEL_CLASS}>Last sync</span>
-                <span className={VALUE_CLASS}>{lastSyncAt ? formatRelativeTime(lastSyncAt) : "Never"}</span>
+                <span className={VALUE_CLASS}>{lastSyncAt ? <RelativeTime iso={lastSyncAt} /> : "Never"}</span>
               </div>
               <div className={ROW_CLASS}>
                 <span className={LABEL_CLASS}>Offline</span>

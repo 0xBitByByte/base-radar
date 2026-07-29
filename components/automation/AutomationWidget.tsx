@@ -13,7 +13,7 @@ import { NotificationBadge } from "@/components/notifications/NotificationBadge"
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { GlowBadge } from "@/components/ui/GlowBadge";
-import { formatRelativeTime } from "@/lib/data/format";
+import { RelativeTime } from "@/components/shared/RelativeTime";
 import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
 import { DEFAULT_AUTOMATION_RULES } from "@/lib/automation/rules";
 
@@ -187,7 +187,7 @@ export function AutomationWidget() {
                 </div>
               )}
               <time dateTime={latest.triggeredAt} className="relative z-[1] text-[10.5px] text-radar-light-muted dark:text-radar-muted">
-                {formatRelativeTime(latest.triggeredAt)}
+                <RelativeTime iso={latest.triggeredAt} />
               </time>
             </div>
           )}

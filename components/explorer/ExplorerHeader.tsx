@@ -1,5 +1,5 @@
 import { GlowBadge } from "@/components/ui/GlowBadge";
-import { formatRelativeTime } from "@/lib/data/format";
+import { RelativeTime } from "@/components/shared/RelativeTime";
 import type { RegistryMetrics } from "@/data/projects/metrics";
 
 type ExplorerHeaderProps = {
@@ -39,7 +39,7 @@ export function ExplorerHeader({ visibleCount, generatedAt, registryMetrics }: E
         aria-live="polite"
       >
         Showing {visibleCount} {visibleCount === 1 ? "Project" : "Projects"} · Updated{" "}
-        {formatRelativeTime(generatedAt)}
+        <RelativeTime iso={generatedAt} />
       </p>
       {/* Activates automatically once registry metadata (lifecycle/verificationLevel) is populated in a future PR — no chip renders on fabricated or zero data. */}
       {chips.length > 0 && (

@@ -2,7 +2,7 @@ import { CheckCircle2, CircleSlash, Database, HelpCircle, XCircle, type LucideIc
 
 import { ProfileSectionCard } from "@/components/explorer/ProfileSectionCard";
 import { PROVIDER_BRANDING } from "@/lib/branding/providers";
-import { formatRelativeTime } from "@/lib/data/format";
+import { RelativeTime } from "@/components/shared/RelativeTime";
 import { PROVIDER_NAMES, type ProviderName } from "@/lib/providers/common/types";
 import { cn } from "@/lib/utils";
 import type { Sources } from "@/lib/intelligence/types";
@@ -142,7 +142,7 @@ export function ProfileSources({ sources, thingsWeCouldntVerify }: ProfileSource
                 </p>
                 {attribution.status === "live" && attribution.fetchedAt && (
                   <span className="text-[10px] text-radar-light-muted/80 dark:text-radar-muted/70">
-                    Updated {formatRelativeTime(attribution.fetchedAt)}
+                    Updated <RelativeTime iso={attribution.fetchedAt} />
                   </span>
                 )}
               </div>

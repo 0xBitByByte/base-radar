@@ -3,7 +3,7 @@ import Link from "next/link";
 import { AutomationActionBadge, AutomationTriggerBadge } from "@/components/automation/AutomationBadge";
 import { getResultActions, getResultTrigger } from "@/components/automation/filters";
 import { NotificationBadge } from "@/components/notifications/NotificationBadge";
-import { formatRelativeTime } from "@/lib/data/format";
+import { RelativeTime } from "@/components/shared/RelativeTime";
 import type { AutomationResult } from "@/lib/automation/types";
 
 type AutomationItemProps = {
@@ -50,7 +50,7 @@ export function AutomationItem({ result, compact = false }: AutomationItemProps)
           dateTime={result.triggeredAt}
           className="shrink-0 text-[10.5px] whitespace-nowrap text-radar-light-muted dark:text-radar-muted"
         >
-          {formatRelativeTime(result.triggeredAt)}
+          <RelativeTime iso={result.triggeredAt} />
         </time>
       </div>
 

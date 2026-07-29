@@ -5,7 +5,7 @@ import { Check, Undo2 } from "lucide-react";
 
 import { NotificationBadge } from "@/components/notifications/NotificationBadge";
 import { TimelineEventBadge } from "@/components/timeline/TimelineEventBadge";
-import { formatRelativeTime } from "@/lib/data/format";
+import { RelativeTime } from "@/components/shared/RelativeTime";
 import type { Notification } from "@/lib/notifications/types";
 import { cn } from "@/lib/utils";
 
@@ -71,7 +71,7 @@ export function NotificationItem({ notification, onMarkRead, onMarkUnread, compa
             dateTime={notification.timestamp}
             className="text-[10.5px] whitespace-nowrap text-radar-light-muted dark:text-radar-muted"
           >
-            {formatRelativeTime(notification.timestamp)}
+            <RelativeTime iso={notification.timestamp} />
           </time>
           {isUnread ? (
             <button

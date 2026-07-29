@@ -5,7 +5,8 @@ import { motion } from "framer-motion";
 import { ArrowDown, ArrowUp, Minus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { formatPercent, formatRelativeTime, formatterForKpiFormat } from "@/lib/data/format";
+import { RelativeTime } from "@/components/shared/RelativeTime";
+import { formatPercent, formatterForKpiFormat } from "@/lib/data/format";
 import type { Kpi, Trend } from "@/lib/data/types";
 import { AnimatedNumber } from "@/components/ui/AnimatedNumber";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -42,7 +43,7 @@ export function KPIRow({ items, lastUpdated }: KPIRowProps) {
               <div className="flex flex-col gap-0.5">
                 <span>{kpi.tooltip}</span>
                 <span className="text-radar-light-muted/70 dark:text-radar-muted/50">
-                  Updated {formatRelativeTime(lastUpdated)}
+                  Updated <RelativeTime iso={lastUpdated} />
                 </span>
               </div>
             }

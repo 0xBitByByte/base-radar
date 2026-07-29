@@ -1,6 +1,6 @@
 import { PortfolioHealthBadge } from "@/components/portfolio/PortfolioHealthBadge";
 import { PortfolioMetric } from "@/components/portfolio/PortfolioMetric";
-import { formatRelativeTime } from "@/lib/data/format";
+import { RelativeTime } from "@/components/shared/RelativeTime";
 import type { PortfolioIntelligence } from "@/lib/portfolio/types";
 
 type PortfolioCardProps = {
@@ -24,7 +24,7 @@ export function PortfolioCard({ portfolio }: PortfolioCardProps) {
             <PortfolioHealthBadge health={portfolio.overallHealth} />
           </div>
           <span className="text-[10.5px] whitespace-nowrap text-radar-light-muted dark:text-radar-muted">
-            Generated {formatRelativeTime(portfolio.generatedAt)}
+            Generated <RelativeTime iso={portfolio.generatedAt} />
           </span>
         </div>
         <p className="text-sm leading-relaxed text-radar-light-muted dark:text-radar-muted">{portfolio.summary}</p>

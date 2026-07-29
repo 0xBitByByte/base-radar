@@ -11,7 +11,7 @@ import { TimelineItem } from "@/components/timeline/TimelineItem";
 import { TimelineMetric } from "@/components/timeline/TimelineMetric";
 import { TimelineSection } from "@/components/timeline/TimelineSection";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { formatRelativeTime } from "@/lib/data/format";
+import { RelativeTime } from "@/components/shared/RelativeTime";
 import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
 import { capitalize } from "@/lib/timeline/summary";
 import type { TimelineEventType } from "@/lib/timeline/types";
@@ -79,7 +79,7 @@ export function Timeline() {
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h1 className="text-xl font-semibold text-radar-light-text dark:text-radar-white">{timeline.headline}</h1>
           <span className="text-[10.5px] whitespace-nowrap text-radar-light-muted dark:text-radar-muted">
-            Generated {formatRelativeTime(timeline.generatedAt)}
+            Generated <RelativeTime iso={timeline.generatedAt} />
           </span>
         </div>
         <p className="text-sm leading-relaxed text-radar-light-muted dark:text-radar-muted">{timeline.summary}</p>

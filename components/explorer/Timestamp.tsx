@@ -1,5 +1,7 @@
+"use client";
+
 import { Tooltip } from "@/components/ui/Tooltip";
-import { formatRelativeTime } from "@/lib/data/format";
+import { useRelativeTime } from "@/lib/hooks/useRelativeTime";
 
 type TimestampProps = {
   iso: string | null;
@@ -15,6 +17,8 @@ type TimestampProps = {
  * honest `fallback` renders instead of a fabricated time.
  */
 export function Timestamp({ iso, fallback = "No live data yet", className }: TimestampProps) {
+  const label = useRelativeTime(iso ?? "");
+
   if (!iso) {
     return <span className={className}>{fallback}</span>;
   }
@@ -23,7 +27,7 @@ export function Timestamp({ iso, fallback = "No live data yet", className }: Tim
 
   return (
     <Tooltip content={exact}>
-      <span className={className}>Updated {formatRelativeTime(iso)}</span>
+      <span className={className}>Updated {label}</span>
     </Tooltip>
   );
 }

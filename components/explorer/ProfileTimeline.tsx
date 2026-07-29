@@ -14,8 +14,8 @@ import {
 } from "lucide-react";
 
 import { QuickViewSectionLabel } from "@/components/explorer/QuickViewSectionLabel";
+import { RelativeTime } from "@/components/shared/RelativeTime";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { formatRelativeTime } from "@/lib/data/format";
 import type { TimelineEvent, TimelineEventKind } from "@/lib/intelligence/timeline";
 
 type ProfileTimelineProps = {
@@ -110,7 +110,7 @@ function TimelineEventRow({ event }: { event: TimelineEvent }) {
         <p className="text-[10px] text-radar-light-muted/70 dark:text-radar-muted/60">Source: {KIND_SOURCE[event.kind]}</p>
       </div>
       <span className="shrink-0 text-[11px] text-radar-light-muted dark:text-radar-muted">
-        {formatRelativeTime(event.timestamp)}
+        <RelativeTime iso={event.timestamp} />
       </span>
     </li>
   );

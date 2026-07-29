@@ -5,8 +5,8 @@ import { NarrativeBadge } from "@/components/alerts/NarrativeBadge";
 import { SeverityBadge } from "@/components/alerts/SeverityBadge";
 import { SignalPills } from "@/components/alerts/SignalPills";
 import { ProjectLogo } from "@/components/branding/ProjectLogo";
+import { RelativeTime } from "@/components/shared/RelativeTime";
 import { getProject } from "@/data/projects/helpers";
-import { formatRelativeTime } from "@/lib/data/format";
 import type { IntelligenceAlert } from "@/lib/alerts/intelligence/types";
 
 type IntelligenceCardProps = {
@@ -46,7 +46,7 @@ export function IntelligenceCard({ alert }: IntelligenceCardProps) {
           <SeverityBadge severity={alert.severity} />
         </div>
         <span className="shrink-0 text-[10.5px] whitespace-nowrap text-radar-light-muted dark:text-radar-muted">
-          {formatRelativeTime(alert.timestamp)}
+          <RelativeTime iso={alert.timestamp} />
         </span>
       </div>
 

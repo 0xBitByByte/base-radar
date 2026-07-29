@@ -4,7 +4,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { CheckCircle2, XCircle } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { formatRelativeTime } from "@/lib/data/format";
+import { RelativeTime } from "@/components/shared/RelativeTime";
 import { useSyncDiagnostics } from "@/lib/hooks/useSyncDiagnostics";
 
 type SyncDiagnosticsDialogProps = {
@@ -80,7 +80,7 @@ export function SyncDiagnosticsDialog({ open, onOpenChange }: SyncDiagnosticsDia
               </div>
               <div className={ROW_CLASS}>
                 <span className={LABEL_CLASS}>Last sync</span>
-                <span className={VALUE_CLASS}>{diagnostics.lastSyncAt ? formatRelativeTime(diagnostics.lastSyncAt) : "Never"}</span>
+                <span className={VALUE_CLASS}>{diagnostics.lastSyncAt ? <RelativeTime iso={diagnostics.lastSyncAt} /> : "Never"}</span>
               </div>
               <div className={ROW_CLASS}>
                 <span className={LABEL_CLASS}>Storage integrity</span>

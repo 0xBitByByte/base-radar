@@ -7,7 +7,7 @@ import { Menu } from "@base-ui/react/menu";
 import { MoreHorizontal, RefreshCw } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { formatRelativeTime } from "@/lib/data/format";
+import { RelativeTime } from "@/components/shared/RelativeTime";
 import type { DataSource } from "@/lib/data/types";
 
 export type WidgetAccent = "primary" | "success" | "purple" | "orange" | "danger" | "accent";
@@ -133,7 +133,7 @@ export function WidgetCard({
 
       {lastUpdated && (
         <p className="-mt-1 text-[10.5px] text-radar-light-muted/70 dark:text-radar-muted/50">
-          Updated {formatRelativeTime(lastUpdated)}
+          Updated <RelativeTime iso={lastUpdated} />
         </p>
       )}
     </motion.div>

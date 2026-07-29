@@ -1,6 +1,7 @@
 import { ArrowRightLeft, ExternalLink } from "lucide-react";
 
-import { formatCompactNumber, formatRelativeTime } from "@/lib/data/format";
+import { RelativeTime } from "@/components/shared/RelativeTime";
+import { formatCompactNumber } from "@/lib/data/format";
 import type { TokenTransfer } from "@/lib/providers/blockscout/service";
 
 type RecentTransactionsProps = {
@@ -53,7 +54,7 @@ export function RecentTransactions({ transfers, tokenSymbol, explorerUrl, unavai
                 {formatCompactNumber(transfer.amount)} {tokenSymbol ?? ""}
               </span>
               <span className="text-radar-light-muted dark:text-radar-muted">
-                {transfer.timestamp ? formatRelativeTime(transfer.timestamp) : "—"}
+                {transfer.timestamp ? <RelativeTime iso={transfer.timestamp} /> : "—"}
               </span>
               {explorerUrl && (
                 <a

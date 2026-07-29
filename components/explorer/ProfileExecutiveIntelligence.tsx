@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 
 import { ProfileSectionCard } from "@/components/explorer/ProfileSectionCard";
-import { formatRelativeTime } from "@/lib/data/format";
+import { RelativeTime } from "@/components/shared/RelativeTime";
 import type { IntelligenceReport } from "@/lib/intelligence/report";
 import type { Freshness, Sources } from "@/lib/intelligence/types";
 import type { VerificationStatus } from "@/data/projects/enums";
@@ -200,7 +200,11 @@ export function ProfileExecutiveIntelligence({ report, freshness, sources, verif
             <span className="flex items-center gap-1.5">
               <Clock className="size-3 shrink-0" aria-hidden="true" />
               Data Freshness: <span className={cn("font-semibold", FRESHNESS_COLOR[freshness.overall])}>{FRESHNESS_LABEL[freshness.overall]}</span>
-              {freshness.newestSourceAt && <span>· Updated {formatRelativeTime(freshness.newestSourceAt)}</span>}
+              {freshness.newestSourceAt && (
+                <span>
+                  · Updated <RelativeTime iso={freshness.newestSourceAt} />
+                </span>
+              )}
             </span>
           </div>
         </div>
