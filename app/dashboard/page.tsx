@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 import {
   getActivityFeed,
   getAIProjects,
@@ -33,6 +35,8 @@ import { NarrativeHeatmap } from "@/components/dashboard/NarrativeHeatmap";
 import { ProjectSpotlight } from "@/components/dashboard/ProjectSpotlight";
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
 import { WatchlistWidget } from "@/components/dashboard/WatchlistWidget";
+
+export const metadata: Metadata = { title: "Dashboard" };
 
 const WIDGET_GRID_CLASS = "grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3";
 

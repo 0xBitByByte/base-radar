@@ -1,6 +1,8 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { getProject } from "@/data/projects/helpers";
+import { SITE, SITE_TWITTER_HANDLE } from "@/constants/site";
 import { getProjectAIIntelligence, getRawWhaleEvents, getSignals } from "@/lib/data/aggregate";
 import { buildProjectIntelligence } from "@/lib/intelligence/engine";
 import { buildIntelligenceReport } from "@/lib/intelligence/report";
@@ -40,6 +42,52 @@ import type { SparklinePoint } from "@/lib/data/types";
 type ProjectProfilePageProps = {
   params: Promise<{ slug: string }>;
 };
+
+/**
+ * Per-project title/description/OG/canonical — `getProject` is a cheap,
+ * synchronous registry lookup (no provider fetch), so this runs independent
+ * of the page's own data-heavy `buildProjectIntelligence` call. Falls back
+ * to root-layout defaults if the slug doesn't resolve; the page component's
+ * own `notFound()` is still what actually produces the 404 response.
+ *
+ * Next's metadata merging replaces `openGraph`/`twitter` wholesale when a
+ * segment sets either at all (shallow merge, not deep) — so every field
+ * needed here (image, siteName, card type, handles) is repeated explicitly
+ * rather than relying on inheritance from the root layout, which would
+ * otherwise silently drop the image and card type.
+ */
+export async function generateMetadata({ params }: ProjectProfilePageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const project = getProject(slug);
+  if (!project) return {};
+
+  const title = project.name;
+  const description = project.shortDescription || project.description;
+  const canonical = `/dashboard/projects/${project.slug}`;
+
+  return {
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      title,
+      description,
+      url: canonical,
+      siteName: SITE.name,
+      images: [{ url: "/og-image.png", width: 1200, height: 630, alt: SITE.name }],
+      locale: "en_US",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: ["/og-image.png"],
+      site: SITE_TWITTER_HANDLE,
+      creator: SITE_TWITTER_HANDLE,
+    },
+  };
+}
 
 /**
  * The Project Profile route (PR11). Streaming Architecture pass — this page

@@ -21,6 +21,7 @@ import type { LiveProject } from "@/lib/projects/types";
 export const metadata: Metadata = {
   title: "Projects",
   description: "Browse the Base ecosystem — every verified, tracked, and discovered project in one place.",
+  alternates: { canonical: PROJECTS_PATH },
 };
 
 /** The most recent `lastUpdated` across every project — real, derived data for the Header's "Updated" indicator, never a fabricated timestamp. */

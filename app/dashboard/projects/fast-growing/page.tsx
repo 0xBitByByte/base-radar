@@ -1,15 +1,10 @@
-import type { Metadata } from "next";
-
 import { renderProjectsCollectionRoute } from "@/components/projects/renderProjectsCollectionRoute";
 import type { RawSearchParams } from "@/components/projects/queryState";
-import { PROJECTS_VIEW_META } from "@/components/projects/viewMeta";
+import { buildViewMetadata } from "@/components/projects/viewMeta";
 
 const VIEW = "topActivity" as const;
 
-export const metadata: Metadata = {
-  title: `${PROJECTS_VIEW_META[VIEW].title} | Projects`,
-  description: PROJECTS_VIEW_META[VIEW].description ?? PROJECTS_VIEW_META[VIEW].title,
-};
+export const metadata = buildViewMetadata(VIEW);
 
 type PageProps = { searchParams: Promise<RawSearchParams> };
 
