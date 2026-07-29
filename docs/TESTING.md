@@ -1,6 +1,6 @@
 # Testing
 
-Base Radar's testing foundation, added in PR-004. This is a foundation, not a coverage target — see [`docs/REPOSITORY_AUDIT_V1.1.md`](REPOSITORY_AUDIT_V1.1.md) and [`docs/ENGINEERING_EXECUTION_PLAN_V1.md`](ENGINEERING_EXECUTION_PLAN_V1.md) for why this exists and what comes after it.
+Base Radar's testing foundation, added in PR-004. This is a foundation, not a coverage target — see [`docs/archive/REPOSITORY_AUDIT_V1.1.md`](archive/REPOSITORY_AUDIT_V1.1.md) and [`docs/ENGINEERING_EXECUTION_PLAN_V1.md`](ENGINEERING_EXECUTION_PLAN_V1.md) for why this exists and what comes after it.
 
 ## Running tests
 

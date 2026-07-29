@@ -44,7 +44,7 @@ its roadmap identifier here.
 
 A second, separate planning track exists alongside this one:
 [ENGINEERING_EXECUTION_PLAN_V1.md](ENGINEERING_EXECUTION_PLAN_V1.md) (status:
-Active), built from [REPOSITORY_AUDIT_V1.1.md](REPOSITORY_AUDIT_V1.1.md)'s
+Active), built from [archive/REPOSITORY_AUDIT_V1.1.md](archive/REPOSITORY_AUDIT_V1.1.md)'s
 findings and the [Product Bible](PRODUCT_BIBLE/00_INDEX.md)'s
 [Release 1–9 plan](PRODUCT_BIBLE/07_ENGINEERING_ROADMAP.md#releases). That
 plan is scoped to **engineering-quality and platform work** (test coverage,

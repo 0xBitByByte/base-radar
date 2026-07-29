@@ -1,7 +1,7 @@
 # Base Radar — Engineering Execution Plan v1.0
 
 > **Status:** ✅ Active — the primary execution document for engineering
-> **Inputs:** [Product Bible v1.0](PRODUCT_BIBLE/00_INDEX.md) (frozen), [Repository Implementation Audit v1.1](REPOSITORY_AUDIT_V1.1.md) (frozen)
+> **Inputs:** [Product Bible v1.0](PRODUCT_BIBLE/00_INDEX.md) (frozen), [Repository Implementation Audit v1.1](archive/REPOSITORY_AUDIT_V1.1.md) (frozen)
 > **Scope:** How engineering executes what the Bible specifies and the Audit found — not a specification document itself.
 
 ---
@@ -10,7 +10,7 @@ This plan converts the Audit's findings into a sequenced, sprint-level delivery 
 
 ## Executive Summary
 
-Base Radar's engineering organization inherits a codebase the Audit rates at a [64% Engineering Readiness Index](REPOSITORY_AUDIT_V1.1.md#engineering-readiness-index) and [68% Overall Product Bible Compliance](REPOSITORY_AUDIT_V1.1.md#final-report) — a mature, substantially-built product sitting on an engineering practice with one glaring gap. **Repository maturity** is genuinely high in the areas that matter most to users: the Intelligence Framework, Provider Layer, and core feature set (Dashboard, Explorer, Portfolio, Notifications, Alerts, Automation) are all real, working, and — per the Audit's Phase 5 — actively improving in discipline over time rather than accumulating debt. **Major risks**, per the Audit's [Repository Risk Register](REPOSITORY_AUDIT_V1.1.md#repository-risk-register), are concentrated in exactly three places: a live navigation defect, a live architectural ownership violation, and a complete absence of automated testing. **Major strengths** are provider abstraction, intelligence-framework discipline, and a clean, ownership-legible repository structure (all detailed in the Audit's [Strengths Summary](REPOSITORY_AUDIT_V1.1.md#strengths-summary)).
+Base Radar's engineering organization inherits a codebase the Audit rates at a [64% Engineering Readiness Index](archive/REPOSITORY_AUDIT_V1.1.md#engineering-readiness-index) and [68% Overall Product Bible Compliance](archive/REPOSITORY_AUDIT_V1.1.md#final-report) — a mature, substantially-built product sitting on an engineering practice with one glaring gap. **Repository maturity** is genuinely high in the areas that matter most to users: the Intelligence Framework, Provider Layer, and core feature set (Dashboard, Explorer, Portfolio, Notifications, Alerts, Automation) are all real, working, and — per the Audit's Phase 5 — actively improving in discipline over time rather than accumulating debt. **Major risks**, per the Audit's [Repository Risk Register](archive/REPOSITORY_AUDIT_V1.1.md#repository-risk-register), are concentrated in exactly three places: a live navigation defect, a live architectural ownership violation, and a complete absence of automated testing. **Major strengths** are provider abstraction, intelligence-framework discipline, and a clean, ownership-legible repository structure (all detailed in the Audit's [Strengths Summary](archive/REPOSITORY_AUDIT_V1.1.md#strengths-summary)).
 
 **Overall recommendation:** This plan sequences work to close the three Critical/High risks first — all of them are converge-and-clean-up work, not new architecture — before any new feature development or Release 1 work begins. This is not a new judgment; it is the same sequence the Audit itself already recommended, now broken into sprints, PRs, and quality gates engineering can actually execute against.
 
@@ -19,7 +19,7 @@ Base Radar's engineering organization inherits a codebase the Audit rates at a [
 Version 1 of this execution plan exists to achieve five objectives, each traceable to a specific Bible principle and Audit finding:
 
 1. **Increase trust** — close the navigation and ownership defects the Audit found live in production, in direct service of [01. Product Strategy](PRODUCT_BIBLE/01_PRODUCT_STRATEGY.md#success-metrics)'s Habitual Trust metric.
-2. **Reduce technical debt** — resolve the Audit's [Phase 7 Technical Debt Audit](REPOSITORY_AUDIT_V1.1.md) findings in severity order (Critical before High before Medium), never let a new debt item form while an existing one is unresolved.
+2. **Reduce technical debt** — resolve the Audit's [Phase 7 Technical Debt Audit](archive/REPOSITORY_AUDIT_V1.1.md) findings in severity order (Critical before High before Medium), never let a new debt item form while an existing one is unresolved.
 3. **Improve engineering quality** — stand up the automated testing foundation the Audit found completely absent, converting Testing from 0% toward a real, growing baseline.
 4. **Protect architecture** — resolve the confirmed Ownership Principle violation (dual watchlist system) without a rewrite, per [11. Architecture Guardrails](PRODUCT_BIBLE/11_ARCHITECTURE_GUARDRAILS.md#architectural-integrity)'s Architectural Integrity principle: leave the system healthier, not merely different.
 5. **Enable Release 1** — clear every blocker the Audit identified so that [07. Engineering Roadmap](PRODUCT_BIBLE/07_ENGINEERING_ROADMAP.md#releases)'s Release 1 (Platform Foundation) can begin on a codebase that can actually support it safely.
@@ -38,7 +38,7 @@ These govern *how* every sprint and PR below is executed — they do not replace
 
 ## Milestone Roadmap
 
-This roadmap has two parts: **Milestones A–C**, converting the Audit's own [Phase 9 Implementation Roadmap](REPOSITORY_AUDIT_V1.1.md) into execution, and **Milestones D onward**, mapping one-to-one onto [07. Engineering Roadmap](PRODUCT_BIBLE/07_ENGINEERING_ROADMAP.md#releases)'s nine already-sequenced Releases. No release is renamed, reordered, or redefined here — this section only assigns each one an execution-plan letter and states its dependency on the milestone before it.
+This roadmap has two parts: **Milestones A–C**, converting the Audit's own [Phase 9 Implementation Roadmap](archive/REPOSITORY_AUDIT_V1.1.md) into execution, and **Milestones D onward**, mapping one-to-one onto [07. Engineering Roadmap](PRODUCT_BIBLE/07_ENGINEERING_ROADMAP.md#releases)'s nine already-sequenced Releases. No release is renamed, reordered, or redefined here — this section only assigns each one an execution-plan letter and states its dependency on the milestone before it.
 
 | Milestone | Name | Source | Depends on |
 | --- | --- | --- | --- |
@@ -169,7 +169,7 @@ Before every merge, the following are verified — this list operationalizes [11
 
 ## Risk Mitigation Plan
 
-Every risk below is carried directly from the Audit's [Repository Risk Register](REPOSITORY_AUDIT_V1.1.md#repository-risk-register) — none are new.
+Every risk below is carried directly from the Audit's [Repository Risk Register](archive/REPOSITORY_AUDIT_V1.1.md#repository-risk-register) — none are new.
 
 | Audit Risk | Severity | Engineering Action |
 | --- | --- | --- |
@@ -187,12 +187,12 @@ Every risk below is carried directly from the Audit's [Repository Risk Register]
 - **Test coverage:** non-zero and growing after Milestone B; Intelligence scoring/confidence and Sync/Account migration modules covered first.
 - **Architecture violations:** zero confirmed Ownership Principle violations (target: 0, current per Audit: 1 — the dual watchlist system).
 - **Performance:** no regression introduced by any PR without explicit sign-off, per the Quality Gates above.
-- **Release readiness:** progression from the Audit's "Not Ready" assessment for Alpha/Closed Beta/Public Beta/Production toward "Ready," tracked milestone by milestone against the Audit's [Release Readiness Assessment](REPOSITORY_AUDIT_V1.1.md#release-readiness-assessment).
+- **Release readiness:** progression from the Audit's "Not Ready" assessment for Alpha/Closed Beta/Public Beta/Production toward "Ready," tracked milestone by milestone against the Audit's [Release Readiness Assessment](archive/REPOSITORY_AUDIT_V1.1.md#release-readiness-assessment).
 - **Developer velocity:** not compromised by this plan — Milestones A–C are deliberately small and parallelizable so they do not stall other work, per the Guiding Principles' "incremental delivery."
 
 ## Exit Criteria
 
-**Milestone A** — Zero sidebar navigation items resolve to a nonexistent route; exactly one watchlist implementation remains, referenced by exactly one navigation entry. *(Carried directly from the Audit's [Success Criteria](REPOSITORY_AUDIT_V1.1.md#success-criteria).)*
+**Milestone A** — Zero sidebar navigation items resolve to a nonexistent route; exactly one watchlist implementation remains, referenced by exactly one navigation entry. *(Carried directly from the Audit's [Success Criteria](archive/REPOSITORY_AUDIT_V1.1.md#success-criteria).)*
 
 **Milestone B** — A `test` script exists and runs in CI; the Intelligence scoring/confidence modules and the Sync/Account migration runners have real, passing test coverage. *(Carried directly from the Audit.)*
 
@@ -209,7 +209,7 @@ Every risk below is carried directly from the Audit's [Repository Risk Register]
 This plan is governed by the following hierarchy, highest authority first:
 
 1. **[Product Bible v1.0](PRODUCT_BIBLE/00_INDEX.md)** — the frozen product specification. No engineering decision in this plan may contradict it; if a conflict is ever found, the Bible wins and this plan is corrected.
-2. **[Repository Audit v1.1](REPOSITORY_AUDIT_V1.1.md)** — the frozen record of current repository state. This plan's milestones and risk mitigations trace to it; if the Audit is ever refreshed (see Future Maintenance below), this plan is updated to match, not the reverse.
+2. **[Repository Audit v1.1](archive/REPOSITORY_AUDIT_V1.1.md)** — the frozen record of current repository state. This plan's milestones and risk mitigations trace to it; if the Audit is ever refreshed (see Future Maintenance below), this plan is updated to match, not the reverse.
 3. **This Execution Plan** — the only document in this hierarchy that changes on a sprint cadence. It sequences and operationalizes the two documents above; it never introduces a requirement neither of them contains.
 4. **A Decision Log** (to be established alongside Sprint A.1, living at `docs/DECISIONS/`, which the repository already has a directory for) — records any execution-level decision made in the course of delivering this plan (e.g., which watchlist system to keep, exact test runner chosen) that isn't already dictated by the Bible or Audit. The Decision Log never overrides the Bible or Audit; it records choices made *within* the room they leave open.
 5. **[`docs/ROADMAP.md`](ROADMAP.md)** — the implementation-level milestone tracker this plan's sprints ultimately populate, exactly as [07](PRODUCT_BIBLE/07_ENGINEERING_ROADMAP.md#related-documents) already describes that document's relationship to the Bible.
@@ -227,4 +227,4 @@ This plan is a living execution document, distinct from the Bible and the Audit,
 
 ---
 
-*This document is the primary engineering execution reference for Base Radar. It references, and does not duplicate, the [Product Bible v1.0](PRODUCT_BIBLE/00_INDEX.md) and the [Repository Implementation Audit v1.1](REPOSITORY_AUDIT_V1.1.md).*
+*This document is the primary engineering execution reference for Base Radar. It references, and does not duplicate, the [Product Bible v1.0](PRODUCT_BIBLE/00_INDEX.md) and the [Repository Implementation Audit v1.1](archive/REPOSITORY_AUDIT_V1.1.md).*
