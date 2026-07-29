@@ -1,10 +1,9 @@
-import { RouteLoading } from "@/components/dashboard/RouteLoading";
+import { BrandLoader } from "@/components/shared/BrandLoader";
 
 /**
- * Same shared `RouteLoading` every other `/dashboard/*` route segment uses
- * (`app/dashboard/loading.tsx`, `app/dashboard/projects/loading.tsx`) — one
- * implementation, not a fourth copy.
+ * PR-065 — the branded page loader shared by every dashboard route, shown
+ * while a single project's fast-path intelligence data is being resolved.
  */
 export default function ProjectProfileLoading() {
-  return <RouteLoading />;
+  return <BrandLoader fullscreen size="lg" label="Preparing project insights…" />;
 }
