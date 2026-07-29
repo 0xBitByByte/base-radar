@@ -6,7 +6,7 @@ import { Bot, Check, Coins, Fish, Fuel, Globe, Landmark, RefreshCw, Sparkles } f
 import type { LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { formatRelativeTime } from "@/lib/data/format";
+import { RelativeTime } from "@/components/shared/RelativeTime";
 import { useNowTick } from "@/lib/hooks/useNowTick";
 import type { BriefTone, IntelligenceBrief as IntelligenceBriefData, WithSource } from "@/lib/data/types";
 import type { DashboardEvidenceSummaryItem, DashboardSourceAttribution } from "@/lib/ai-intelligence/dashboard-adapter";
@@ -179,7 +179,11 @@ export function IntelligenceBrief({ data, evidenceSummary, sources, className }:
       )}
 
       <p className="text-[11px] text-radar-light-muted/70 dark:text-radar-muted/50">
-        {refreshLabel ?? `Generated ${formatRelativeTime(data.generatedAt)}`}
+        {refreshLabel ?? (
+          <>
+            Generated <RelativeTime iso={data.generatedAt} />
+          </>
+        )}
       </p>
     </WidgetCard>
   );

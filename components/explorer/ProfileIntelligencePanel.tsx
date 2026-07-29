@@ -7,7 +7,7 @@ import { formatLabel } from "@/components/explorer/format";
 import { GlowBadge, type GlowBadgeColor } from "@/components/ui/GlowBadge";
 import { RichTooltip } from "@/components/ui/RichTooltip";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { formatRelativeTime } from "@/lib/data/format";
+import { RelativeTime } from "@/components/shared/RelativeTime";
 import { cn } from "@/lib/utils";
 import type { DiscoverySource, RegistryLifecycleState, VerificationLevel } from "@/data/projects/enums";
 import type { DashboardEvidenceSummaryItem, DashboardSourceAttribution } from "@/lib/ai-intelligence/dashboard-adapter";
@@ -104,7 +104,7 @@ export function ProfileIntelligencePanel({
               {formatLabel(latest.confidenceLevel)} confidence
             </GlowBadge>
             <span className="text-[11px] text-radar-light-muted/70 dark:text-radar-muted/50">
-              {formatRelativeTime(latest.timestamp)}
+              <RelativeTime iso={latest.timestamp} />
             </span>
           </div>
         </div>
@@ -195,7 +195,7 @@ export function ProfileIntelligencePanel({
                   </div>
                 </div>
                 <span className="shrink-0 text-[11px] text-radar-light-muted dark:text-radar-muted">
-                  {formatRelativeTime(item.timestamp)}
+                  <RelativeTime iso={item.timestamp} />
                 </span>
               </li>
             ))}

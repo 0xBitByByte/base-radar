@@ -1,5 +1,5 @@
 import { BriefMetric } from "@/components/brief/BriefMetric";
-import { formatRelativeTime } from "@/lib/data/format";
+import { RelativeTime } from "@/components/shared/RelativeTime";
 import type { DailyBrief } from "@/lib/brief/types";
 
 type BriefCardProps = {
@@ -21,7 +21,7 @@ export function BriefCard({ brief }: BriefCardProps) {
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h1 className="text-xl font-semibold text-radar-light-text dark:text-radar-white">{brief.headline}</h1>
           <span className="text-[10.5px] whitespace-nowrap text-radar-light-muted dark:text-radar-muted">
-            Generated {formatRelativeTime(brief.generatedAt)}
+            Generated <RelativeTime iso={brief.generatedAt} />
           </span>
         </div>
         <p className="text-sm leading-relaxed text-radar-light-muted dark:text-radar-muted">{brief.summary}</p>

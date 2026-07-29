@@ -8,7 +8,7 @@ import { NotificationMetric } from "@/components/notifications/NotificationMetri
 import { TimelineEventBadge } from "@/components/timeline/TimelineEventBadge";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { formatRelativeTime } from "@/lib/data/format";
+import { RelativeTime } from "@/components/shared/RelativeTime";
 import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
 
 /**
@@ -80,7 +80,7 @@ export function NotificationWidget() {
                 {latest.title}
               </span>
               <time dateTime={latest.timestamp} className="relative z-[1] text-[10.5px] text-radar-light-muted dark:text-radar-muted">
-                {formatRelativeTime(latest.timestamp)}
+                <RelativeTime iso={latest.timestamp} />
               </time>
             </div>
           )}

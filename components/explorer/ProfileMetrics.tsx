@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { Code2, GitBranch, Globe, Layers, Wallet } from "lucide-react";
 
 import { MetricItem } from "@/components/explorer/MetricItem";
+import { MetricItemRelativeTime } from "@/components/explorer/MetricItemRelativeTime";
 import { MetricItemSkeleton } from "@/components/explorer/MetricItemSkeleton";
 import { ProfileCommitsAsync } from "@/components/explorer/ProfileCommitsAsync";
 import { ProfileNetworkLive } from "@/components/explorer/ProfileNetworkLive";
@@ -15,7 +16,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { WidgetSkeleton } from "@/components/dashboard/WidgetSkeleton";
 import { CHAIN_BRANDING } from "@/lib/branding/chains";
 import { getExplorerLink } from "@/lib/branding/explorerLink";
-import { formatCompactCurrency, formatCompactNumber, formatDate, formatNumber, formatPercent, formatRelativeTime } from "@/lib/data/format";
+import { formatCompactCurrency, formatCompactNumber, formatDate, formatNumber, formatPercent } from "@/lib/data/format";
 import type { ChainInfo, Contracts, GithubIntel, Identity, Trading, Tvl } from "@/lib/intelligence/types";
 import type { SparklinePoint } from "@/lib/data/types";
 import type { CommitActivity } from "@/lib/providers/github/service";
@@ -316,7 +317,7 @@ export function ProfileMetrics({
                 {github.language && <MetricItem bare label="Language" value={github.language} />}
                 {github.license && <MetricItem bare label="License" value={github.license} />}
                 {github.createdAt && <MetricItem bare label="Repo Age" value={formatDate(github.createdAt)} />}
-                {github.pushedAt && <MetricItem bare label="Last Push" value={formatRelativeTime(github.pushedAt)} />}
+                {github.pushedAt && <MetricItemRelativeTime bare label="Last Push" iso={github.pushedAt} />}
               </div>
             )}
           </>

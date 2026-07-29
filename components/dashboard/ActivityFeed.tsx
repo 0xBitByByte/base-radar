@@ -9,7 +9,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { formatRelativeTime } from "@/lib/data/format";
+import { RelativeTime } from "@/components/shared/RelativeTime";
 import type { ActivityEvent, ActivityKind, WithSource } from "@/lib/data/types";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -93,7 +93,7 @@ export function ActivityFeed({ data, lastUpdated }: ActivityFeedProps) {
                   dateTime={event.timestamp}
                   className="shrink-0 text-[11px] whitespace-nowrap text-radar-light-muted dark:text-radar-muted"
                 >
-                  {formatRelativeTime(event.timestamp)}
+                  <RelativeTime iso={event.timestamp} />
                 </time>
               </li>
             );

@@ -3,7 +3,7 @@ import { BadgeCheck, Code2, Droplets, Gauge, HeartPulse, Landmark, ShieldAlert, 
 
 import { ProfileDeveloperTileAsync } from "@/components/explorer/ProfileDeveloperTileAsync";
 import { ProfileSectionCard } from "@/components/explorer/ProfileSectionCard";
-import { formatRelativeTime } from "@/lib/data/format";
+import { RelativeTime } from "@/components/shared/RelativeTime";
 import { cn } from "@/lib/utils";
 import type { ScorecardSeverity, ScorecardTile } from "@/lib/intelligence/scorecard";
 import type { Confidence, Health, Risk } from "@/lib/intelligence/types";
@@ -311,7 +311,13 @@ export function ProjectHealthScorecard({
         </p>
         {/* PR-062 Task 4 — real freshness, so "Is it active?" also answers "as of when?" */}
         <span className="shrink-0 text-[10.5px] font-medium whitespace-nowrap text-radar-light-muted/80 dark:text-radar-muted/70">
-          {lastUpdated ? `Updated ${formatRelativeTime(lastUpdated)}` : "Freshness not available"}
+          {lastUpdated ? (
+            <>
+              Updated <RelativeTime iso={lastUpdated} />
+            </>
+          ) : (
+            "Freshness not available"
+          )}
         </span>
       </div>
       <div role="list" aria-label="Project health score matrix" className="grid grid-cols-1 gap-3 sm:grid-cols-2">

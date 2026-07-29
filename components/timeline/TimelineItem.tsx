@@ -3,7 +3,7 @@ import Link from "next/link";
 import { NarrativeBadge } from "@/components/alerts/NarrativeBadge";
 import { SeverityBadge } from "@/components/alerts/SeverityBadge";
 import { TimelineEventBadge } from "@/components/timeline/TimelineEventBadge";
-import { formatRelativeTime } from "@/lib/data/format";
+import { RelativeTime } from "@/components/shared/RelativeTime";
 import type { TimelineEvent } from "@/lib/timeline/types";
 
 type TimelineItemProps = {
@@ -44,7 +44,7 @@ export function TimelineItem({ event }: TimelineItemProps) {
           dateTime={event.timestamp}
           className="shrink-0 text-[10.5px] whitespace-nowrap text-radar-light-muted dark:text-radar-muted"
         >
-          {formatRelativeTime(event.timestamp)}
+          <RelativeTime iso={event.timestamp} />
         </time>
       </div>
 

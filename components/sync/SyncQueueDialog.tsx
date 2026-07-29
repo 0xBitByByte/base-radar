@@ -4,7 +4,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { RefreshCw, Trash2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { formatRelativeTime } from "@/lib/data/format";
+import { RelativeTime } from "@/components/shared/RelativeTime";
 import { useSyncStatus } from "@/lib/hooks/useSyncStatus";
 
 type SyncQueueDialogProps = {
@@ -83,7 +83,7 @@ export function SyncQueueDialog({ open, onOpenChange }: SyncQueueDialogProps) {
                       {operation.entityId}
                     </p>
                     <p className="mt-0.5 text-xs text-radar-light-muted dark:text-radar-muted">
-                      Updated {formatRelativeTime(operation.updatedAt)}
+                      Updated <RelativeTime iso={operation.updatedAt} />
                       {operation.retryCount > 0 ? ` · ${operation.retryCount} retr${operation.retryCount === 1 ? "y" : "ies"}` : ""}
                     </p>
                   </li>
