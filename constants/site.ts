@@ -30,6 +30,16 @@ export type SiteConfig = {
   contact: SiteContact;
 };
 
+/**
+ * Absolute production origin, used only for `metadataBase` and other
+ * URL-based metadata fields that require a fully-qualified URL (Open
+ * Graph/Twitter images, canonical links, the sitemap). No custom domain is
+ * live yet, so this defaults to the project's Vercel URL; override with
+ * `NEXT_PUBLIC_SITE_URL` once a production domain is assigned — no code
+ * changes needed elsewhere, every consumer reads this one constant.
+ */
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://base-radar.vercel.app";
+
 export const SITE: SiteConfig = {
   name: "Base Radar",
   shortName: "BaseRadar",
@@ -52,6 +62,22 @@ export const SITE: SiteConfig = {
     blog: null,
   },
 };
+
+/** SEO keywords for the root layout's `metadata.keywords`. */
+export const SITE_KEYWORDS: string[] = [
+  "Base",
+  "Base ecosystem",
+  "crypto intelligence",
+  "onchain analytics",
+  "DeFi tracker",
+  "Base blockchain",
+  "TVL tracker",
+  "project discovery",
+  "crypto dashboard",
+];
+
+/** `@handle` form of `SITE.social.x`, for `twitter:site`/`twitter:creator`. */
+export const SITE_TWITTER_HANDLE = "@TheBaseRadar";
 
 export type NavLink = {
   label: string;

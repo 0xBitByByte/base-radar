@@ -10,6 +10,7 @@
  * `RAIL_META`, just relocated and given a real URL slug alongside it.
  */
 
+import type { Metadata } from "next";
 import { AlertTriangle, BadgeCheck, BarChart3, Compass, Flame, Gem, GitBranch, Landmark, RefreshCw, Sparkles, Zap, type LucideIcon } from "lucide-react";
 
 import type { ProjectsView } from "@/components/projects/queryState";
@@ -149,4 +150,22 @@ export function viewForSlug(slug: string): Exclude<ProjectsView, "all"> | null {
     ([, meta]) => meta.slug === slug
   );
   return entry ? entry[0] : null;
+}
+
+/**
+ * The one place title/description/canonical is derived for a curated
+ * collection route — every `app/dashboard/projects/{slug}/page.tsx` calls
+ * this instead of duplicating the same three-line `Metadata` object 11
+ * times. Canonical matters here specifically because these routes carry
+ * search/sort/filter query-param state (`renderProjectsCollectionRoute`);
+ * without it, `?search=...`/`?sort=...` variants would each look like a
+ * distinct, duplicate page to a crawler.
+ */
+export function buildViewMetadata(view: Exclude<ProjectsView, "all">): Metadata {
+  const meta = PROJECTS_VIEW_META[view];
+  return {
+    title: `${meta.title} | Projects`,
+    description: meta.description ?? meta.title,
+    alternates: { canonical: `/dashboard/projects/${meta.slug}` },
+  };
 }
