@@ -17,14 +17,15 @@ import { motion, useReducedMotion } from "framer-motion";
  * `BrandSpinner` overlay here (`tier="md"`, fixed ~220ms lifetime), added
  * back when `PR9.3.4`'s streaming refactor meant `loading.tsx` never fired
  * on navigation. `PR9.5.2` restored genuine top-level `await`ing in
- * `app/dashboard/page.tsx`, so `loading.tsx` (via the shared `RouteLoading`,
- * `tier="lg"`) fires correctly again — which made this decorative overlay
- * redundant, and actively wrong: being `position: fixed` with `z-[150]`, it
- * painted on top of the real `RouteLoading` fallback underneath it, so
- * every navigation showed a small logo (this overlay's `tier="md"`) that
- * faded away after ~220ms to reveal the real, larger `RouteLoading` spinner
- * — two loaders in sequence instead of one. Removed entirely; `loading.tsx`
- * is now the one and only loading indicator for Dashboard navigation.
+ * `app/dashboard/page.tsx`, so `loading.tsx` fires correctly again — which
+ * made this decorative overlay redundant, and actively wrong: being
+ * `position: fixed` with `z-[150]`, it painted on top of the real
+ * `loading.tsx` fallback underneath it, so every navigation showed a small
+ * logo (this overlay's `tier="md"`) that faded away after ~220ms to reveal
+ * the real, larger fallback — two loaders in sequence instead of one.
+ * Removed entirely; `loading.tsx` (PR-065's `BrandLoader`) is now the one
+ * and only loading indicator for Dashboard navigation — this file's own
+ * fade/slide-in below is purely the *content* transition once that resolves.
  */
 export default function DashboardTemplate({ children }: { children: ReactNode }) {
   const pathname = usePathname();

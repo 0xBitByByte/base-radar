@@ -39,15 +39,15 @@ const WIDGET_GRID_CLASS = "grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3"
 /**
  * `async` at the top level (PR9.5.2) — awaiting every critical widget's
  * data directly in the page component, with no inner `<Suspense>` split,
- * is what makes this route's own `loading.tsx` (the shared `BrandSpinner`
- * fallback, identical to `/dashboard/projects/loading.tsx`) actually fire
- * during navigation: Next.js only shows a route's `loading.tsx` while that
- * route's top-level render is genuinely suspended, and a nested Suspense
- * boundary (the previous PR9.5 §4 approach) catches its own suspension
- * locally, so it never bubbles up to the route boundary above it. This
- * mirrors `app/dashboard/projects/page.tsx`'s `ExplorerPage` exactly, so
+ * is what makes this route's own `loading.tsx` (PR-065's `BrandLoader`,
+ * identical to `/dashboard/projects/loading.tsx`) actually fire during
+ * navigation: Next.js only shows a route's `loading.tsx` while that route's
+ * top-level render is genuinely suspended, and a nested Suspense boundary
+ * (the previous PR9.5 §4 approach) catches its own suspension locally, so
+ * it never bubbles up to the route boundary above it. This mirrors
+ * `app/dashboard/projects/page.tsx`'s `ExplorerPage` exactly, so
  * `/dashboard` gets the identical premium loading experience Projects
- * already had — same spinner, same timing, held for exactly as long as
+ * already had — same loader, same timing, held for exactly as long as
  * the data genuinely takes, never a moment longer.
  */
 export default async function DashboardPage() {

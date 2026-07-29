@@ -214,6 +214,50 @@
   }
 }
 
+/* BrandLoader (components/shared/BrandLoader.tsx) — the in-app page loader's
+   one-shot logo reveal, distinct from BrandSpinner's continuous ambient
+   breathing above (which stays reserved for the true app-boot splash).
+   `br-loader-reveal` wipes the real, full-color logo open via `clip-path`
+   (never redrawing or approximating it); `br-loader-outline` fades a desaturated
+   "ghost" pass of that same asset in and back out underneath the wipe. Both
+   run exactly once (`animation-iteration-count: 1`, set at each call site)
+   and hold their final frame via `forwards` — no looping, per this app's
+   "avoid infinite pulse" motion rule. `clip-path`/`opacity` only. */
+@keyframes br-loader-reveal {
+  0% {
+    clip-path: inset(0 100% 0 0);
+  }
+  62.5% {
+    clip-path: inset(0 0% 0 0);
+  }
+  100% {
+    clip-path: inset(0 0% 0 0);
+  }
+}
+
+@keyframes br-loader-outline {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  10%,
+  55% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 0;
+  }
+}
+
+@keyframes br-loader-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* The splash screen's bottom loading bar — an indeterminate gradient chunk
    sliding across its track, looping. `transform`-only. */
 @keyframes br-loading-bar {

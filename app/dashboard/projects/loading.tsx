@@ -1,12 +1,13 @@
-import { ProjectsPageSkeleton } from "@/components/projects/ProjectsPageSkeleton";
+import { BrandLoader } from "@/components/shared/BrandLoader";
 
 /**
- * PR-057 — the Projects page still awaits `getLiveProjects()` fully before
- * rendering, so this fallback is real and meaningfully shown. Shaped like
- * the new page layout (header, search, KPI pulse, category rail, rails,
- * directory grid) rather than the previous generic `RouteLoading` spinner,
- * per Task 8's "skeleton loading" requirement.
+ * PR-065 — the Projects page (and every dedicated collection route nested
+ * under it — `/blue-chips`, `/top-tvl`, etc., which have no `loading.tsx`
+ * of their own and fall back to this one) still awaits `getLiveProjects()`
+ * fully before rendering, so this fallback is real and meaningfully shown.
+ * Replaces the previous content-shaped `ProjectsPageSkeleton` with the
+ * branded page loader shared by every dashboard route.
  */
 export default function ProjectsLoading() {
-  return <ProjectsPageSkeleton />;
+  return <BrandLoader fullscreen size="lg" label="Resolving trusted providers…" />;
 }
