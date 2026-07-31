@@ -20,6 +20,8 @@ type MetricItemProps = {
   emphasize?: boolean;
   /** When set (including `null`), renders via the shared `ChangeValue` (green ▲/red ▼/gray) instead of the plain `value` string — PR12.1 Req 5's consistent positive/negative coloring. Takes priority over `value`. */
   changeValue?: number | null;
+  /** PR-071 Task 6 — what to render in place of `value` when unavailable. Defaults to the existing bare "—" (every pre-existing call site keeps its current look); pass `"Not Tracked"` (this app's established convention, see `ProfileTokenAndPrice.tsx`) for a caller that wants an honest, explicit phrase instead of a silent dash. Kept short deliberately — a longer phrase like "Unavailable" was found to overflow this component's narrow grid cells (PR-071 Round 3, Task 7). */
+  unavailableLabel?: string;
 };
 
 /**
@@ -32,7 +34,7 @@ type MetricItemProps = {
  */
 // Needs "use client": the info-icon button's onClick can't cross a Server->Client
 // boundary when this is rendered directly from a Server Component (e.g. ProfileMetrics).
-export function MetricItem({ label, value, unavailable, className, infoTooltip, bare, emphasize, changeValue }: MetricItemProps) {
+export function MetricItem({ label, value, unavailable, className, infoTooltip, bare, emphasize, changeValue, unavailableLabel = "—" }: MetricItemProps) {
   const hasChangeValue = changeValue !== undefined;
   const isUnavailable = hasChangeValue ? unavailable || changeValue === null : unavailable || !value;
 
@@ -71,13 +73,14 @@ export function MetricItem({ label, value, unavailable, className, infoTooltip, 
         />
       ) : (
         <span
+          title={isUnavailable ? unavailableLabel : value}
           className={cn(
-            "font-semibold tabular-nums",
+            "truncate font-semibold tabular-nums",
             emphasize ? "text-xl font-bold tracking-tight" : "text-sm",
             isUnavailable ? "text-radar-light-muted dark:text-radar-muted" : "text-radar-light-text dark:text-radar-white"
           )}
         >
-          {isUnavailable ? "—" : value}
+          {isUnavailable ? unavailableLabel : value}
         </span>
       )}
     </div>

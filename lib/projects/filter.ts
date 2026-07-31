@@ -40,6 +40,7 @@ function matches(project: LiveProject, options: FilterOptions): boolean {
   if (options.hasGovernance !== undefined && project.governance.configured !== options.hasGovernance) return false;
   if (options.hasContracts !== undefined && (project.contracts.count > 0) !== options.hasContracts) return false;
   if (options.minConfidence !== undefined && project.confidence.score < options.minConfidence) return false;
+  if (options.confidenceLevel !== undefined && project.confidence.level !== options.confidenceLevel) return false;
   if (options.verified !== undefined && isVerified(project) !== options.verified) return false;
   if (options.financialRanges) {
     for (const rangeId of Object.values(options.financialRanges)) {

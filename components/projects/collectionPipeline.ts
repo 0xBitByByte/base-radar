@@ -193,9 +193,8 @@ export function buildDirectoryPipeline({
     category: state.categories.length > 0 ? state.categories : undefined,
     verified: state.verified ? true : undefined,
     hasVolume: state.hasVolume ? true : undefined,
-    minConfidence: state.highConfidence ? 70 : undefined,
+    confidenceLevel: state.confidenceLevel ?? undefined,
     discoveryStatus: state.discoveryStatuses.length > 0 ? state.discoveryStatuses : undefined,
-    verificationStatus: state.verificationStatuses.length > 0 ? state.verificationStatuses : undefined,
     financialRanges: Object.keys(financialRanges).length > 0 ? financialRanges : undefined,
   };
   const filtered = filterLiveProjects(base, filterOptions);
@@ -221,10 +220,9 @@ export function buildDirectoryPipeline({
           clearHref: `${PROJECTS_PATH}${buildProjectsQuery(state, {
             categories: [],
             verified: false,
-            highConfidence: false,
+            confidenceLevel: null,
             hasVolume: false,
             discoveryStatuses: [],
-            verificationStatuses: [],
             tvlRange: null,
             liquidityRange: null,
             marketCapRange: null,

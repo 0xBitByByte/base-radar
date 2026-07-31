@@ -349,6 +349,7 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
         contracts={profile.contracts}
         github={profile.github}
         market={market}
+        tvl={profile.tvl}
         health={profile.health}
         confidence={profile.confidence}
         risk={profile.risk}

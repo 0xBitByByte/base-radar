@@ -19,6 +19,22 @@ import type {
   SearchIdentifiers,
 } from "@/lib/projects/types";
 
+/**
+ * PR-072 — the one logo-resolution priority order, used by both adapters
+ * below: Registry `logoUrl` (editorial, most trusted) → CoinGecko token
+ * image → DefiLlama protocol logo → GitHub org/repo avatar → (handled by
+ * `ProjectLogo` itself, not here) generated initials as the last resort.
+ * Every candidate here is real, already-fetched provider data — nothing is
+ * a new request, and nothing is fabricated. Returns the winning URL plus
+ * every other real candidate in the same order, so a caller can retry a
+ * lower-priority source if the winner's URL turns out to be broken (a 404)
+ * rather than jumping straight to initials.
+ */
+function resolveLogoUrl(candidates: (string | null)[]): { logoUrl: string | null; logoUrlFallbacks: string[] } {
+  const real = candidates.filter((url): url is string => Boolean(url));
+  return { logoUrl: real[0] ?? null, logoUrlFallbacks: real.slice(1) };
+}
+
 const SOCIAL_LINK_FIELDS: (keyof SocialLinks)[] = [
   "twitter",
   "discord",
@@ -95,6 +111,20 @@ export function buildLiveProjectFromIntelligence(
     contractAddresses: contracts.items.map((item) => item.address),
   };
 
+  // PR-072 — the full priority chain (see `resolveLogoUrl`'s own doc comment):
+  // registry → CoinGecko → DefiLlama → GitHub avatar. Previously stopped at
+  // CoinGecko, which is exactly why a real, well-known project whose token
+  // CoinGecko doesn't tag `category=base-ecosystem` (Uniswap being the
+  // clearest example — see `sources.ts`'s `mergeMarketResults`) fell all the
+  // way to initials even though this app already fetches its DefiLlama/
+  // GitHub data anyway.
+  const { logoUrl, logoUrlFallbacks } = resolveLogoUrl([
+    identity.logoUrl,
+    market.available ? market.imageUrl : null,
+    tvl.available ? tvl.imageUrl : null,
+    github.available ? github.avatarUrl : null,
+  ]);
+
   return {
     id: project.id,
     slug: project.slug,
@@ -103,7 +133,8 @@ export function buildLiveProjectFromIntelligence(
       name: identity.name,
       shortDescription: identity.shortDescription,
       description: identity.description,
-      logoUrl: identity.logoUrl,
+      logoUrl,
+      logoUrlFallbacks,
       websiteUrl: identity.websiteUrl,
     },
     category: identity.categories[0] ?? "other",
@@ -202,7 +233,16 @@ export function buildLiveProjectFromDiscovery(discoveryProject: DiscoveryProject
       name: discoveryProject.displayName,
       shortDescription: null,
       description: null,
-      logoUrl: null,
+      // PR-072 — was unconditionally `null` regardless of what Discovery
+      // actually found; `discoveryProject.logoUrl` is real, already-fetched
+      // provider image data (CoinGecko/DefiLlama) that a discovery-only
+      // project simply never had a field to carry through before now (see
+      // `lib/discovery/project.ts`'s `pickCandidateLogoUrl`). No registry
+      // record and no per-project GitHub call exist for a discovery-only
+      // project, so this is the one candidate available here — never a
+      // fabricated fallback.
+      logoUrl: discoveryProject.logoUrl ?? null,
+      logoUrlFallbacks: [],
       websiteUrl: discoveryProject.website ?? null,
     },
     category: discoveryProject.category,

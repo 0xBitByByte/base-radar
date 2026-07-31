@@ -42,6 +42,23 @@ export async function fetchBaseEcosystemMarkets(perPage: number): Promise<RawCoi
   return fetchJson<RawCoinGeckoMarket[]>("coingecko", url);
 }
 
+/**
+ * PR-072 — same `/coins/markets` shape as the category-based bulk fetch
+ * above, filtered by explicit `ids` instead of `category=base-ecosystem`.
+ * Exists because CoinGecko's own Base-ecosystem category tagging is
+ * incomplete for real registry projects (e.g. Uniswap's UNI is categorized
+ * as an Ethereum-ecosystem asset there, even though the protocol is
+ * deployed on Base) — a project can have a perfectly valid, configured
+ * `providerIds.coingeckoId` and still never appear in the category list.
+ * Called once per fetch cycle with every registry project's `coingeckoId`
+ * batched into one request (see `sources.ts`'s `collectRegistryCoingeckoIds`),
+ * not once per project.
+ */
+export async function fetchMarketsByIds(ids: string[]): Promise<RawCoinGeckoMarket[]> {
+  const url = `${BASE_URL}/coins/markets?vs_currency=usd&ids=${ids.join(",")}&order=market_cap_desc&sparkline=true&price_change_percentage=24h,7d,30d`;
+  return fetchJson<RawCoinGeckoMarket[]>("coingecko", url);
+}
+
 export async function fetchSimplePrice(ids: string[]): Promise<RawSimplePrice> {
   const url = `${BASE_URL}/simple/price?ids=${ids.join(",")}&vs_currencies=usd&include_24hr_change=true`;
   return fetchJson<RawSimplePrice>("coingecko", url);

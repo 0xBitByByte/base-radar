@@ -43,6 +43,8 @@ export const defillamaDiscoveryProvider: DiscoveryProvider = {
       // a best-effort, name-derived approximation — treated as fuzzy
       // evidence by `registryMatch.ts`, never an exact identifier.
       defillamaSlug: slugify(protocol.name),
+      // PR-072 — real protocol logo, already fetched as part of this same list entry.
+      logoUrl: protocol.logoUrl ?? undefined,
       socials: {},
       contracts: [],
       discoveredAt: fetchedAt,

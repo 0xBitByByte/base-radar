@@ -55,6 +55,8 @@ export type DiscoveryProject = {
   contracts: CandidateContract[];
   coingeckoId?: string;
   defillamaSlug?: string;
+  /** PR-072 — real logo/image URL, when any contributing candidate (primary or a merged duplicate) has one — see `pickCandidateLogoUrl` below. `undefined` when none do; never fabricated. */
+  logoUrl?: string;
   category: ProjectCategory;
   tags: ProjectTag[];
   status: DiscoveryStatus;
@@ -64,6 +66,20 @@ export type DiscoveryProject = {
   evidence: DiscoveryEvidence;
   discoveredAt: string;
 };
+
+/**
+ * PR-072 — prefers the primary candidate's own logo, but a dedup group's
+ * `primary` is chosen by source-confidence (`dedupe.ts`'s `pickPrimary`),
+ * not by which source happens to carry image data — so a DefiLlama-primary
+ * group with a merged CoinGecko duplicate (or vice versa) can still have a
+ * real logo available even when the primary itself doesn't. Same
+ * "loop primary+duplicates, take the first real value" pattern
+ * `enrich.ts`'s `extractMarketEvidence` already uses for volume/TVL.
+ */
+function pickCandidateLogoUrl(deduped: DeduplicatedCandidate): string | undefined {
+  const candidates = [deduped.primary, ...deduped.duplicates];
+  return candidates.find((candidate) => candidate.logoUrl)?.logoUrl;
+}
 
 /**
  * Builds the final `DiscoveryProject` for one deduplicated candidate group
@@ -92,6 +108,7 @@ export async function buildDiscoveryProject(deduped: DeduplicatedCandidate, exis
     contracts: candidate.contracts,
     coingeckoId: candidate.coingeckoId,
     defillamaSlug: candidate.defillamaSlug,
+    logoUrl: pickCandidateLogoUrl(deduped),
     category: classification.category,
     tags: classification.tags,
     status: statusResult.status,

@@ -153,6 +153,7 @@ function buildFeaturedProject(spec: FeaturedProjectSpec): ProjectIntelligence {
       changePct30d: null,
       defillamaCategory: null,
       tvlResolution: emptyResolution<number>(),
+      imageUrl: null,
     },
     contracts: { count: 0, items: [] },
     github: {
@@ -171,6 +172,7 @@ function buildFeaturedProject(spec: FeaturedProjectSpec): ProjectIntelligence {
       commitsLast7d: null,
       commitsPrev7d: null,
       commitTrendPct: null,
+      avatarUrl: null,
     },
     chain: {
       chains: spec.chains,

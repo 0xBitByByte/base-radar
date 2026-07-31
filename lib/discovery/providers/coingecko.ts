@@ -43,6 +43,10 @@ export const coingeckoDiscoveryProvider: DiscoveryProvider = {
       // PR-053 — the real CoinGecko API id, already fetched as `externalId`;
       // surfaced as its own structured field for registry matching.
       coingeckoId: market.id,
+      // PR-072 — real token image, already fetched as part of this same
+      // market entry; `|| undefined` guards against CoinGecko's rare empty-
+      // string image field turning into a broken `<img src="">`.
+      logoUrl: market.imageUrl || undefined,
       socials: {},
       contracts: [],
       discoveredAt: fetchedAt,

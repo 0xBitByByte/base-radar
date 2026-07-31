@@ -41,6 +41,7 @@ import { Timestamp } from "@/components/explorer/Timestamp";
 import { VerificationBadge } from "@/components/explorer/VerificationBadge";
 import { GlowBadge } from "@/components/ui/GlowBadge";
 import { WatchButton } from "@/components/watchlists/WatchButton";
+import type { ProjectCategory } from "@/data/projects/enums";
 import { CATEGORY_BRANDING } from "@/lib/branding/categories";
 import { formatCompactCurrency, formatCompactNumber } from "@/lib/data/format";
 import { cn } from "@/lib/utils";
@@ -55,12 +56,56 @@ type LiveProjectCardProps = {
   className?: string;
 };
 
-type PrimaryMetric = { label: string; value?: string };
+type PrimaryMetric = { label: string; value?: string; changePct24h?: number | null };
 
-/** Price → market cap → TVL, first real one wins; never two empty dashes side by side when a project genuinely has no market read at all. */
+/**
+ * PR-071 Round 3 — Task 8: which real metric is *most meaningful* differs
+ * by category — a Lending market's headline number is what it holds (TVL),
+ * a DEX's is trading activity (Volume), a Stablecoin/Infrastructure/AI
+ * token's identity is its supply value (Market Cap; this card's `LiveProject`
+ * model has no `fullyDilutedValuationUsd` field — that only exists on the
+ * deeper Project Profile page's intelligence data — so Market Cap is the
+ * closest real number already available here). Every other category keeps
+ * the general Price-first chain below; this table only overrides the
+ * *order*, never fabricates a number a project doesn't actually have.
+ *
+ * PR-071 Round 4 — Task 6: added Bridge → Volume (a bridge's headline
+ * number is throughput, exactly like a DEX's — real field, same rule).
+ * Two categories from the brief's own examples are deliberately NOT
+ * mapped: Oracle → "Integrations" and Gaming → "Users" have no
+ * corresponding field anywhere in `LiveProject`/`MarketSummary` — no
+ * provider this app integrates surfaces an oracle's consumer count or a
+ * game's active-user count today. Adding them would mean inventing a
+ * number, which breaks this whole page's "every figure is real,
+ * registry- or provider-derived" rule (`build.ts`'s own governing
+ * principle since PR-061). Both categories keep the general chain below
+ * instead — honest, not most-relevant-in-theory.
+ */
+const CATEGORY_PRIMARY_METRIC: Partial<Record<ProjectCategory, "tvl" | "volume" | "marketCap">> = {
+  lending: "tvl",
+  dex: "volume",
+  bridge: "volume",
+  stablecoin: "marketCap",
+  infrastructure: "marketCap",
+  ai: "marketCap",
+};
+
+/** Category preference first (when that project actually has the number) → Price → Market Cap → TVL, first real one wins; never two empty dashes side by side when a project genuinely has no market read at all. Price carries its real 24h change alongside it when available — the other fallbacks have no 24h figure of their own to attach. */
 function primaryMetric(project: LiveProject): PrimaryMetric {
   const { market } = project;
-  if (market.available && market.priceUsd !== null) return { label: "Price", value: formatCompactCurrency(market.priceUsd) };
+  const preferred = CATEGORY_PRIMARY_METRIC[project.category];
+  if (preferred === "tvl" && market.tvlUsd !== null) {
+    return { label: "TVL", value: formatCompactCurrency(market.tvlUsd) };
+  }
+  if (preferred === "volume" && market.volume24hUsd !== null) {
+    return { label: "Volume 24h", value: formatCompactCurrency(market.volume24hUsd) };
+  }
+  if (preferred === "marketCap" && market.marketCapUsd !== null) {
+    return { label: "Market Cap", value: formatCompactCurrency(market.marketCapUsd) };
+  }
+  if (market.available && market.priceUsd !== null) {
+    return { label: "Price", value: formatCompactCurrency(market.priceUsd), changePct24h: market.changePct24h };
+  }
   if (market.marketCapUsd !== null) return { label: "Market Cap", value: formatCompactCurrency(market.marketCapUsd) };
   if (market.tvlUsd !== null) return { label: "TVL", value: formatCompactCurrency(market.tvlUsd) };
   return { label: "Market" };
@@ -92,8 +137,12 @@ export function LiveProjectCard({ project, variant = "detailed", className }: Li
   const { identity, confidence, chains, verification, engineering, market } = project;
 
   const metric = primaryMetric(project);
-  const volumeValue = market.volume24hUsd !== null ? formatCompactCurrency(market.volume24hUsd) : undefined;
+  // Each secondary tile only when it isn't already the primary metric (never show the same number twice) AND has a real value — Task 8: never stack multiple "Not Tracked" placeholders, omit the tile entirely instead.
+  const tvlValue = market.tvlUsd !== null && metric.label !== "TVL" ? formatCompactCurrency(market.tvlUsd) : undefined;
+  const volumeValue = market.volume24hUsd !== null && metric.label !== "Volume 24h" ? formatCompactCurrency(market.volume24hUsd) : undefined;
   const activityValue = engineering.commitsLast7d !== null ? formatCompactNumber(engineering.commitsLast7d) : undefined;
+  const hasSecondaryMetrics = tvlValue !== undefined || volumeValue !== undefined || activityValue !== undefined;
+  const showChange = !isCompact && metric.changePct24h !== undefined;
 
   const verificationRow = (
     <div className={cn("flex flex-wrap items-center gap-1.5", !isCompact && "min-h-[26px]")}>
@@ -118,7 +167,7 @@ export function LiveProjectCard({ project, variant = "detailed", className }: Li
     >
       {/* 1. Name — always the card's most prominent line. */}
       <div className="flex items-center gap-2.5">
-        <ProjectLogo logoUrl={identity.logoUrl} name={identity.name} size={isCompact ? 32 : 40} />
+        <ProjectLogo logoUrl={identity.logoUrl} fallbackUrls={identity.logoUrlFallbacks} name={identity.name} size={isCompact ? 32 : 40} />
         <span
           title={identity.name}
           className="min-w-0 flex-1 truncate text-sm font-semibold text-radar-light-text dark:text-radar-white"
@@ -132,9 +181,10 @@ export function LiveProjectCard({ project, variant = "detailed", className }: Li
       {/* 2. Verification. */}
       {verificationRow}
 
-      {/* 3 & 4. Primary metric + Confidence — promoted above chain/category so they're impossible to miss, matching Task 8's priority order. */}
-      <div className="grid grid-cols-2 gap-2">
-        <MetricItem label={metric.label} value={metric.value} emphasize={!isCompact} bare={isCompact} />
+      {/* 3 & 4. Primary metric (+ its real 24h change, when it's Price) + Confidence — promoted above chain/category so they're impossible to miss, matching Task 8's priority order. */}
+      <div className={cn("grid gap-2", showChange ? "grid-cols-3" : "grid-cols-2")}>
+        <MetricItem label={metric.label} value={metric.value} unavailableLabel="Not Tracked" emphasize={!isCompact} bare={isCompact} />
+        {showChange && <MetricItem label="24h" changeValue={metric.changePct24h} />}
         <ScoreBadge
           type="confidence"
           score={confidence.score}
@@ -146,24 +196,29 @@ export function LiveProjectCard({ project, variant = "detailed", className }: Li
 
       {!isCompact && (
         <>
-          {/* Chain — real data, deliberately quieter than the metrics above. */}
-          <ChainBadgeGroup chains={chains} size="sm" max={1} className="flex-nowrap self-start" />
-
-          {/* Why it matters — one deterministic line combining ecosystem role + category, replacing the old two-row category-chip block with something that answers "why should I care?" in the same vertical space. */}
-          <p className="truncate text-[11px] font-medium text-radar-light-muted dark:text-radar-muted">
-            <span className="text-radar-primary">{ecosystemRoleTag(project)}</span>
-            <span aria-hidden="true"> · </span>
-            {CATEGORY_BRANDING[project.category].label}
-          </p>
-
-          {/* Secondary metrics — same real numbers as before, just visually quieter (`bare`, no boxed tile) so they read as supporting detail, not competing with the primary metric/confidence above. */}
-          <div className="mt-auto flex items-center gap-4 border-t border-radar-light-border/60 pt-3 dark:border-white/[0.06]">
-            <MetricItem label="Volume 24h" value={volumeValue} bare />
-            <MetricItem label="GitHub Activity" value={activityValue} bare />
+          {/* Chain + Category — both real registry facts, together forming one quick "what/where is this" line, one step down from the primary metric/confidence above. */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <ChainBadgeGroup chains={chains} size="sm" max={1} className="flex-nowrap" />
+            <span className="flex items-center gap-1 rounded-full border border-radar-light-border bg-radar-light-surface px-2 py-0.5 text-[10.5px] font-medium text-radar-light-muted dark:border-white/10 dark:bg-white/5 dark:text-radar-muted">
+              {CATEGORY_BRANDING[project.category].label}
+            </span>
           </div>
 
-          <div className="text-[10.5px] text-radar-light-muted/70 dark:text-radar-muted/50">
-            <Timestamp iso={project.lastUpdated} />
+          {/* Why it matters — one deterministic phrase, real fields only, never an invented ranking. */}
+          <p className="truncate text-[11px] font-medium text-radar-primary">{ecosystemRoleTag(project)}</p>
+
+          {/* Secondary metrics — same real numbers as before, just visually quieter (`bare`, no boxed tile) so they read as supporting detail, not competing with the primary metric/confidence above. PR-071 Round 3 — Task 8: each tile only renders when it has a real value; a project with nothing left to show here (already covered by the primary metric) skips the row entirely rather than stacking several "Not Tracked" placeholders. Grouped with the timestamp so the bottom of the card stays aligned whether or not this row renders. */}
+          <div className="mt-auto flex flex-col gap-2">
+            {hasSecondaryMetrics && (
+              <div className="flex items-center gap-4 border-t border-radar-light-border/60 pt-3 dark:border-white/[0.06]">
+                {tvlValue !== undefined && <MetricItem label="TVL" value={tvlValue} bare />}
+                {volumeValue !== undefined && <MetricItem label="Volume 24h" value={volumeValue} bare />}
+                {activityValue !== undefined && <MetricItem label="GitHub Activity" value={activityValue} bare />}
+              </div>
+            )}
+            <div className="text-[10.5px] text-radar-light-muted/70 dark:text-radar-muted/50">
+              <Timestamp iso={project.lastUpdated} />
+            </div>
           </div>
         </>
       )}

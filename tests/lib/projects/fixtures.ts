@@ -76,6 +76,7 @@ export function intelligence(overrides: Partial<ProjectIntelligence> = {}): Proj
       changePct30d: null,
       defillamaCategory: null,
       tvlResolution: unresolvedMetric(),
+      imageUrl: null,
     },
     contracts: { count: 0, items: [] },
     github: {
@@ -94,6 +95,7 @@ export function intelligence(overrides: Partial<ProjectIntelligence> = {}): Proj
       commitsLast7d: null,
       commitsPrev7d: null,
       commitTrendPct: null,
+      avatarUrl: null,
     },
     chain: {
       chains: ["base"],
@@ -162,7 +164,14 @@ export function liveProject(overrides: Partial<LiveProject> = {}): LiveProject {
     id: "test-project",
     slug: "test-project",
     source: "registry",
-    identity: { name: "Test Project", shortDescription: "A test project.", description: "A test project.", logoUrl: null, websiteUrl: "https://test-project.example" },
+    identity: {
+      name: "Test Project",
+      shortDescription: "A test project.",
+      description: "A test project.",
+      logoUrl: null,
+      logoUrlFallbacks: [],
+      websiteUrl: "https://test-project.example",
+    },
     category: "dex",
     subcategories: [],
     chains: ["base"],

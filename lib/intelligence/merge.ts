@@ -199,6 +199,7 @@ export function mergeTvl(sources: ProjectSources, tvlHistory: SparklinePoint[] |
     changePct30d: changePctOverDays(tvlHistory, 30),
     defillamaCategory: protocol?.category ?? null,
     tvlResolution,
+    imageUrl: protocol?.logoUrl ?? null,
   };
 }
 
@@ -234,6 +235,7 @@ export function mergeGithub(sources: ProjectSources, commitActivity: CommitActiv
     commitsLast7d: commitActivity?.commitsLast7d ?? null,
     commitsPrev7d: commitActivity?.commitsPrev7d ?? null,
     commitTrendPct: commitActivity?.trendPct ?? null,
+    avatarUrl: repo?.avatarUrl ?? null,
   };
 }
 

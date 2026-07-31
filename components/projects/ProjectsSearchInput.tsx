@@ -1,8 +1,8 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { Search, X } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { Loader2, Search, X } from "lucide-react";
 
 import { buildProjectsQuery, type ProjectsQueryState } from "@/components/projects/queryState";
 import { formatNumber } from "@/lib/data/format";
@@ -24,6 +24,7 @@ const DEBOUNCE_MS = 300;
 export function ProjectsSearchInput({ state, resultCount }: ProjectsSearchInputProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const [isPending, startTransition] = useTransition();
   const [value, setValue] = useState(state.search);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -45,7 +46,9 @@ export function ProjectsSearchInput({ state, resultCount }: ProjectsSearchInputP
   }, []);
 
   function navigate(nextSearch: string) {
-    router.push(`${pathname}${buildProjectsQuery(state, { search: nextSearch })}`, { scroll: false });
+    startTransition(() => {
+      router.push(`${pathname}${buildProjectsQuery(state, { search: nextSearch })}`, { scroll: false });
+    });
   }
 
   function handleChange(next: string) {
@@ -74,6 +77,7 @@ export function ProjectsSearchInput({ state, resultCount }: ProjectsSearchInputP
           aria-label="Search projects"
           className="min-w-0 flex-1 bg-transparent text-sm text-radar-light-text outline-none placeholder:text-radar-light-muted dark:text-radar-white dark:placeholder:text-radar-muted"
         />
+        {isPending && <Loader2 className="size-3.5 shrink-0 animate-spin text-radar-light-muted dark:text-radar-muted" aria-hidden="true" />}
         {value && (
           <button
             type="button"

@@ -21,6 +21,8 @@ export type Protocol = {
   marketCapUsd: number | null;
   changePct24h: number | null;
   category: string | null;
+  /** PR-072 — real DefiLlama-hosted protocol logo, `null` when this protocol has none on record (never fabricated). */
+  logoUrl: string | null;
 };
 
 // Centralized exchanges and bridges show up in DefiLlama's protocol list
@@ -54,6 +56,7 @@ export function mapProtocol(raw: RawLlamaProtocol): Protocol {
     marketCapUsd: raw.mcap,
     changePct24h: raw.change_1d,
     category: raw.category ?? null,
+    logoUrl: raw.logo ?? null,
   };
 }
 

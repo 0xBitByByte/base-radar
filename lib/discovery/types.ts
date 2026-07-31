@@ -61,6 +61,13 @@ export type CandidateProject = {
    * evidence than `coingeckoId`, never as an exact identifier.
    */
   defillamaSlug?: string;
+  /**
+   * PR-072 — the source's own real logo/image URL, when it has one
+   * (CoinGecko's `imageUrl`, DefiLlama's `logoUrl`) — kept as its own
+   * structured field for the same reason `coingeckoId`/`defillamaSlug` are,
+   * rather than reaching into `providerMetadata`.
+   */
+  logoUrl?: string;
   /** ISO timestamp of this discovery run, not the project's real-world launch date. */
   discoveredAt: string;
   /**

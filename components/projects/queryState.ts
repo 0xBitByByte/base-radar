@@ -15,10 +15,13 @@
  * `URLSearchParams`-shaped object and a typed `ProjectsQueryState`, and back.
  */
 
-import { PROJECT_CATEGORIES, VERIFICATION_STATUSES, type ProjectCategory, type VerificationStatus } from "@/data/projects/enums";
+import { PROJECT_CATEGORIES, type ProjectCategory } from "@/data/projects/enums";
 import { DISCOVERY_STATUSES, type DiscoveryStatus } from "@/lib/discovery/status";
 import { FINANCIAL_RANGES } from "@/lib/projects/financial";
-import { SORT_FIELDS, type FinancialMetric, type FinancialRangeId, type SortField, type SortOrder } from "@/lib/projects/types";
+import { SORT_FIELDS, type ConfidenceLevel, type FinancialMetric, type FinancialRangeId, type SortField, type SortOrder } from "@/lib/projects/types";
+
+/** PR-071 Round 3 — the toolbar's Confidence control; `null` means "All." Every real level a project can carry (`lib/projects/types.ts`'s `ConfidenceLevel`) is offered — never a subset. */
+export const CONFIDENCE_LEVELS: ConfidenceLevel[] = ["high", "medium", "low"];
 
 /** The one route every href/navigation on this page targets — avoids hardcoding the path string in every server-rendered `<Link>`. */
 export const PROJECTS_PATH = "/dashboard/projects";
@@ -148,10 +151,10 @@ export type ProjectsQueryState = {
   search: string;
   categories: ProjectCategory[];
   verified: boolean;
-  highConfidence: boolean;
+  /** PR-071 Round 3 — replaces the old boolean "High Confidence only" toggle with the real tier a project already carries (`ConfidenceLevel`); `null` is "All." Confidence lives only in the toolbar now — never duplicated in the Advanced Filters panel. */
+  confidenceLevel: ConfidenceLevel | null;
   hasVolume: boolean;
   discoveryStatuses: DiscoveryStatus[];
-  verificationStatuses: VerificationStatus[];
   /** PR-063 — one active range per financial metric; `null` means "no constraint." Ranges within a metric are mutually exclusive (a project can't be both "< $1M" and "$1M–10M" TVL), so each is a single value, not an array. */
   tvlRange: FinancialRangeId | null;
   liquidityRange: FinancialRangeId | null;
@@ -169,10 +172,9 @@ export const DEFAULT_QUERY_STATE: ProjectsQueryState = {
   search: "",
   categories: [],
   verified: false,
-  highConfidence: false,
+  confidenceLevel: null,
   hasVolume: false,
   discoveryStatuses: [],
-  verificationStatuses: [],
   tvlRange: null,
   liquidityRange: null,
   marketCapRange: null,
@@ -201,6 +203,12 @@ function parseList<T extends string>(value: string | string[] | undefined, valid
     .filter((item): item is T => set.has(item));
 }
 
+/** An unrecognized value (or none) falls back to `null` ("All") rather than throwing. */
+function parseConfidenceLevel(value: string | string[] | undefined): ConfidenceLevel | null {
+  const raw = first(value);
+  return raw && (CONFIDENCE_LEVELS as string[]).includes(raw) ? (raw as ConfidenceLevel) : null;
+}
+
 /** An unrecognized or malformed range id for `metric` falls back to `null` ("no constraint") rather than throwing. */
 function parseFinancialRange(value: string | string[] | undefined, metric: FinancialMetric): FinancialRangeId | null {
   const raw = first(value);
@@ -226,10 +234,9 @@ export function parseProjectsQueryState(searchParams: RawSearchParams): Projects
     search: (first(searchParams.search) ?? "").trim(),
     categories: parseList(searchParams.category, PROJECT_CATEGORIES),
     verified: first(searchParams.verified) === "true",
-    highConfidence: first(searchParams.highConfidence) === "true",
+    confidenceLevel: parseConfidenceLevel(searchParams.confidence),
     hasVolume: first(searchParams.hasVolume) === "true",
     discoveryStatuses: parseList(searchParams.discoveryStatus, DISCOVERY_STATUSES),
-    verificationStatuses: parseList(searchParams.verificationStatus, VERIFICATION_STATUSES),
     tvlRange: parseFinancialRange(searchParams.tvlRange, "tvl"),
     liquidityRange: parseFinancialRange(searchParams.liquidityRange, "liquidity"),
     marketCapRange: parseFinancialRange(searchParams.marketCapRange, "marketCap"),
@@ -252,10 +259,9 @@ const PAGE_RESETTING_KEYS: (keyof ProjectsQueryState)[] = [
   "search",
   "categories",
   "verified",
-  "highConfidence",
+  "confidenceLevel",
   "hasVolume",
   "discoveryStatuses",
-  "verificationStatuses",
   "tvlRange",
   "liquidityRange",
   "marketCapRange",
@@ -282,10 +288,9 @@ export function buildProjectsQuery(state: ProjectsQueryState, overrides: Partial
   if (next.search) params.set("search", next.search);
   if (next.categories.length > 0) params.set("category", next.categories.join(","));
   if (next.verified) params.set("verified", "true");
-  if (next.highConfidence) params.set("highConfidence", "true");
+  if (next.confidenceLevel) params.set("confidence", next.confidenceLevel);
   if (next.hasVolume) params.set("hasVolume", "true");
   if (next.discoveryStatuses.length > 0) params.set("discoveryStatus", next.discoveryStatuses.join(","));
-  if (next.verificationStatuses.length > 0) params.set("verificationStatus", next.verificationStatuses.join(","));
   if (next.tvlRange) params.set("tvlRange", next.tvlRange);
   if (next.liquidityRange) params.set("liquidityRange", next.liquidityRange);
   if (next.marketCapRange) params.set("marketCapRange", next.marketCapRange);
@@ -307,10 +312,9 @@ export function hasActiveFilters(state: ProjectsQueryState): boolean {
   return (
     state.categories.length > 0 ||
     state.verified ||
-    state.highConfidence ||
+    state.confidenceLevel !== null ||
     state.hasVolume ||
     state.discoveryStatuses.length > 0 ||
-    state.verificationStatuses.length > 0 ||
     state.tvlRange !== null ||
     state.liquidityRange !== null ||
     state.marketCapRange !== null ||
@@ -322,10 +326,9 @@ export function countActiveFilters(state: ProjectsQueryState): number {
   return (
     state.categories.length +
     (state.verified ? 1 : 0) +
-    (state.highConfidence ? 1 : 0) +
+    (state.confidenceLevel ? 1 : 0) +
     (state.hasVolume ? 1 : 0) +
     state.discoveryStatuses.length +
-    state.verificationStatuses.length +
     (state.tvlRange ? 1 : 0) +
     (state.liquidityRange ? 1 : 0) +
     (state.marketCapRange ? 1 : 0) +
