@@ -14,7 +14,7 @@ import type { SocialPlatform } from "@/lib/branding/types";
 import { formatDate } from "@/lib/data/format";
 import { cn } from "@/lib/utils";
 import type { ProjectCategory } from "@/data/projects/enums";
-import type { ChainInfo, Community, Confidence, Contracts, GithubIntel, Health, Identity, Market, Risk } from "@/lib/intelligence/types";
+import type { ChainInfo, Community, Confidence, Contracts, GithubIntel, Health, Identity, Market, Risk, Tvl } from "@/lib/intelligence/types";
 
 type ProfileHeaderProps = {
   identity: Identity;
@@ -23,6 +23,8 @@ type ProfileHeaderProps = {
   contracts: Contracts;
   github: GithubIntel;
   market: Market;
+  /** PR-072 — carries DefiLlama's own protocol logo (`tvl.imageUrl`), the third-priority logo candidate after the registry and CoinGecko. */
+  tvl: Tvl;
   health: Health;
   confidence: Confidence;
   risk: Risk;
@@ -218,6 +220,7 @@ export function ProfileHeader({
   contracts,
   github,
   market,
+  tvl,
   health,
   confidence,
   risk,
@@ -230,12 +233,22 @@ export function ProfileHeader({
   const ecosystemRole = primaryCategory ? ECOSYSTEM_ROLE_LABEL[primaryCategory] : null;
   const heroSummary = buildHeroSummary(identity.shortDescription, ecosystemRole?.toLowerCase(), categoryTvlLeadership);
   const githubHref = github.available && github.fullName ? `https://github.com/${github.fullName}` : null;
-  // Goal 1 — logo priority: the registry's own official logo first, then
-  // CoinGecko's token image (already fetched for this page's Token & Price
-  // section, no new request), then `ProjectLogo`'s own initials-avatar
-  // fallback. Never a broken image: `ProjectLogo` itself swaps to initials
-  // the moment either URL 404s.
-  const logoUrl = identity.logoUrl ?? (market.available ? market.imageUrl : null);
+  // Goal 1 / PR-072 — logo priority: the registry's own official logo
+  // first, then CoinGecko's token image, DefiLlama's protocol logo, and the
+  // GitHub repo owner's avatar (all already fetched for this page's other
+  // sections — Token & Price, TVL, Engineering Health — no new request),
+  // and finally `ProjectLogo`'s own initials-avatar fallback. A broken URL
+  // (a 404, not just an absent one) now retries the next real candidate
+  // instead of jumping straight to initials — see `logoUrlFallbacks` below
+  // and `ProjectLogo`'s own doc comment.
+  const logoCandidates = [
+    identity.logoUrl,
+    market.available ? market.imageUrl : null,
+    tvl.available ? tvl.imageUrl : null,
+    github.available ? github.avatarUrl : null,
+  ].filter((url): url is string => Boolean(url));
+  const logoUrl = logoCandidates[0] ?? null;
+  const logoUrlFallbacks = logoCandidates.slice(1);
 
   // Goal 3 — only a real on-chain address view counts as "Explorer" here;
   // `getExplorerLink` falling back to the project's website (no registered
@@ -278,7 +291,7 @@ export function ProfileHeader({
     <div className="flex flex-col gap-4 rounded-2xl border border-radar-light-border bg-gradient-to-br from-radar-light-card to-radar-light-card p-5 shadow-sm transition-shadow duration-200 hover:shadow-md dark:border-white/10 dark:from-radar-card dark:to-white/[0.015] sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3.5">
-          <ProjectLogo logoUrl={logoUrl} name={identity.name} size={56} />
+          <ProjectLogo logoUrl={logoUrl} fallbackUrls={logoUrlFallbacks} name={identity.name} size={56} />
           <div className="flex min-w-0 flex-col gap-2">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="truncate text-2xl font-bold tracking-tight text-radar-light-text dark:text-radar-white">

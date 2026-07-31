@@ -8,6 +8,15 @@ import { cn } from "@/lib/utils";
 
 type ProjectLogoProps = {
   logoUrl: string | null | undefined;
+  /**
+   * PR-072 — real, lower-priority logo candidates (e.g. `identity.logoUrlFallbacks`)
+   * to try, in order, if `logoUrl`'s image fails to actually load (a broken
+   * URL/404) — never tried before `logoUrl`, and never substituted just
+   * because `logoUrl` is falsy (that case already skips straight to
+   * initials, same as before this prop existed). Omit for call sites that
+   * only ever had one candidate to begin with.
+   */
+  fallbackUrls?: (string | null | undefined)[];
   name: string;
   size?: number;
   className?: string;
@@ -25,22 +34,30 @@ function initialsTextClass(size: number): string {
  * reimplemented at every call site (card header, table row, Quick View
  * header); this is the single source now, so a fallback-avatar change
  * never has to be made four times. Both branches occupy an identical
- * `size`×`size` box, so nothing reflows whichever renders — including the
- * case where an image URL 404s after mount, which falls back to initials
- * instead of a broken-image icon.
+ * `size`×`size` box, so nothing reflows whichever renders.
+ *
+ * PR-072 — a broken image URL (a 404, not just an absent one) now advances
+ * to the next real candidate in `fallbackUrls` instead of jumping straight
+ * to initials; only once every candidate has failed to load does this fall
+ * back to the initials avatar.
  */
-export function ProjectLogo({ logoUrl, name, size = 40, className }: ProjectLogoProps) {
-  const [failed, setFailed] = useState(false);
+export function ProjectLogo({ logoUrl, fallbackUrls, name, size = 40, className }: ProjectLogoProps) {
+  const candidates = [logoUrl, ...(fallbackUrls ?? [])].filter((url): url is string => Boolean(url));
+  const uniqueCandidates = Array.from(new Set(candidates));
+  const [candidateIndex, setCandidateIndex] = useState(0);
 
-  if (logoUrl && !failed) {
+  const activeUrl = uniqueCandidates[candidateIndex];
+
+  if (activeUrl) {
     return (
       <Image
-        src={logoUrl}
+        key={activeUrl}
+        src={activeUrl}
         alt=""
         width={size}
         height={size}
         unoptimized
-        onError={() => setFailed(true)}
+        onError={() => setCandidateIndex((index) => index + 1)}
         className={cn("shrink-0 rounded-full object-cover", className)}
       />
     );

@@ -29,16 +29,16 @@ export function ProjectsKpiPulse({ totalProjects, verified, newlyDiscovered, hig
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
       {tiles.map((tile) => (
         <div
           key={tile.label}
-          className="flex flex-col gap-2 rounded-2xl border border-radar-light-border bg-radar-light-card/80 p-5 backdrop-blur-xl dark:border-white/10 dark:bg-radar-card/60"
+          className="flex items-baseline justify-between gap-2 rounded-xl border border-radar-light-border bg-radar-light-card/80 px-4 py-3 backdrop-blur-xl dark:border-white/10 dark:bg-radar-card/60"
         >
-          <span className="truncate text-xs font-semibold tracking-wide text-radar-light-muted uppercase dark:text-radar-muted">
+          <span className="truncate text-[11px] font-semibold tracking-wide text-radar-light-muted uppercase dark:text-radar-muted">
             {tile.label}
           </span>
-          <span className="text-3xl font-bold tracking-tight tabular-nums text-radar-light-text dark:text-radar-white">
+          <span className="text-lg font-bold tracking-tight tabular-nums text-radar-light-text dark:text-radar-white">
             {formatNumber(tile.value)}
           </span>
         </div>

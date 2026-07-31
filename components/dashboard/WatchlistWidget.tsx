@@ -49,6 +49,15 @@ export function WatchlistWidget({ projects, lastUpdated }: WatchlistWidgetProps)
         <ul className="flex flex-col gap-3">
           {watched.map((project) => {
             const priceAvailable = project.market.available && project.market.priceUsd !== null;
+            // PR-072 — same registry → CoinGecko → DefiLlama → GitHub avatar
+            // priority as every other logo consumer; all already part of this
+            // same `ProjectIntelligence` object, no new fetch.
+            const logoCandidates = [
+              project.identity.logoUrl,
+              project.market.available ? project.market.imageUrl : null,
+              project.tvl.available ? project.tvl.imageUrl : null,
+              project.github.available ? project.github.avatarUrl : null,
+            ].filter((url): url is string => Boolean(url));
 
             return (
               <li key={project.identity.id}>
@@ -56,7 +65,7 @@ export function WatchlistWidget({ projects, lastUpdated }: WatchlistWidgetProps)
                   href={`/dashboard/projects/${project.identity.slug}`}
                   className="flex items-center gap-3 rounded-lg p-1 outline-none transition-colors hover:bg-radar-light-surface focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:hover:bg-white/5"
                 >
-                  <ProjectLogo logoUrl={project.identity.logoUrl} name={project.identity.name} size={32} />
+                  <ProjectLogo logoUrl={logoCandidates[0] ?? null} fallbackUrls={logoCandidates.slice(1)} name={project.identity.name} size={32} />
 
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-semibold text-radar-light-text dark:text-radar-white">

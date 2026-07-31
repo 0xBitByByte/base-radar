@@ -1,7 +1,8 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { ArrowUpDown } from "lucide-react";
+import { useTransition } from "react";
+import { ArrowUpDown, Loader2 } from "lucide-react";
 
 import { SORT_OPTIONS, buildProjectsQuery, sortValueFor, type ProjectsQueryState } from "@/components/projects/queryState";
 
@@ -25,13 +26,16 @@ type ProjectsSortSelectProps = {
 export function ProjectsSortSelect({ state }: ProjectsSortSelectProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const [isPending, startTransition] = useTransition();
   const disabled = state.search.length > 0;
   const value = sortValueFor(state.sortField, state.sortOrder);
 
   function handleChange(nextValue: string) {
     const option = SORT_OPTIONS.find((candidate) => candidate.value === nextValue);
     if (!option) return;
-    router.push(`${pathname}${buildProjectsQuery(state, { sortField: option.field, sortOrder: option.order })}`, { scroll: false });
+    startTransition(() => {
+      router.push(`${pathname}${buildProjectsQuery(state, { sortField: option.field, sortOrder: option.order })}`, { scroll: false });
+    });
   }
 
   return (
@@ -58,6 +62,7 @@ export function ProjectsSortSelect({ state }: ProjectsSortSelectProps) {
           ))
         )}
       </select>
+      {isPending && <Loader2 className="size-3.5 shrink-0 animate-spin text-radar-light-muted dark:text-radar-muted" aria-hidden="true" />}
     </div>
   );
 }

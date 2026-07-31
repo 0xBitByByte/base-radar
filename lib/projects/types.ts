@@ -29,7 +29,10 @@ export type LiveProjectIdentity = {
   /** `null` for a discovery-only project — no editorial registry description exists for it yet. */
   shortDescription: string | null;
   description: string | null;
+  /** The single best logo candidate, already priority-resolved (registry → CoinGecko → DefiLlama → GitHub avatar). `null` only when none of those sources has one. */
   logoUrl: string | null;
+  /** PR-072 — every other real, lower-priority logo candidate `logoUrl` didn't win, in the same priority order, for `ProjectLogo` to retry if `logoUrl`'s URL turns out to be broken (a 404, not just absent) — never attempted before `logoUrl`, and this app's UI never needs to reach further than this list before falling back to initials. Empty when no lower-priority candidate exists. */
+  logoUrlFallbacks: string[];
   websiteUrl: string | null;
 };
 
@@ -229,6 +232,8 @@ export type FilterOptions = {
   hasGovernance?: boolean;
   hasContracts?: boolean;
   minConfidence?: number;
+  /** PR-071 Round 3 — exact confidence tier (`project.confidence.level`), for the toolbar's All/High/Medium/Low control. Independent of `minConfidence`, which stays a raw numeric floor used elsewhere (e.g. the "Emerging" collection). */
+  confidenceLevel?: ConfidenceLevel;
   /**
    * PR-056 — the composed "Verified" facet the PR-055 UX design calls for:
    * `true` requires `verification.status === "verified"` OR

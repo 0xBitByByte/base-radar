@@ -1,6 +1,6 @@
 /** Public API for the CoinGecko provider — cache- and rate-limit-guarded. */
 
-import { fetchBaseEcosystemMarkets, fetchCoinDetail, fetchMarketChart, fetchSimplePrice } from "@/lib/providers/coingecko/client";
+import { fetchBaseEcosystemMarkets, fetchCoinDetail, fetchMarketChart, fetchMarketsByIds, fetchSimplePrice } from "@/lib/providers/coingecko/client";
 import {
   mapAssetPrice,
   mapCoinMarkets,
@@ -43,6 +43,30 @@ export async function getBaseEcosystemMarkets(perPage = 20): Promise<ProviderRes
     getOrSet(`${PROVIDER}:markets:${perPage}`, CACHE_TTL_MS, async () => {
       assertRateLimit(PROVIDER, RATE_LIMIT);
       const raw = await fetchBaseEcosystemMarkets(perPage);
+      return mapCoinMarkets(raw);
+    })
+  );
+}
+
+/**
+ * PR-072 — backfills market data (price, market cap, and crucially the token
+ * `image` URL) for registry projects CoinGecko's `category=base-ecosystem`
+ * tagging misses entirely — see `fetchMarketsByIds`'s own doc comment.
+ * `ids` is expected to be every registry project's configured
+ * `providerIds.coingeckoId` (`sources.ts`'s `collectRegistryCoingeckoIds`),
+ * a small, fixed list — one batched request, cached the same way as every
+ * other bulk fetch here. Returns an empty result (not an error) for an
+ * empty `ids` list, since there's nothing to fetch.
+ */
+export async function getMarketsByIds(ids: string[]): Promise<ProviderResult<CoinMarket[]>> {
+  if (ids.length === 0) {
+    return { ok: true, data: [], source: PROVIDER, fetchedAt: new Date().toISOString() };
+  }
+  const sortedIds = [...ids].sort();
+  return toProviderResult(PROVIDER, () =>
+    getOrSet(`${PROVIDER}:markets:by-id:${sortedIds.join(",")}`, CACHE_TTL_MS, async () => {
+      assertRateLimit(PROVIDER, RATE_LIMIT);
+      const raw = await fetchMarketsByIds(sortedIds);
       return mapCoinMarkets(raw);
     })
   );

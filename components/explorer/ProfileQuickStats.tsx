@@ -93,7 +93,7 @@ export function ProfileQuickStats({ market, tvl, trading }: ProfileQuickStatsPro
   const volumeReason = resolutionTooltip(trading.volumeResolution);
 
   return (
-    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
+    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:grid-cols-7">
       <QuickStat icon={DollarSign} label="Price" unavailable={market.priceUsd === null} reason={priceReason}>
         {market.priceUsd !== null ? formatPrice(market.priceUsd) : "Not Tracked"}
       </QuickStat>
@@ -103,6 +103,14 @@ export function ProfileQuickStats({ market, tvl, trading }: ProfileQuickStatsPro
         ) : (
           "Not Tracked"
         )}
+      </QuickStat>
+      <QuickStat
+        icon={Coins}
+        label="Market Cap"
+        unavailable={!market.available || market.marketCapUsd === null}
+        reason={priceReason}
+      >
+        {market.available && market.marketCapUsd !== null ? formatCompactCurrency(market.marketCapUsd) : "Not Tracked"}
       </QuickStat>
       <QuickStat icon={Wallet} label="TVL" unavailable={tvl.tvlUsd === null} reason={tvlReason}>
         {tvl.tvlUsd !== null ? formatCompactCurrency(tvl.tvlUsd) : "Not Tracked"}

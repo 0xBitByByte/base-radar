@@ -14,7 +14,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
-import { availableDiscoveryStatuses, availableVerificationStatuses, financialRangeOptions } from "@/components/projects/filterOptions";
+import { availableDiscoveryStatuses, financialRangeOptions } from "@/components/projects/filterOptions";
 import { FinancialSummary } from "@/components/projects/FinancialSummary";
 import { ProjectsDirectory } from "@/components/projects/ProjectsDirectory";
 import { ProjectsInteractionBar } from "@/components/projects/ProjectsInteractionBar";
@@ -79,7 +79,6 @@ export function ProjectsCollectionPage({
         state={state}
         resultCount={directoryPage.totalItems}
         availableDiscoveryStatuses={availableDiscoveryStatuses(allProjects)}
-        availableVerificationStatuses={availableVerificationStatuses(allProjects)}
         financialRangeOptions={financialRangeOptions(allProjects)}
       />
 

@@ -127,7 +127,12 @@ export function BaseTodayPanel({ projects, collections, leaderboards }: BaseToda
               href={spotlightHref(highestActivity, PROJECTS_VIEW_META.topActivity.slug)}
               className="flex items-center gap-3 rounded-xl border border-radar-light-border/70 bg-radar-light-surface/60 p-3.5 outline-none transition-colors hover:border-radar-primary/30 focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:border-white/[0.06] dark:bg-white/[0.02]"
             >
-              <ProjectLogo logoUrl={highestActivity.identity.logoUrl} name={highestActivity.identity.name} size={36} />
+              <ProjectLogo
+                logoUrl={highestActivity.identity.logoUrl}
+                fallbackUrls={highestActivity.identity.logoUrlFallbacks}
+                name={highestActivity.identity.name}
+                size={36}
+              />
               <div className="flex min-w-0 flex-col">
                 <span className="text-[11px] font-medium uppercase tracking-wide text-radar-light-muted dark:text-radar-muted">
                   Highest GitHub Activity

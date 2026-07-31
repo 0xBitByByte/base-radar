@@ -133,6 +133,8 @@ export type Tvl = {
   defillamaCategory: string | null;
   /** PR-050 provider-resolution — DefiLlama is the only protocol-TVL provider this Engine integrates (CoinGecko's API doesn't expose per-protocol TVL, and no on-chain TVL aggregator is implemented). Formalized into the same resolution shape for a consistent UI contract. */
   tvlResolution: MetricResolution<number>;
+  /** PR-072 — DefiLlama's own protocol logo, a real third-priority logo candidate (behind the registry and CoinGecko) — `null` when DefiLlama has none on record for this protocol. */
+  imageUrl: string | null;
 };
 
 export type ContractInfo = {
@@ -167,6 +169,8 @@ export type GithubIntel = {
   commitsLast7d: number | null;
   commitsPrev7d: number | null;
   commitTrendPct: number | null;
+  /** PR-072 — the repo owner's real avatar, the last-resort logo candidate behind the registry, CoinGecko, and DefiLlama. `null` when GitHub isn't available for this project at all. */
+  avatarUrl: string | null;
 };
 
 export type ChainInfo = {

@@ -108,6 +108,36 @@ function collectBaseTokenAddresses(): string[] {
   return [...addresses];
 }
 
+/** PR-072 — every registry project's configured `providerIds.coingeckoId`, the input to `getMarketsByIds`'s category-independent backfill fetch below. */
+function collectRegistryCoingeckoIds(): string[] {
+  const ids = new Set<string>();
+  for (const project of getProjects()) {
+    if (project.providerIds.coingeckoId) ids.add(project.providerIds.coingeckoId);
+  }
+  return [...ids];
+}
+
+/**
+ * PR-072 — `matchMarket` searches whatever `markets` list it's handed by
+ * exact `id`; this widens that list beyond the category-filtered bulk fetch
+ * (which misses real registry projects CoinGecko doesn't tag
+ * `base-ecosystem`, e.g. Uniswap) by also including every registry
+ * project's own id-based lookup. Category-list entries win on conflict
+ * (kept first) since that data is already fresher/broader; the id-based
+ * fetch only ever fills in ids the category list didn't already have.
+ */
+function mergeMarketResults(
+  categoryResult: ProviderResult<coingecko.CoinMarket[]>,
+  registryResult: ProviderResult<coingecko.CoinMarket[]>
+): ProviderResult<coingecko.CoinMarket[]> {
+  if (!categoryResult.ok) return registryResult.ok ? registryResult : categoryResult;
+  if (!registryResult.ok) return categoryResult;
+
+  const seenIds = new Set(categoryResult.data.map((m) => m.id));
+  const merged = [...categoryResult.data, ...registryResult.data.filter((m) => !seenIds.has(m.id))];
+  return { ...categoryResult, data: merged };
+}
+
 /**
  * Fetches every "shared across all projects" provider result once. Safe to
  * call once per batch (see `engine.ts`'s `getAllProjectIntelligence`) and
@@ -117,14 +147,16 @@ function collectBaseTokenAddresses(): string[] {
  * within each provider's TTL window.
  */
 export async function fetchProviderBulkData(): Promise<ProviderBulkData> {
-  const [markets, pairs, tokenPairs, protocols, verifiedContract, network] = await Promise.all([
+  const [categoryMarkets, registryMarkets, pairs, tokenPairs, protocols, verifiedContract, network] = await Promise.all([
     coingecko.getBaseEcosystemMarkets(coingecko.BASE_ECOSYSTEM_MARKETS_PAGE_SIZE),
+    coingecko.getMarketsByIds(collectRegistryCoingeckoIds()),
     dexscreener.getBaseTrendingPairs(),
     dexscreener.getPairsByTokenAddresses(collectBaseTokenAddresses()),
     defillama.getBaseProtocols(),
     blockscout.getRecentlyVerifiedContract(),
     base.getBaseNetworkStatus(),
   ]);
+  const markets = mergeMarketResults(categoryMarkets, registryMarkets);
   return { markets, pairs, tokenPairs, protocols, verifiedContract, network };
 }
 

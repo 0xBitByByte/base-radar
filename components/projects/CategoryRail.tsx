@@ -34,9 +34,9 @@
  * ecosystem's most active verticals first, everything else one click away.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp } from "lucide-react";
 
 import { buildProjectsQuery, PROJECTS_PATH, type ProjectsQueryState } from "@/components/projects/queryState";
 import { PROJECT_CATEGORIES, type ProjectCategory } from "@/data/projects/enums";
@@ -49,12 +49,36 @@ type CategoryRailProps = {
   state: ProjectsQueryState;
 };
 
-const FEATURED_CAP = 4;
-const VISIBLE_CAP = 10;
+const FEATURED_CAP = 6;
+const VISIBLE_CAP = 14;
+/** PR-071 Round 2 — remembers this section's own collapse choice, same convention `CollapsibleSection` uses for KPI Pulse/Smart Views (this rail keeps its own toggle, not the shared wrapper, since its header already carries real Clear/Show-All controls tied to internal state). */
+const COLLAPSE_STORAGE_KEY = "br-projects-section-collapsed:explore-by-category";
 
 export function CategoryRail({ byCategory, state }: CategoryRailProps) {
   const [expanded, setExpanded] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const hasSelection = state.categories.length > 0;
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      try {
+        setCollapsed(window.localStorage.getItem(COLLAPSE_STORAGE_KEY) === "1");
+      } catch {
+        // Storage unavailable — stays expanded for this session.
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  function toggleCollapsed() {
+    const next = !collapsed;
+    setCollapsed(next);
+    try {
+      window.localStorage.setItem(COLLAPSE_STORAGE_KEY, next ? "1" : "0");
+    } catch {
+      // Storage unavailable — the toggle still works for this session.
+    }
+  }
 
   const totalTracked = PROJECT_CATEGORIES.reduce((sum, category) => sum + (byCategory[category]?.length ?? 0), 0);
 
@@ -82,9 +106,15 @@ export function CategoryRail({ byCategory, state }: CategoryRailProps) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-bold tracking-wide text-radar-light-muted uppercase dark:text-radar-muted">
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-expanded={!collapsed}
+          className="flex items-center gap-1.5 text-sm font-bold tracking-wide text-radar-light-muted uppercase outline-none transition-colors hover:text-radar-light-text focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:text-radar-muted dark:hover:text-radar-white"
+        >
+          <ChevronDown className={cn("size-3.5 shrink-0 transition-transform duration-200", collapsed && "-rotate-90")} aria-hidden="true" />
           Explore by Category
-        </h2>
+        </button>
         <div className="flex items-center gap-3">
           {hasSelection && (
             <Link
@@ -109,79 +139,91 @@ export function CategoryRail({ byCategory, state }: CategoryRailProps) {
         </div>
       </div>
 
-      {/* Featured tier — the most active verticals right now, given real visual weight. */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {featured.map((category) => {
-          const { label, Icon } = CATEGORY_BRANDING[category];
-          const count = byCategory[category]?.length ?? 0;
-          const isActive = state.categories.includes(category);
-          const share = totalTracked > 0 ? count / totalTracked : 0;
+      {!collapsed && (
+        <>
+          {/* Featured tier — the most active verticals right now, given real visual weight but a compact footprint so more of them clear the fold. */}
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
+            {featured.map((category) => {
+              const { label, Icon } = CATEGORY_BRANDING[category];
+              const count = byCategory[category]?.length ?? 0;
+              const isActive = state.categories.includes(category);
+              const share = totalTracked > 0 ? count / totalTracked : 0;
 
-          return (
-            <Link
-              key={category}
-              href={hrefFor(category, isActive)}
-              scroll={false}
-              aria-current={isActive ? "true" : undefined}
-              className={cn(
-                "flex flex-col gap-2.5 rounded-2xl border p-4 backdrop-blur-xl outline-none transition-colors focus-visible:ring-2 focus-visible:ring-radar-primary/50",
-                isActive
-                  ? "border-radar-primary/40 bg-radar-primary/10"
-                  : "border-radar-light-border bg-radar-light-card/80 hover:border-radar-primary/30 dark:border-white/10 dark:bg-radar-card/60"
-              )}
-            >
-              <span
-                className={cn(
-                  "flex size-10 items-center justify-center rounded-xl",
-                  isActive ? "bg-radar-primary/20 text-radar-primary" : "bg-radar-primary/10 text-radar-primary"
-                )}
-              >
-                <Icon className="size-5" aria-hidden="true" />
-              </span>
-              <div className="flex flex-col gap-0.5">
-                <span className="text-sm font-semibold text-radar-light-text dark:text-radar-white">{label}</span>
-                <span className="text-lg font-bold tabular-nums tracking-tight text-radar-light-text dark:text-radar-white">
-                  {formatNumber(count)}
-                </span>
-                <span className="text-[11px] text-radar-light-muted dark:text-radar-muted">
-                  {count > 0 ? `${formatPercent(share * 100, { showSign: false })} of tracked projects` : "No tracked projects yet"}
-                </span>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
+              return (
+                <Link
+                  key={category}
+                  href={hrefFor(category, isActive)}
+                  scroll={false}
+                  aria-current={isActive ? "true" : undefined}
+                  className={cn(
+                    "group relative flex flex-col gap-1.5 rounded-xl border p-3 outline-none transition-all duration-150 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_-12px_rgba(var(--color-radar-primary-rgb),0.35)] focus-visible:ring-2 focus-visible:ring-radar-primary/50 motion-reduce:hover:translate-y-0",
+                    isActive
+                      ? "border-radar-primary/40 bg-radar-primary/10"
+                      : "border-radar-light-border bg-radar-light-card/80 hover:border-radar-primary/30 dark:border-white/10 dark:bg-radar-card/60"
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        "flex size-7 shrink-0 items-center justify-center rounded-lg transition-transform duration-150 group-hover:scale-105",
+                        isActive ? "bg-radar-primary/20 text-radar-primary" : "bg-radar-primary/10 text-radar-primary"
+                      )}
+                    >
+                      <Icon className="size-3.5" aria-hidden="true" />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-xs font-semibold text-radar-light-text dark:text-radar-white">
+                      {label}
+                    </span>
+                    <ChevronRight
+                      className="size-3.5 shrink-0 text-radar-light-muted opacity-0 transition-opacity duration-150 group-hover:opacity-100 dark:text-radar-muted"
+                      aria-hidden="true"
+                    />
+                  </div>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-base font-bold tabular-nums tracking-tight text-radar-light-text dark:text-radar-white">
+                      {formatNumber(count)}
+                    </span>
+                    <span className="truncate text-[10px] text-radar-light-muted dark:text-radar-muted">
+                      {count > 0 ? `${formatPercent(share * 100, { showSign: false })} share` : "No projects yet"}
+                    </span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
 
-      {/* Compact tier — everything else, quieter and denser by design so the featured tier above reads as the entry point. */}
-      {sortedCategories.length > FEATURED_CAP && (
-        <div className="flex flex-wrap gap-2">
-          {visibleCompact.map((category) => {
-            const { label, Icon } = CATEGORY_BRANDING[category];
-            const count = byCategory[category]?.length ?? 0;
-            const isEmpty = count === 0;
-            const isActive = state.categories.includes(category);
+          {/* Compact tier — everything else, quieter and denser by design so the featured tier above reads as the entry point. */}
+          {sortedCategories.length > FEATURED_CAP && (
+            <div className="flex flex-wrap gap-2">
+              {visibleCompact.map((category) => {
+                const { label, Icon } = CATEGORY_BRANDING[category];
+                const count = byCategory[category]?.length ?? 0;
+                const isEmpty = count === 0;
+                const isActive = state.categories.includes(category);
 
-            return (
-              <Link
-                key={category}
-                href={hrefFor(category, isActive)}
-                scroll={false}
-                aria-current={isActive ? "true" : undefined}
-                className={cn(
-                  "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-radar-primary/50",
-                  isActive
-                    ? "border-radar-primary/40 bg-radar-primary/10 text-radar-primary"
-                    : "border-radar-light-border bg-radar-light-card/60 text-radar-light-text hover:border-radar-primary/30 dark:border-white/10 dark:bg-radar-card/40 dark:text-radar-white",
-                  isEmpty && !isActive && "opacity-50"
-                )}
-              >
-                <Icon className="size-3.5" aria-hidden="true" />
-                {label}
-                <span className="tabular-nums text-radar-light-muted dark:text-radar-muted">{formatNumber(count)}</span>
-              </Link>
-            );
-          })}
-        </div>
+                return (
+                  <Link
+                    key={category}
+                    href={hrefFor(category, isActive)}
+                    scroll={false}
+                    aria-current={isActive ? "true" : undefined}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-radar-primary/50",
+                      isActive
+                        ? "border-radar-primary/40 bg-radar-primary/10 text-radar-primary"
+                        : "border-radar-light-border bg-radar-light-card/60 text-radar-light-text hover:border-radar-primary/30 dark:border-white/10 dark:bg-radar-card/40 dark:text-radar-white",
+                      isEmpty && !isActive && "opacity-50"
+                    )}
+                  >
+                    <Icon className="size-3.5" aria-hidden="true" />
+                    {label}
+                    <span className="tabular-nums text-radar-light-muted dark:text-radar-muted">{formatNumber(count)}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

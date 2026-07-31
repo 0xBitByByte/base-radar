@@ -5,7 +5,8 @@ import { ExplorerErrorState } from "@/components/explorer/ExplorerErrorState";
 import { BaseTodayPanel } from "@/components/projects/BaseTodayPanel";
 import { buildDirectoryPipeline } from "@/components/projects/collectionPipeline";
 import { CategoryRail } from "@/components/projects/CategoryRail";
-import { availableDiscoveryStatuses, availableVerificationStatuses, financialRangeOptions } from "@/components/projects/filterOptions";
+import { CollapsibleSection } from "@/components/projects/CollapsibleSection";
+import { availableDiscoveryStatuses, financialRangeOptions } from "@/components/projects/filterOptions";
 import { FinancialSummary } from "@/components/projects/FinancialSummary";
 import { loadProjectsPageData } from "@/components/projects/loadProjectsData";
 import { ProjectRail } from "@/components/projects/ProjectRail";
@@ -106,17 +107,22 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
         state={state}
         resultCount={directoryPage.totalItems}
         availableDiscoveryStatuses={availableDiscoveryStatuses(projects)}
-        availableVerificationStatuses={availableVerificationStatuses(projects)}
         financialRangeOptions={financialRangeOptions(projects)}
       />
 
-      <ProjectsKpiPulse
-        totalProjects={projects.length}
-        verified={collections.verified.length}
-        newlyDiscovered={collections.new.length}
-        highConfidence={collections.highConfidence.length}
-      />
-      <SmartViews counts={smartViewCounts} />
+      <CollapsibleSection id="kpi-pulse" title="Overview">
+        <ProjectsKpiPulse
+          totalProjects={projects.length}
+          verified={collections.verified.length}
+          newlyDiscovered={collections.new.length}
+          highConfidence={collections.highConfidence.length}
+        />
+      </CollapsibleSection>
+
+      <CollapsibleSection id="smart-views" title="Smart Views">
+        <SmartViews counts={smartViewCounts} />
+      </CollapsibleSection>
+
       <CategoryRail byCategory={collections.byCategory} state={state} />
 
       <div className="flex flex-col gap-6">

@@ -15,6 +15,8 @@ export type RawRepo = {
   pushed_at: string;
   /** PR15.2 — real, already-present on this same `fetchRepo` response; read for the Alert Engine's "Repository Archived" alert. Zero new request. */
   archived: boolean;
+  /** PR-072 — the repo owner's real avatar (org or user), already present on this same response; simply never typed/read before. */
+  owner: { avatar_url: string };
 };
 
 export type RawRelease = {

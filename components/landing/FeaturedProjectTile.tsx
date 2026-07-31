@@ -31,10 +31,19 @@ const HEALTH_COLOR: Record<string, string> = {
  * one-off lookalike computation.
  */
 export function FeaturedProjectTile({ project, onActivate }: FeaturedProjectTileProps) {
-  const { identity, community, health, tvl, market } = project;
+  const { identity, community, health, tvl, market, github } = project;
   const category = identity.categories[0];
   const change = market.available ? market.changePct24h : null;
   const isUp = (change ?? 0) >= 0;
+  // PR-072 — same registry → CoinGecko → DefiLlama → GitHub avatar priority
+  // as every other logo consumer; all four are already part of this same
+  // `ProjectIntelligence` object, no new fetch.
+  const logoCandidates = [
+    identity.logoUrl,
+    market.available ? market.imageUrl : null,
+    tvl.available ? tvl.imageUrl : null,
+    github.available ? github.avatarUrl : null,
+  ].filter((url): url is string => Boolean(url));
 
   return (
     <button
@@ -52,7 +61,7 @@ export function FeaturedProjectTile({ project, onActivate }: FeaturedProjectTile
           purely for breathing room — the fix itself no longer depends on
           the extra width. */}
       <div className="flex items-center gap-3">
-        <ProjectLogo logoUrl={identity.logoUrl} name={identity.name} size={44} />
+        <ProjectLogo logoUrl={logoCandidates[0] ?? null} fallbackUrls={logoCandidates.slice(1)} name={identity.name} size={44} />
         <span className="min-w-0 flex-1 truncate text-sm font-semibold text-radar-light-text dark:text-radar-white">
           {identity.name}
         </span>

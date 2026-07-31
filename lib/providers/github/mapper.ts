@@ -17,6 +17,8 @@ export type RepoStats = {
   pushedAt: string;
   /** PR15.2 — real, current archived status, for the Alert Engine's GitHub provider. */
   archived: boolean;
+  /** PR-072 — the repo owner's real avatar URL — the last-resort provider-supplied logo candidate, behind the registry, CoinGecko, and DefiLlama. `null` only if GitHub itself has none on record (effectively never, in practice). */
+  avatarUrl: string | null;
 };
 
 export function mapRepoStats(fullName: string, repo: RawRepo, release: RawRelease | null): RepoStats {
@@ -33,6 +35,7 @@ export function mapRepoStats(fullName: string, repo: RawRepo, release: RawReleas
     createdAt: repo.created_at,
     pushedAt: repo.pushed_at,
     archived: repo.archived,
+    avatarUrl: repo.owner?.avatar_url ?? null,
   };
 }
 

@@ -49,7 +49,7 @@ export function ProjectsDirectory({ title, subtitle, page, state, emptyState }: 
       {page.items.length === 0 ? (
         <DirectoryEmptyState {...emptyState} />
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {page.items.map((project) => (
             <LiveProjectCard key={project.id} project={project} />
           ))}

@@ -18,6 +18,8 @@ export type RawLlamaProtocol = {
   mcap: number | null;
   change_1d: number | null;
   category?: string;
+  /** PR-072 — real per-protocol logo URL, already present on DefiLlama's `/protocols` response; simply never typed/read before. */
+  logo?: string;
 };
 
 export async function fetchHistoricalChainTvl(chain: string): Promise<RawHistoricalTvlPoint[]> {

@@ -7,21 +7,27 @@
  * already established (`components/explorer/filters.ts`).
  */
 
-import { VERIFICATION_STATUSES, type VerificationStatus } from "@/data/projects/enums";
 import { DISCOVERY_STATUSES, type DiscoveryStatus } from "@/lib/discovery/status";
 import { availableFinancialRanges } from "@/lib/projects/financial";
 import { FINANCIAL_METRICS, type FinancialMetric, type FinancialRangeDef, type LiveProject } from "@/lib/projects/types";
 
+/**
+ * PR-071 Round 6 — "Discovery Status" answers exactly one question: where is
+ * this project in Base Radar's own lifecycle (tracked, new, needs review,
+ * recently updated, ...)? `"verified"` is excluded from what's offered here
+ * even though it's a real `DiscoveryStatus` value elsewhere in the pipeline
+ * (`lib/discovery/status.ts`, still used by `isVerified()`/the "Verified
+ * Projects" Smart View) — verification is a trust judgment, not a lifecycle
+ * stage, and exposing it here duplicated the panel's own (now-removed, see
+ * `ProjectsFilterBar.tsx`) Verification section under an identical "Verified"
+ * label with no way for a user to tell the two apart. This is a display-time
+ * filter, not a type change: `DiscoveryStatus` itself is untouched, so every
+ * other consumer of `discoveryStatus === "verified"` keeps working exactly
+ * as before.
+ */
 export function availableDiscoveryStatuses(projects: LiveProject[]): DiscoveryStatus[] {
   const present = new Set(projects.map((project) => project.discoveryStatus).filter((status): status is DiscoveryStatus => status !== null));
-  return DISCOVERY_STATUSES.filter((status) => present.has(status));
-}
-
-export function availableVerificationStatuses(projects: LiveProject[]): VerificationStatus[] {
-  const present = new Set(
-    projects.map((project) => project.verification.status).filter((status): status is VerificationStatus => status !== null)
-  );
-  return VERIFICATION_STATUSES.filter((status) => present.has(status));
+  return DISCOVERY_STATUSES.filter((status) => status !== "verified" && present.has(status));
 }
 
 /**
@@ -31,7 +37,7 @@ export function availableVerificationStatuses(projects: LiveProject[]): Verifica
  * empty array for a metric means "no reliable data for this metric — hide
  * the whole filter" (Task 1); a present metric with only some empty buckets
  * omits just those buckets, the same "never offer a zero-match option" rule
- * this file already applies to Discovery/Verification Status.
+ * this file already applies to Discovery Status.
  */
 export function financialRangeOptions(projects: LiveProject[]): Record<FinancialMetric, FinancialRangeDef[]> {
   return Object.fromEntries(FINANCIAL_METRICS.map((metric) => [metric, availableFinancialRanges(projects, metric)])) as Record<
