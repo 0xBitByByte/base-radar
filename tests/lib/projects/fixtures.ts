@@ -96,6 +96,8 @@ export function intelligence(overrides: Partial<ProjectIntelligence> = {}): Proj
       commitsPrev7d: null,
       commitTrendPct: null,
       avatarUrl: null,
+      stale: false,
+      dataFetchedAt: null,
     },
     chain: {
       chains: ["base"],
@@ -116,6 +118,7 @@ export function intelligence(overrides: Partial<ProjectIntelligence> = {}): Proj
         linkedin: null,
       },
       governanceUrl: null,
+      governanceType: null,
       verificationStatus: "verified",
     },
     health: { score: 50, label: "unknown", factors: [] },
@@ -188,6 +191,7 @@ export function liveProject(overrides: Partial<LiveProject> = {}): LiveProject {
     governance: { configured: false, activeProposalCount: null, totalProposalCount: null },
     contracts: { count: 0, verifiedCount: 0 },
     lastUpdated: "2026-01-01T00:00:00.000Z",
+    registryUpdatedAt: null,
     discoveryMetadata: null,
     ...overrides,
   };

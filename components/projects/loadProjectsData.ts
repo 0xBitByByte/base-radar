@@ -26,6 +26,9 @@ export type ProjectsLeaderboards = {
   topTvl: LiveProject[];
   topVolume: LiveProject[];
   topActivity: LiveProject[];
+  /** PR-074 REVIEW #2 — fallback rankings for the "Top Activity" ("Most Starred") route when GitHub is unavailable and that leaderboard has zero qualifying projects. Always computed (cheap, no extra fetch — same fields the Full Directory's own sort already reads), not only when needed. */
+  topMarketCap: LiveProject[];
+  topMovers: LiveProject[];
 };
 
 export type SmartViewLists = {
@@ -54,7 +57,16 @@ export async function loadProjectsPageData(): Promise<ProjectsPageData> {
   const leaderboards: ProjectsLeaderboards = {
     topTvl: sortLiveProjects(filterLiveProjects(projects, { hasTvl: true }), "tvl", "desc"),
     topVolume: sortLiveProjects(filterLiveProjects(projects, { hasVolume: true }), "volume", "desc"),
-    topActivity: sortLiveProjects(filterLiveProjects(projects, { hasGithub: true }), "activity", "desc"),
+    // PR-074 — was sorted by "activity" (`engineering.commitsLast7d`), a
+    // field this list-wide computation never populates for any project
+    // (commit history is only ever fetched for the single Project Profile
+    // page's extended path) — confirmed live: this leaderboard was
+    // structurally empty for the entire ~1,000-project catalog, not a
+    // filtering bug. Re-ranked by real GitHub stars instead — see
+    // `viewMeta.ts`'s `topActivity` entry for the full explanation.
+    topActivity: sortLiveProjects(filterLiveProjects(projects, { hasGithub: true }), "stars", "desc"),
+    topMarketCap: sortLiveProjects(filterLiveProjects(projects, { hasMarketCap: true }), "marketCap", "desc"),
+    topMovers: sortLiveProjects(filterLiveProjects(projects, { hasChangePct24h: true }), "movers", "desc"),
   };
 
   const smartViewLists: SmartViewLists = {

@@ -168,11 +168,23 @@ export function ContractsList({ contracts, detailsByAddress = {} }: ContractsLis
                       {detail.licenseType && <span className="rounded-md bg-radar-light-border/60 px-1.5 py-0.5 dark:bg-white/5">{detail.licenseType} license</span>}
                       {detail.proxyType && (
                         <span className="rounded-md bg-radar-light-border/60 px-1.5 py-0.5 dark:bg-white/5">
-                          Proxy ({detail.proxyType}){detail.implementationAddress && ` → ${shortenAddress(detail.implementationAddress)}`}
+                          Proxy ({detail.proxyType})
+                          {detail.implementationAddress &&
+                            ` → ${detail.implementationName ?? shortenAddress(detail.implementationAddress)}`}
                         </span>
                       )}
                       {detail.creatorAddress && (
                         <span className="rounded-md bg-radar-light-border/60 px-1.5 py-0.5 dark:bg-white/5">Creator {shortenAddress(detail.creatorAddress)}</span>
+                      )}
+                      {detail.creationTxHash && explorerHref && (
+                        <a
+                          href={`${explorerUrl}/tx/${detail.creationTxHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-md bg-radar-light-border/60 px-1.5 py-0.5 text-radar-light-muted outline-none transition-colors hover:text-radar-light-text focus-visible:text-radar-light-text dark:bg-white/5 dark:text-radar-muted dark:hover:text-radar-white dark:focus-visible:text-radar-white"
+                        >
+                          Creation Tx {shortenAddress(detail.creationTxHash)}
+                        </a>
                       )}
                     </div>
                   )}

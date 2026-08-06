@@ -96,7 +96,19 @@ export function mergeMarket(sources: ProjectSources, genesisDate: string | null 
   ]);
 
   return {
-    available: sources.market.status === "live" && market !== null,
+    // PR-075 FINAL — previously `sources.market.status === "live" && market
+    // !== null`, i.e. derived from CoinGecko's own status alone, while
+    // `priceUsd` below (`priceResolution.value`) can resolve from a
+    // DexScreener fallback even when CoinGecko has nothing. That split
+    // let `available: false` coexist with a real, resolved `priceUsd` in
+    // the exact same object — a real, deterministic (not timing-dependent)
+    // bug, confirmed live: Aave's hero showed "No Live Market" directly
+    // beside a real price. Every consumer of `market.available` (the
+    // header badge, Token & Price's whole-section empty state, Quick
+    // Stats, key signals, the scorecard, watchlist rows, project
+    // filtering) treats it as "is there a real price to show" — so it has
+    // to agree with the one field, `priceUsd`, that actually answers that.
+    available: priceResolution.value !== null,
     imageUrl: market?.imageUrl ?? null,
     symbol: market?.symbol ?? null,
     priceUsd: priceResolution.value,
@@ -236,6 +248,8 @@ export function mergeGithub(sources: ProjectSources, commitActivity: CommitActiv
     commitsPrev7d: commitActivity?.commitsPrev7d ?? null,
     commitTrendPct: commitActivity?.trendPct ?? null,
     avatarUrl: repo?.avatarUrl ?? null,
+    stale: sources.github.stale ?? false,
+    dataFetchedAt: repo !== null ? sources.github.fetchedAt : null,
   };
 }
 
@@ -268,6 +282,7 @@ export function mergeCommunity(project: Project): Community {
       linkedin: project.social.linkedin ?? null,
     },
     governanceUrl: project.governance?.governanceUrl ?? null,
+    governanceType: project.governance?.governanceType ?? null,
     verificationStatus: project.verification.status,
   };
 }

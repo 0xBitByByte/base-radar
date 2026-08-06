@@ -33,7 +33,7 @@ export function CopyButton({ value, label = "address", className }: CopyButtonPr
       onClick={handleCopy}
       aria-label={copied ? `Copied ${label}` : `Copy ${label}`}
       className={cn(
-        "shrink-0 text-radar-light-muted/70 outline-none transition-colors hover:text-radar-light-muted focus-visible:text-radar-light-muted dark:text-radar-muted/60 dark:hover:text-radar-muted dark:focus-visible:text-radar-muted",
+        "shrink-0 cursor-pointer text-radar-light-muted/70 outline-none transition-colors hover:text-radar-light-muted focus-visible:text-radar-light-muted dark:text-radar-muted/60 dark:hover:text-radar-muted dark:focus-visible:text-radar-muted",
         className
       )}
     >

@@ -2,18 +2,19 @@
 
 import { ProfileTokenAndPrice } from "@/components/explorer/ProfileTokenAndPrice";
 import { useLivePrice } from "@/lib/hooks/useLivePrice";
-import type { ChainInfo, Contracts, Identity, Market, Trading, Tvl } from "@/lib/intelligence/types";
+import type { Identity, Market, Trading, Tvl } from "@/lib/intelligence/types";
 import type { SparklinePoint } from "@/lib/data/types";
+import type { ProviderResult } from "@/lib/providers/common/types";
 
 type ProfileTokenAndPriceLiveProps = {
   identity: Identity;
   market: Market;
   trading: Trading;
   tvl: Tvl;
-  contracts: Contracts;
-  chain: ChainInfo;
   priceHistory: SparklinePoint[] | null;
   coingeckoId: string | null;
+  /** PR-079 — passed straight through to `ProfileTokenAndPrice`'s TVL card, unresolved; this wrapper doesn't need to await it, only the live-price polling below is its concern. */
+  tvlHistoryPromise: Promise<ProviderResult<SparklinePoint[]> | null>;
 };
 
 const POLL_MS = 90_000;
@@ -39,10 +40,9 @@ export function ProfileTokenAndPriceLive({
   market,
   trading,
   tvl,
-  contracts,
-  chain,
   priceHistory,
   coingeckoId,
+  tvlHistoryPromise,
 }: ProfileTokenAndPriceLiveProps) {
   const { price } = useLivePrice(
     coingeckoId,
@@ -67,7 +67,19 @@ export function ProfileTokenAndPriceLive({
       : undefined
   );
 
-  const liveMarket: Market = price ? { ...market, ...price } : market;
+  // PR-075 FINAL — `LivePrice` (`useLivePrice.ts`) deliberately excludes
+  // `available`: it's not one of CoinGecko's bulk-list fields, it's this
+  // app's own derived fact. Without setting it here, a real, reproducible
+  // contradiction follows whenever the SSR-time fetch failed (`market.
+  // available: false`, `priceUsd: null`) but the client poll then succeeds
+  // (`price` present, real numbers) — this tile renders the live price
+  // fine (it checks `priceUsd`, not `available`), but `liveMarket.available`
+  // stays frozen at `false`, so anything downstream still reading
+  // `available` (this project's own header badge included) keeps calling
+  // it "No Live Market" next to a real, live price. Live price data is
+  // itself proof the market is available, regardless of what the earlier
+  // SSR snapshot said.
+  const liveMarket: Market = price ? { ...market, ...price, available: true } : market;
 
   return (
     <ProfileTokenAndPrice
@@ -75,10 +87,9 @@ export function ProfileTokenAndPriceLive({
       market={liveMarket}
       trading={trading}
       tvl={tvl}
-      contracts={contracts}
-      chain={chain}
       priceHistory={priceHistory}
       coingeckoId={coingeckoId}
+      tvlHistoryPromise={tvlHistoryPromise}
     />
   );
 }

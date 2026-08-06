@@ -121,16 +121,46 @@ export type RiskAnalysisInput = {
   verificationStatus: string;
   freshness: string;
   hasRecentWhaleActivity: boolean;
-  /** Share (0-100) of this project's registered contracts confirmed verified. `null` when the project has no contracts on record. */
+  /**
+   * Share (0-100) of this project's registered contracts *confirmed*
+   * verified. `null` both when the project has no contracts on record AND
+   * when it has contracts but none were confirmed — see
+   * `hasRegisteredContracts` to tell those two apart. This is deliberately
+   * never a confident "0%": the underlying registry-merge match
+   * (`matchVerifiedContract`, `lib/intelligence/sources.ts`) only checks
+   * whether a contract happens to be Blockscout's single "most-recently-
+   * verified contract on Base" — a near-lottery match that misses real,
+   * verified contracts constantly (confirmed live: a contract shown
+   * "Verified" with real compiler detail elsewhere on the same page still
+   * came back unmatched here). A `true`/matched contract is a real, trusted
+   * positive; an unmatched one tells us nothing, so it must not be
+   * presented as a measured "X% verified."
+   */
   verifiedContractPct: number | null;
+  /** Whether this project has any registered contracts at all — lets `verifiedContractPct === null` read "no contracts" vs. "contracts exist, verification just isn't confirmable this way" instead of conflating the two. */
+  hasRegisteredContracts: boolean;
   /** Real DexScreener-aggregated liquidity in USD. `null` when no trading data is available. */
   liquidityUsd: number | null;
   /** Real 7-day TVL change, derived from DefiLlama's per-protocol history. `null` when unavailable or the project has no TVL. */
   tvlChangePct7d: number | null;
   /** Real weekly commit count from GitHub. `null` when unavailable. */
   githubCommitsLast7d: number | null;
+  /**
+   * PR-074 REVIEW #10 — real, always-available fallback evidence for
+   * "Developer Health" when `githubCommitsLast7d` is `null` (this
+   * codebase's fast/batch path never populates it, and GitHub's shared
+   * rate limit can additionally block the extended commit-activity call).
+   * All three come from the same single `fetchRepo()` response that
+   * determines `githubAvailable` — zero extra GitHub calls.
+   */
+  githubAvailable: boolean;
+  githubStars: number | null;
+  githubPushedAt: string | null;
+  githubLatestReleasePublishedAt: string | null;
   /** Count of currently-active Snapshot proposals. `null` when this project has no governance configured (never fabricated as zero). */
   governanceActiveCount: number | null;
+  /** PR-075 — `"on-chain"`/`"forum"`/`"none"` mean `governanceActiveCount === null` is a real, confirmed governance mechanism, not a registry gap. See `data/projects/types.ts`'s `ProjectGovernance.governanceType`. */
+  governanceType: "snapshot" | "on-chain" | "forum" | "none" | null;
 };
 
 export type RiskAnalysisOutput = {

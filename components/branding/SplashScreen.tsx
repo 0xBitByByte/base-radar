@@ -18,12 +18,42 @@ const FADE_MS = 400;
  */
 const RAMP_CEILING = 92;
 /**
- * Absolute worst-case hold, only reached if `load` genuinely never fires
- * (a stalled/broken resource) — this is the one hard stop that guarantees
- * the splash can never loop or hang forever, not a disguised fixed timer:
- * under normal operation the real `load` event always wins well before this.
+ * PR-074 REVIEW #2 — absolute last-resort hold, only reached if the page
+ * genuinely never finishes streaming (a hung provider call that neither
+ * resolves nor rejects — a real, confirmed possibility in this app; see
+ * the Sources panel's per-provider retry/timeout diagnostics). This is NOT
+ * the readiness signal anymore (see `isPageReady()` below) — it's the one
+ * hard stop that guarantees the splash can never hang forever if the real
+ * signal never fires. Previously this constant WAS the de facto readiness
+ * signal (tied only to `window.load`, which fires on initial script/style/
+ * image resources — not on whether streamed Suspense content has actually
+ * arrived), and a live production timing measurement (7.78s for a
+ * data-rich project) confirmed it was dangerously close to firing before
+ * the page was genuinely ready. Kept generous now that it's purely a
+ * safety net, not a timer being raced against real content.
  */
-const MAX_WAIT_MS = 8000;
+const MAX_WAIT_MS = 20_000;
+
+/**
+ * PR-074 REVIEW #2 — the real "is the page actually ready" signal,
+ * replacing a bare `window.load` check. `window.load` only reflects the
+ * initial document's own referenced resources (scripts/styles/images) —
+ * it says nothing about whether this page's `<Suspense>`-streamed sections
+ * (GitHub commits, TVL history, contributor counts, etc. — see
+ * `app/dashboard/projects/[slug]/page.tsx`'s fast-path/extended-path split)
+ * have actually resolved. Every Suspense fallback that renders a generic
+ * "still loading" placeholder (`WidgetSkeleton`, `MetricItemSkeleton`, and
+ * the couple of inline equivalents) carries a shared `data-loading-skeleton`
+ * marker; this is genuinely true only once none remain in the live DOM —
+ * i.e. every streamed section has actually swapped in its real content (or
+ * a real, resolved empty/error state, which is a normal component render,
+ * not a "still waiting" placeholder). Checked every animation frame below,
+ * so it reacts within ~16ms of the last skeleton disappearing — no polling
+ * interval to tune, no MutationObserver lifecycle to manage.
+ */
+function isPageReady(): boolean {
+  return document.readyState === "complete" && document.querySelectorAll("[data-loading-skeleton]").length === 0;
+}
 
 const PARTICLES = [
   { top: "32%", left: "28%", size: 3, duration: 6, delay: 0 },
@@ -44,13 +74,20 @@ const PARTICLES = [
  * bar filled on a timer that had no relationship to whether the app was
  * actually ready, while the logo above it never changed at all). `progress`
  * eases toward `RAMP_CEILING` while genuinely waiting — it never reaches
- * 100 on its own — and only snaps to 100 when the real browser `load` event
- * fires (every critical resource for the initial paint has actually
- * arrived). `MAX_WAIT_MS` is a hard ceiling for the pathological case where
- * `load` never fires at all (a stalled resource); it never fires under
- * normal operation, so this isn't a disguised fixed timer — the real event
- * is what almost always completes the reveal, and there is no
+ * 100 on its own — and only snaps to 100 when `isPageReady()` is genuinely
+ * true (see that function's doc comment) or, failing that, once
+ * `MAX_WAIT_MS` elapses as a last-resort safety net. There is no
  * repeating/looping animation of any kind once `visible` becomes `false`.
+ *
+ * PR-074 REVIEW #2 — previously this snapped to 100 on the browser's
+ * `window.load` event, which only reflects the initial document's own
+ * referenced resources (scripts/styles/images), not whether this page's
+ * `<Suspense>`-streamed sections have actually resolved. A live production
+ * timing measurement (7.78s to fully stream a data-rich project) confirmed
+ * this was a real, reproducible false-completion bug — `load` (and the old,
+ * much shorter `MAX_WAIT_MS`) could both fire before the page was actually
+ * ready. `isPageReady()` fixes this at the root by checking the real DOM
+ * for remaining loading placeholders instead of guessing from a timer.
  *
  * PR-071 Round 3 — Task 10/11: `visible` now flips to `false` in the exact
  * same tick `progress` reaches 100 — no artificial hold in between (the
@@ -118,35 +155,47 @@ export function SplashScreen() {
       });
     }
 
-    if (prefersReducedMotion) {
-      // No sweep to show — jump straight to the finished state and let the one fade-out play.
-      rafId = requestAnimationFrame(completeNow);
-      return () => cancelAnimationFrame(rafId);
-    }
-
     function tick(now: number) {
       const elapsed = now - start;
-      if (elapsed >= MAX_WAIT_MS) {
+      // PR-074 REVIEW #2 — `isPageReady()` (real Suspense-streamed content
+      // readiness) is checked every frame and wins the moment it's true,
+      // even on frame one for an already-warm/cached page. `MAX_WAIT_MS` is
+      // reached only if that never becomes true — the pathological case.
+      if (isPageReady() || elapsed >= MAX_WAIT_MS) {
         completeNow();
         return;
       }
-      // Decaying approach toward the ceiling — fast at first, slower as it
-      // nears `RAMP_CEILING`, so it reads as real progress rather than a
-      // linear bar that could visually "finish" before the page is ready.
-      setProgress((prev) => prev + (RAMP_CEILING - prev) * 0.03);
+      // PR-074 REVIEW #2 — reduced motion skips the visible sweep (no
+      // `setProgress` call, so there's nothing to animate) but still waits
+      // on the same real `isPageReady()` check above before completing —
+      // previously this branch jumped straight to `completeNow()`
+      // unconditionally, which was this exact false-completion bug for
+      // anyone with reduced motion enabled, just with the ramp skipped.
+      if (!prefersReducedMotion) {
+        // Decaying approach toward the ceiling — fast at first, slower as it
+        // nears `RAMP_CEILING`, so it reads as real progress rather than a
+        // linear bar that could visually "finish" before the page is ready.
+        setProgress((prev) => prev + (RAMP_CEILING - prev) * 0.03);
+      }
       rafId = requestAnimationFrame(tick);
     }
 
-    if (document.readyState === "complete") {
-      rafId = requestAnimationFrame(completeNow);
-    } else {
-      rafId = requestAnimationFrame(tick);
-      window.addEventListener("load", completeNow);
-    }
+    rafId = requestAnimationFrame(tick);
+
+    // PR-075 — `requestAnimationFrame` is throttled or fully paused by the
+    // browser for a backgrounded/hidden tab (confirmed live: a tab opened
+    // in the background and never foregrounded can go 30+ real seconds
+    // without a single `tick()` call), which silently defeats the
+    // `MAX_WAIT_MS` guarantee above — `elapsed` only advances when `tick`
+    // actually runs, so a hidden tab's splash can hang indefinitely despite
+    // the doc comment's claim that this can never happen. `setTimeout` is
+    // also throttled in background tabs but, unlike rAF, is never fully
+    // suspended, so it reaches `completeNow()` even when `tick` doesn't.
+    const backstop = setTimeout(completeNow, MAX_WAIT_MS);
 
     return () => {
       cancelAnimationFrame(rafId);
-      window.removeEventListener("load", completeNow);
+      clearTimeout(backstop);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs exactly once per real page load, not on every `prefersReducedMotion` re-evaluation.
   }, []);

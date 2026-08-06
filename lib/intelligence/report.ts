@@ -113,7 +113,7 @@ export type SourceLink = {
 };
 
 /** Which real signal a `DevelopmentEntry` came from — drives the category icon in `ProfileExecutiveIntelligence`. Only the categories this codebase can actually produce today; never a placeholder category with no real candidate behind it. */
-export type DevelopmentCategory = "release" | "governance" | "tvl" | "whale";
+export type DevelopmentCategory = "release" | "governance" | "tvl" | "whale" | "registry" | "discovery";
 
 /** One real, dated development — a release, a governance proposal, a whale transfer, a TVL move. `detail` is always sourced from real data (release notes, proposal description, or a plain factual restatement); never a fabricated summary. */
 export type DevelopmentEntry = {
@@ -203,6 +203,17 @@ export type IntelligenceReportInput = {
    * built for this request — `buildHighlights` simply skips the bullet.
    */
   categoryTvlLeadership?: { rank: number; totalInCategory: number } | null;
+  /**
+   * PR-074 — real registry lifecycle timestamps (`data/projects/types.ts`'s
+   * `ProjectLifecycle`), already computed by `page.tsx` for the Activity
+   * Feed/Timeline but never threaded into this report — so a project with a
+   * genuinely recent registry update or discovery event still showed "No
+   * recent project activity" here. Reused, not recomputed; `undefined`/
+   * `null` simply skips these two candidate types.
+   */
+  registryUpdatedAt?: string | null;
+  discoveredAt?: string | null;
+  discoverySource?: string | null;
 };
 
 function tileExplanation(tile: ScorecardTile, meaning: string): MetricExplanation {
@@ -589,6 +600,39 @@ export function buildIntelligenceReport(input: IntelligenceReportInput): Intelli
       timestamp: Date.now(),
       importance: 3,
     });
+  }
+
+  // PR-074 — Registry Updates & Discovery Events: two more real, dated
+  // signals this report never surfaced, even though `page.tsx` already
+  // computes them for the Timeline. Bounded to the last 30 days so a
+  // long-stable, long-verified project doesn't show a years-old registry
+  // edit as if it were "recent" — the same recency spirit as this section's
+  // other candidates, applied to data this codebase already has.
+  const RECENT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  if (input.registryUpdatedAt) {
+    const timestamp = new Date(input.registryUpdatedAt).getTime();
+    if (Number.isFinite(timestamp) && now - timestamp <= RECENT_WINDOW_MS) {
+      candidates.push({
+        category: "registry",
+        headline: "Registry Updated",
+        detail: "Base Radar's editorial team updated this project's registry entry.",
+        timestamp,
+        importance: 1,
+      });
+    }
+  }
+  if (input.discoveredAt) {
+    const timestamp = new Date(input.discoveredAt).getTime();
+    if (Number.isFinite(timestamp) && now - timestamp <= RECENT_WINDOW_MS) {
+      candidates.push({
+        category: "discovery",
+        headline: "Added to Registry",
+        detail: input.discoverySource ? `Discovered via ${input.discoverySource}.` : "Discovered and added to the Base Radar registry.",
+        timestamp,
+        importance: 1,
+      });
+    }
   }
 
   const recentDevelopments: DevelopmentEntry[] = candidates

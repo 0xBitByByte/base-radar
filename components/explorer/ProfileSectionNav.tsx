@@ -6,20 +6,32 @@ import { useReducedMotion } from "framer-motion";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * PR-073 refinement pass — reordered to match the page's new investor-first
+ * reading order (verdict -> market/on-chain data -> evidence & history), and
+ * "Trust" (`trust-center`) and "Timeline" (`ProfileActivityFeed`, previously
+ * missing its own anchor) added so every real section a reader lands on has
+ * a working nav entry.
+ */
+// PR-079 Phase 6 — order now matches the page's actual zone order (Overview
+// -> Intelligence -> Market -> Trust -> Governance -> Activity -> Sources)
+// so the nav's left-to-right link order lines up with top-to-bottom scroll
+// position. `tvl` removed (absorbed into the `price` card's Overview metric
+// cards, Section 3); `community`/`developer` merged into one `intelligence`
+// id (Section 4's "Project Intelligence").
 const SECTIONS = [
+  { id: "price", label: "Price" },
   { id: "summary", label: "Summary" },
-  { id: "why-it-matters", label: "Why It Matters" },
   { id: "overview", label: "Health & Trust" },
-  { id: "sources", label: "Sources" },
+  { id: "why-it-matters", label: "Why It Matters" },
+  { id: "intelligence", label: "Intelligence" },
+  { id: "contracts", label: "Contracts" },
+  { id: "network", label: "Network" },
+  { id: "trust-center", label: "Trust" },
+  { id: "governance", label: "Governance" },
   { id: "recent-highlights", label: "Highlights" },
   { id: "timeline", label: "Timeline" },
-  { id: "price", label: "Price" },
-  { id: "tvl", label: "TVL" },
-  { id: "network", label: "Network" },
-  { id: "developer", label: "Engineering" },
-  { id: "community", label: "Community" },
-  { id: "contracts", label: "Contracts" },
-  { id: "governance", label: "Governance" },
+  { id: "sources", label: "Sources" },
 ] as const;
 
 /**
@@ -73,7 +85,13 @@ export function ProfileSectionNav() {
   return (
     <nav
       aria-label="Profile sections"
-      className="sticky top-16 z-20 -mx-1 overflow-x-auto rounded-xl border border-radar-light-border bg-radar-light-card/80 px-3 py-2 backdrop-blur-xl dark:border-white/10 dark:bg-radar-bg/60"
+      // PR-080 Task 4 — `mb-3` gives the Overview zone below it real
+      // breathing room from this sticky bar (the uniform `gap-6` the page's
+      // other zone-to-zone transitions use reads fine there, but felt like a
+      // collision directly under this bar's own border/backdrop-blur
+      // weight). Scoped to this one gap only — every other zone spacing in
+      // `page.tsx` is unaffected.
+      className="sticky top-16 z-20 mb-3 -mx-1 overflow-x-auto rounded-xl border border-radar-light-border bg-radar-light-card/80 px-3 py-2 backdrop-blur-xl dark:border-white/10 dark:bg-radar-bg/60"
     >
       <ul className="flex min-w-max gap-1.5">
         {SECTIONS.map((section) => {

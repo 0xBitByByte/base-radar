@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 
 import { getProject } from "@/data/projects/helpers";
+import { CATEGORY_BRANDING } from "@/lib/branding/categories";
 import { SITE, SITE_TWITTER_HANDLE } from "@/constants/site";
 import { getProjectAIIntelligence, getRawWhaleEvents, getSignals } from "@/lib/data/aggregate";
 import { buildProjectIntelligence } from "@/lib/intelligence/engine";
 import { buildIntelligenceReport } from "@/lib/intelligence/report";
 import { buildHealthScorecard } from "@/lib/intelligence/scorecard";
+import { normalizeName } from "@/lib/intelligence/helpers";
 import { toLatestProjectHighlight, toRelatedProjectHighlights } from "@/lib/ai-intelligence/project-adapter";
 import { filterLiveProjects } from "@/lib/projects/filter";
 import { getLiveProjects } from "@/lib/projects/service";
@@ -20,6 +23,8 @@ import { ProfileActivityFeed } from "@/components/explorer/ProfileActivityFeed";
 import { ProfileBreadcrumb } from "@/components/explorer/ProfileBreadcrumb";
 import { ProfileCommunityMetrics } from "@/components/explorer/ProfileCommunityMetrics";
 import { ProfileHeader } from "@/components/explorer/ProfileHeader";
+import { ProfileKeySignals } from "@/components/explorer/ProfileKeySignals";
+import { ProfileQuickActions } from "@/components/explorer/ProfileQuickActions";
 import { ProfileTokenAndPriceLive } from "@/components/explorer/ProfileTokenAndPriceLive";
 import { ProfileMetrics } from "@/components/explorer/ProfileMetrics";
 import { ProfileExecutiveIntelligence } from "@/components/explorer/ProfileExecutiveIntelligence";
@@ -27,7 +32,6 @@ import { ProfileIntelligence } from "@/components/explorer/ProfileIntelligence";
 import { ProfileIntelligencePanel } from "@/components/explorer/ProfileIntelligencePanel";
 import { ProfileContracts } from "@/components/explorer/ProfileContracts";
 import { ProfileGovernance } from "@/components/explorer/ProfileGovernance";
-import { ProfileQuickStats } from "@/components/explorer/ProfileQuickStats";
 import { ProfileRecentHighlights } from "@/components/explorer/ProfileRecentHighlights";
 import { ProfileRelatedIntelligence } from "@/components/explorer/ProfileRelatedIntelligence";
 import { ProfileRelatedProjects } from "@/components/explorer/ProfileRelatedProjects";
@@ -42,6 +46,28 @@ import type { SparklinePoint } from "@/lib/data/types";
 type ProjectProfilePageProps = {
   params: Promise<{ slug: string }>;
 };
+
+/**
+ * PR-073 refinement pass — a plain, page-local zone divider (no new
+ * component, no new architecture) grouping the report's ~19 sections into
+ * four readable zones matching an investor's actual reading order: the
+ * verdict first, then the underlying market/on-chain data, then supporting
+ * evidence and history, then related projects. Purely presentational —
+ * every section beneath it still receives the exact same props it always
+ * did.
+ */
+function ZoneHeading({ children }: { children: ReactNode }) {
+  return (
+    <p className="mt-2 px-1 text-[11px] font-semibold tracking-widest text-radar-light-muted/70 uppercase dark:text-radar-muted/60">
+      {children}
+    </p>
+  );
+}
+
+/** PR-083 — `Date.now()` extracted into this standalone helper rather than called inline in the page component's own body, same pattern `ProfileTimeline.tsx`'s `splitByRecency` already uses (the purity lint rule flags an impure call written directly inside a component's render body, not one inside a called helper). */
+function isWithinLast30Days(iso: string): boolean {
+  return Date.now() - new Date(iso).getTime() <= 30 * 24 * 60 * 60 * 1000;
+}
 
 /**
  * Per-project title/description/OG/canonical — `getProject` is a cheap,
@@ -129,6 +155,37 @@ export async function generateMetadata({ params }: ProjectProfilePageProps): Pro
  * changed — every section below still receives the exact same `profile.*`
  * fields it always did.
  */
+/**
+ * UX polish pass — FUTURE ARCHITECTURE NOTE, documentation only, nothing
+ * below is implemented by this PR. A future "Community Confidence System"
+ * PR would add a wallet-driven trust signal alongside this page's existing,
+ * purely registry/provider-derived Health/Confidence/Risk scores:
+ *
+ * - Wallet-based Likes/Stars — a connected wallet can like/star a project.
+ * - Community Confidence Score — an aggregate derived from like/star volume,
+ *   distinct from (never blended into) the existing intelligence-engine
+ *   Confidence score, so a provider-data signal and a crowd signal stay
+ *   clearly separate and neither silently distorts the other.
+ * - Verified Wallet Reputation — reputation levels (Genesis / Bronze /
+ *   Silver / Gold / Diamond) built from real on-chain wallet history, so a
+ *   single fresh wallet can't outweigh an established one.
+ * - One Wallet = One Vote, with gas-protected voting (no on-chain tx cost to
+ *   the voter) and an optional fully on-chain vote path for users who want
+ *   an immutable record.
+ * - Community Leaderboards — Most Trusted / Fastest Growing / Most
+ *   Supported / Most Controversial, plus a Confidence Trend over time and a
+ *   Verified Wallet Count per project.
+ * - Share/PDF export integration — the header's `Share` button (see
+ *   `ProfileQuickActions.tsx`) is already positioned as this feature's
+ *   future trigger; `profile`/`intelligenceReport`/`scorecardTiles` below
+ *   are already plain, fully-serializable objects a future exporter could
+ *   consume directly, no new data plumbing needed.
+ *
+ * This would need real new infrastructure this PR does not add: wallet auth,
+ * a votes/likes datastore, and new UI surfaces (leaderboards, reputation
+ * badges) — out of scope here by design; documented so the next PR has a
+ * concrete starting point instead of re-deriving it from scratch.
+ */
 export default async function ProjectProfilePage({ params }: ProjectProfilePageProps) {
   const { slug } = await params;
 
@@ -181,6 +238,17 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
   const allWhaleEvents = whaleRes.status === "fulfilled" ? whaleRes.value : [];
   const whaleEvents = allWhaleEvents.filter((event) => event.projectId === profile.identity.id);
 
+  // PR-083 — Governance Activity tile density: computed here (a Server
+  // Component) rather than inside `ProfileKeySignals` (a Client Component)
+  // since it needs `Date.now()` (via `isWithinLast30Days`). Both are
+  // zero-fetch aggregates over `profile.governance`, already fetched.
+  const governancePassed30d = profile.governance?.filter((event) => event.status === "passed" && isWithinLast30Days(event.end)).length ?? 0;
+  const governanceQuorumTracked = profile.governance?.filter((event) => event.quorumMet !== null) ?? [];
+  const governanceQuorumPct =
+    governanceQuorumTracked.length > 0
+      ? Math.round((governanceQuorumTracked.filter((event) => event.quorumMet).length / governanceQuorumTracked.length) * 100)
+      : null;
+
   const allSignals = signalsRes.status === "fulfilled" ? signalsRes.value : [];
   const signals = allSignals.filter(
     (signal) => signal.project.toLowerCase() === profile.identity.name.toLowerCase()
@@ -225,11 +293,32 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
   // every contract this project has registered (typically 0-3), fetched in
   // parallel, extended/Profile-page-only. Base-chain-only, same as the
   // token-transfer lookup above — Blockscout only indexes Base.
+  //
+  // PR-078 FINAL REVIEW — candidate addresses now mirror `sources.ts`'s
+  // `matchVerifiedContract` exactly: `providerIds.blockscoutAddress` (if
+  // set) is included alongside every registered Base contract, not just
+  // `profile.contracts.items`. Every registry project that currently sets
+  // `blockscoutAddress` happens to duplicate an existing `contracts[]`
+  // entry (confirmed by checking all 12), but the schema and
+  // `matchVerifiedContract` both explicitly support it being a distinct,
+  // extra address — without this, a future project relying on
+  // `blockscoutAddress` alone (no matching `contracts[]` entry) would read
+  // "Registry Missing" on Evidence & Sources while the fast path correctly
+  // attempted a real check, a real inconsistency this fixes before it can
+  // ever actually occur.
+  const blockscoutCandidateAddresses = [
+    ...(registryProject.providerIds.blockscoutAddress ? [registryProject.providerIds.blockscoutAddress] : []),
+    ...profile.contracts.items.filter((item) => item.chain === "base").map((item) => item.address),
+  ].filter((address, index, all) => all.findIndex((other) => normalizeName(other) === normalizeName(address)) === index);
+
   const contractDetailsPromise = Promise.all(
-    profile.contracts.items
-      .filter((item) => item.chain === "base")
-      .map((item) => blockscout.getContractDetail(item.address).then((result) => ({ address: item.address, result })))
+    blockscoutCandidateAddresses.map((address) => blockscout.getContractDetail(address).then((result) => ({ address, result })))
   );
+
+  // PR-078 §5 — real Base-chain-wide gas trend + network utilization,
+  // extended/Profile-page-only (never part of the batch Explorer/Dashboard
+  // path) — see `ProfileNetworkChainStatsAsync`.
+  const chainStatsPromise = blockscout.getChainStats();
 
   const priceHistory: SparklinePoint[] | null =
     profile.market.sparkline7d.length > 0
@@ -275,6 +364,13 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
   // can't be a "leader" by TVL); any failure to load the comparison set
   // degrades to `null`, never blocking the page or fabricating a rank.
   let categoryTvlLeadership: { rank: number; totalInCategory: number } | null = null;
+  // PR-083 — Category Rank card density: two more real ranks, reusing the
+  // exact same already-fetched `liveProjects`/`categoryPeers` this block
+  // already builds for `categoryTvlLeadership` — just re-sorting the same
+  // in-memory arrays by a different `SortField`, never a second fetch or a
+  // second ranking implementation.
+  let categoryMarketCapLeadership: { rank: number; totalInCategory: number } | null = null;
+  let baseEcosystemTvlLeadership: { rank: number; totalInCategory: number } | null = null;
   const primaryCategory = profile.identity.categories[0];
   if (primaryCategory && profile.tvl.available && profile.tvl.tvlUsd !== null) {
     try {
@@ -288,8 +384,27 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
       if (rankIndex !== -1) {
         categoryTvlLeadership = { rank: rankIndex + 1, totalInCategory: categoryPeers.length };
       }
+
+      // Only claim a market-cap rank when this project itself has a real
+      // market cap — same "never rank leadership you can't verify" guard the
+      // TVL rank above already applies to itself.
+      if (profile.market.available && profile.market.marketCapUsd !== null) {
+        const categoryPeersByMarketCap = sortLiveProjects(categoryPeers, "marketCap", "desc");
+        const marketCapRankIndex = categoryPeersByMarketCap.findIndex((project) => project.id === registryProject.id);
+        if (marketCapRankIndex !== -1) {
+          categoryMarketCapLeadership = { rank: marketCapRankIndex + 1, totalInCategory: categoryPeersByMarketCap.length };
+        }
+      }
+
+      const ecosystemPeers = sortLiveProjects(filterLiveProjects(liveProjects, { hasTvl: true }), "tvl", "desc");
+      const ecosystemRankIndex = ecosystemPeers.findIndex((project) => project.id === registryProject.id);
+      if (ecosystemRankIndex !== -1) {
+        baseEcosystemTvlLeadership = { rank: ecosystemRankIndex + 1, totalInCategory: ecosystemPeers.length };
+      }
     } catch {
       categoryTvlLeadership = null;
+      categoryMarketCapLeadership = null;
+      baseEcosystemTvlLeadership = null;
     }
   }
 
@@ -309,6 +424,7 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
     trading: profile.trading,
     github: profile.github,
     governance: profile.governance,
+    governanceType: profile.community.governanceType,
     whaleEvents,
     narrativeLabel,
     communityLinkCount,
@@ -336,11 +452,20 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
     contracts: profile.contracts,
     community: profile.community,
     categoryTvlLeadership,
+    registryUpdatedAt,
+    discoveredAt,
+    discoverySource,
   });
+
+  const categoryLabel = primaryCategory ? CATEGORY_BRANDING[primaryCategory].label : null;
 
   return (
     <div className="flex flex-col gap-6">
-      <ProfileBreadcrumb projectName={profile.identity.name} />
+      {/* UX polish pass, Section 7 — "Back to Projects" (inside `ProfileBreadcrumb`) stays left-aligned; Watchlist/Alert/Share/Compare move to the same row's right edge, directly above the header card — a single left/right toolbar row instead of two stacked full-width blocks. */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <ProfileBreadcrumb projectName={profile.identity.name} />
+        <ProfileQuickActions projectId={registryProject.id} projectName={profile.identity.name} />
+      </div>
 
       <ProfileHeader
         identity={profile.identity}
@@ -350,52 +475,83 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
         github={profile.github}
         market={market}
         tvl={profile.tvl}
+        trading={profile.trading}
         health={profile.health}
         confidence={profile.confidence}
         risk={profile.risk}
         coingeckoId={registryProject.providerIds.coingeckoId ?? null}
         defillamaSlug={registryProject.providerIds.defillamaSlug ?? null}
         categoryTvlLeadership={categoryTvlLeadership}
+        contractDetailsPromise={contractDetailsPromise}
+        priceHistory={priceHistory}
       />
 
       <ProfileRelatedIntelligence projectId={registryProject.id} />
 
-      <ProfileQuickStats market={profile.market} tvl={profile.tvl} trading={profile.trading} />
+      {/* UX polish pass, Sections 15/18 — the old standalone `ProfileQuickStats` section (Price/Market Cap/TVL as large "emphasized" cards, Liquidity/Volume/FDV below) duplicated the same six numbers as full-size cards, once more here and again in the Overview zone's `ExpandableMetricCard`s below. Replaced by the header's compact stat-chip row (Section 15) — the Overview zone remains the one place with the full-detail cards. */}
+
+      {/* PR-073 refinement pass — a concise, four-tile "Key Signals" strip: real signals (category rank, 7d momentum, governance activity, whale activity) that today only exist buried deep in the page or hidden entirely unless this project happens to be a category #1. Same data, surfaced as a glance instead of only in long-form prose or after several more scrolls. */}
+      <ProfileKeySignals
+        market={market}
+        categoryLabel={categoryLabel}
+        categoryTvlLeadership={categoryTvlLeadership}
+        categoryMarketCapLeadership={categoryMarketCapLeadership}
+        baseEcosystemTvlLeadership={baseEcosystemTvlLeadership}
+        governance={profile.governance}
+        governanceType={profile.community.governanceType}
+        governancePassed30d={governancePassed30d}
+        governanceQuorumPct={governanceQuorumPct}
+        whaleEvents={whaleEvents}
+      />
 
       <ProfileSectionNav />
 
       {/*
-        PR-050 follow-up — the page now reads as one intelligence-report
-        narrative (Header → Project Summary → Why It Matters → Health &
-        Trust → Evidence & Sources → Recent Highlights → Timeline → Token
-        & Price → Metrics → Community → AI Intelligence → Contracts →
-        Governance) instead of PR13.3's "widget grid" ordering. Every
-        section still receives the exact same `profile.*`/`intelligenceReport`
-        fields it always did — this is a render-order change only, no new
-        provider call, no new calculation.
+        PR-079 Phase 6 — regrouped into the spec's named zones (Overview →
+        Intelligence → Market → Trust → Governance → Activity → Sources,
+        Timeline lives inside Activity's `ProfileActivityFeed`/
+        `ProfileTimeline`). Every section still receives the exact same
+        `profile.*`/`intelligenceReport` fields it always did — this is a
+        render-order change only, no new provider call, no new calculation.
+        Quick Stats/Key Signals stay above this nav (they're the page's
+        always-visible glance strip, not scoped to one zone); the Overview
+        zone below is the Token & Price metric cards.
       */}
-      <ProfileSummary thesis={intelligenceReport.thesis} />
+      <ZoneHeading>Overview</ZoneHeading>
 
-      <ProfileWhyItMatters highlights={intelligenceReport.highlights} />
-
-      <ProfileTrustCenter
-        verificationStatus={profile.community.verificationStatus}
-        confidence={profile.confidence}
-        contracts={profile.contracts}
-        sources={profile.sources}
-        github={profile.github}
-        githubConfigured={githubConfigured}
-        websiteUrl={profile.identity.websiteUrl}
-        docsUrl={profile.community.socials.docs ?? null}
-        communityLinkCount={communityLinkCount}
-        communityLinkTotal={communityLinkTotal}
+      <ProfileTokenAndPriceLive
+        identity={profile.identity}
+        market={market}
+        trading={profile.trading}
+        tvl={profile.tvl}
+        priceHistory={priceHistory}
+        coingeckoId={registryProject.providerIds.coingeckoId ?? null}
+        tvlHistoryPromise={tvlHistoryPromise}
       />
+
+      <ZoneHeading>Intelligence</ZoneHeading>
+
+      <ProfileSummary thesis={intelligenceReport.thesis} />
 
       <ProfileExecutiveIntelligence
         report={intelligenceReport}
         freshness={profile.freshness}
         sources={profile.sources}
         verificationStatus={profile.community.verificationStatus}
+      />
+
+      <ProfileWhyItMatters highlights={intelligenceReport.highlights} />
+
+      <ProfileCommunityMetrics
+        github={profile.github}
+        community={profile.community}
+        contributorCountPromise={contributorCountPromise}
+        commitActivityPromise={commitActivityPromise}
+        githubRepo={registryProject.github ?? null}
+        githubConfigured={githubConfigured}
+        sources={profile.sources}
+        communityLinkCount={communityLinkCount}
+        communityLinkTotal={communityLinkTotal}
       />
 
       <ProjectHealthScorecard
@@ -410,7 +566,67 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
         lastUpdated={profile.freshness.newestSourceAt}
       />
 
-      <ProfileSources sources={profile.sources} thingsWeCouldntVerify={intelligenceReport.thingsWeCouldntVerify} />
+      <ProfileIntelligence narrative={profile.narrative} risk={profile.risk} health={profile.health} confidence={profile.confidence} />
+
+      {aiIntelligence && (
+        <ProfileIntelligencePanel
+          registry={aiIntelligence.registry}
+          latest={latestIntelligence}
+          related={relatedIntelligence}
+          evidenceSummary={aiIntelligence.evidenceSummary}
+          sources={aiIntelligence.sources}
+        />
+      )}
+
+      {/* PR-079 Section 14 — this "Market" zone groups Contracts/Network
+          together deliberately; a future Token Pairs section (PR-080) slots
+          in here between the Overview cards above and Contracts below
+          without another page reorder. No Pairs UI is added in this PR. */}
+      <ZoneHeading>Market</ZoneHeading>
+
+      <ProfileContracts contracts={profile.contracts} chain={profile.chain} contractDetailsPromise={contractDetailsPromise} />
+
+      <ProfileMetrics
+        identity={profile.identity}
+        contracts={profile.contracts}
+        chain={profile.chain}
+        transfersPromise={transfersPromise}
+        tokenSymbol={profile.market.symbol}
+        finality={finality}
+        contractDetailsPromise={contractDetailsPromise}
+        chainStatsPromise={chainStatsPromise}
+      />
+
+      <ZoneHeading>Trust</ZoneHeading>
+
+      <ProfileTrustCenter
+        verificationStatus={profile.community.verificationStatus}
+        confidence={profile.confidence}
+        contracts={profile.contracts}
+        sources={profile.sources}
+        github={profile.github}
+        githubConfigured={githubConfigured}
+        websiteUrl={profile.identity.websiteUrl}
+        docsUrl={profile.community.socials.docs ?? null}
+        communityLinkCount={communityLinkCount}
+        communityLinkTotal={communityLinkTotal}
+        contractDetailsPromise={contractDetailsPromise}
+      />
+
+      <ZoneHeading>Governance</ZoneHeading>
+
+      <ProfileGovernance
+        governance={profile.governance}
+        governanceUrl={profile.community.governanceUrl}
+        governanceType={profile.community.governanceType}
+      />
+
+      {/* PR-079 Section 6 — Recent Highlights docked immediately above
+          Activity Feed/Timeline (previously floated alone between Sources
+          and Activity Feed) since its categories (release/governance/whale/
+          tvl/registry/discovery) directly overlap what Activity/Timeline
+          already show in full below it. */}
+      <ZoneHeading>Activity</ZoneHeading>
 
       <ProfileRecentHighlights entries={intelligenceReport.recentDevelopments} />
 
@@ -431,58 +647,19 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
         discoverySource={discoverySource}
       />
 
-      <ProfileTokenAndPriceLive
-        identity={profile.identity}
-        market={market}
-        trading={profile.trading}
-        tvl={profile.tvl}
-        contracts={profile.contracts}
-        chain={profile.chain}
-        priceHistory={priceHistory}
-        coingeckoId={registryProject.providerIds.coingeckoId ?? null}
+      <ZoneHeading>Sources</ZoneHeading>
+
+      <ProfileSources
+        sources={profile.sources}
+        thingsWeCouldntVerify={intelligenceReport.thingsWeCouldntVerify}
+        contractDetailsPromise={contractDetailsPromise}
       />
-
-      <ProfileMetrics
-        identity={profile.identity}
-        trading={profile.trading}
-        tvl={profile.tvl}
-        github={profile.github}
-        contracts={profile.contracts}
-        chain={profile.chain}
-        tvlHistoryPromise={tvlHistoryPromise}
-        defillamaSlug={registryProject.providerIds.defillamaSlug ?? null}
-        commitActivityPromise={commitActivityPromise}
-        transfersPromise={transfersPromise}
-        tokenSymbol={profile.market.symbol}
-        finality={finality}
-        githubConfigured={githubConfigured}
-      />
-
-      <ProfileCommunityMetrics
-        github={profile.github}
-        community={profile.community}
-        contributorCountPromise={contributorCountPromise}
-        githubConfigured={githubConfigured}
-      />
-
-      <ProfileIntelligence narrative={profile.narrative} risk={profile.risk} health={profile.health} confidence={profile.confidence} />
-
-      {aiIntelligence && (
-        <ProfileIntelligencePanel
-          registry={aiIntelligence.registry}
-          latest={latestIntelligence}
-          related={relatedIntelligence}
-          evidenceSummary={aiIntelligence.evidenceSummary}
-          sources={aiIntelligence.sources}
-        />
-      )}
-
-      <ProfileContracts contracts={profile.contracts} chain={profile.chain} contractDetailsPromise={contractDetailsPromise} />
-
-      <ProfileGovernance governance={profile.governance} governanceUrl={profile.community.governanceUrl} />
 
       {primaryCategory && (
-        <ProfileRelatedProjects currentProjectId={registryProject.id} category={primaryCategory} tags={profile.identity.tags} />
+        <>
+          <ZoneHeading>Related</ZoneHeading>
+          <ProfileRelatedProjects currentProjectId={registryProject.id} category={primaryCategory} tags={profile.identity.tags} />
+        </>
       )}
     </div>
   );

@@ -171,6 +171,10 @@ export type GithubIntel = {
   commitTrendPct: number | null;
   /** PR-072 — the repo owner's real avatar, the last-resort logo candidate behind the registry, CoinGecko, and DefiLlama. `null` when GitHub isn't available for this project at all. */
   avatarUrl: string | null;
+  /** PR-075 — `true` when the fields above are real but stale (GitHub's live API just failed, usually rate-limited) rather than freshly fetched. */
+  stale: boolean;
+  /** PR-075 — when the data actually came from GitHub, real and honest either way (never "now" for stale data). `null` when `available` is `false`. */
+  dataFetchedAt: string | null;
 };
 
 export type ChainInfo = {
@@ -199,6 +203,8 @@ export type Community = {
   };
   /** Real Snapshot/governance forum URL — `null` when this project has no `governance.governanceUrl` configured (never fabricated). */
   governanceUrl: string | null;
+  /** PR-074/PR-075 — distinguishes a real, confirmed non-Snapshot governance mechanism ("on-chain", "forum", or "none") from simply having no `snapshotSpace` configured yet. `null` when neither is known. */
+  governanceType: "snapshot" | "on-chain" | "forum" | "none" | null;
   /** Mirrors the registry's own editorial trust signal — see docs/PROJECT_REGISTRY.md. */
   verificationStatus: VerificationStatus;
 };
@@ -294,6 +300,8 @@ export type ProviderSlice<T> = {
   fetchedAt: string | null;
   matchQuality: MatchQuality;
   detail: string | null;
+  /** PR-075 — `true` when `data` is real but stale (served from cache after a live refetch failed), mirroring `ProviderSuccess.stale`. `fetchedAt` above stays the real original fetch time either way. */
+  stale?: boolean;
 };
 
 /**

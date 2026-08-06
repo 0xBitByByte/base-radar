@@ -4,10 +4,7 @@ import { use } from "react";
 
 import { ContractsList } from "@/components/explorer/ContractsList";
 import type { Contracts } from "@/lib/intelligence/types";
-import type { ContractDetail } from "@/lib/providers/blockscout/service";
-import type { ProviderResult } from "@/lib/providers/common/types";
-
-type ContractDetailEntry = { address: string; result: ProviderResult<ContractDetail> };
+import { contractDetailsByAddress, type ContractDetailEntry } from "@/lib/providers/blockscout/service";
 
 type ProfileContractDetailsAsyncProps = {
   contracts: Contracts;
@@ -23,9 +20,5 @@ type ProfileContractDetailsAsyncProps = {
  */
 export function ProfileContractDetailsAsync({ contracts, detailsPromise }: ProfileContractDetailsAsyncProps) {
   const entries = use(detailsPromise);
-  const detailsByAddress: Record<string, ContractDetail> = {};
-  for (const entry of entries) {
-    if (entry.result.ok) detailsByAddress[entry.address] = entry.result.data;
-  }
-  return <ContractsList contracts={contracts} detailsByAddress={detailsByAddress} />;
+  return <ContractsList contracts={contracts} detailsByAddress={contractDetailsByAddress(entries)} />;
 }

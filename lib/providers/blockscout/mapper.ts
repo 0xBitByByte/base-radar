@@ -53,6 +53,8 @@ export type TokenTransfer = {
   timestamp: string | null;
   from: string;
   to: string;
+  /** PR-078 §2 — real, already-returned by `/tokens/{address}/transfers` — never a separate lookup. */
+  blockNumber: number;
   /**
    * Decimal-adjusted token amount (raw integer value / 10^decimals). Uses
    * `Number`, not a bignum library — for whale-detection thresholding this
@@ -64,6 +66,15 @@ export type TokenTransfer = {
 
 export type ContractDetail = {
   verified: boolean;
+  /**
+   * PR-078 §1 — whether Blockscout recognizes this address as a contract at
+   * all (from `/addresses/{address}`'s own `is_contract`), independent of
+   * verification. Lets a caller distinguish "real contract, just not
+   * verified" from "this registry address isn't a contract on this chain" —
+   * two genuinely different, real reasons that both used to collapse into
+   * the same generic failure.
+   */
+  isContract: boolean;
   name: string | null;
   compilerVersion: string | null;
   optimizationEnabled: boolean | null;
@@ -77,17 +88,32 @@ export type ContractDetail = {
   creationTxHash: string | null;
 };
 
-/** PR13.7 Goal 10 — combines the two real Blockscout responses this evidence needs (contract-detail + address-info) into one domain model. Owner and creation date/block are deliberately absent — neither is a real field on either endpoint (confirmed via a live test fetch), never fabricated. */
-export function mapContractDetail(contract: RawContractDetail, address: RawAddressInfo): ContractDetail {
-  const implementation = contract.implementations[0] ?? null;
+/**
+ * PR13.7 Goal 10 — combines the two real Blockscout responses this evidence
+ * needs (contract-detail + address-info) into one domain model. Owner and
+ * creation date/block are deliberately absent — neither is a real field on
+ * either endpoint (confirmed via a live test fetch), never fabricated.
+ *
+ * PR-078 §1 — `contract` is now `null` when `/smart-contracts/{address}`
+ * genuinely 404s (confirmed live: this happens both for a plain EOA and for
+ * a real, deployed-but-unverified contract — Blockscout's smart-contracts
+ * index only lists verified ones). `address` (from `/addresses/{address}`,
+ * confirmed live to still answer both cases) is the fallback source of
+ * truth for `verified`/`isContract` in that case — never fabricated, and
+ * never confused with a genuine transport failure (`service.ts` only calls
+ * this with `contract: null` after confirming the failure really was a 404).
+ */
+export function mapContractDetail(contract: RawContractDetail | null, address: RawAddressInfo): ContractDetail {
+  const implementation = contract?.implementations[0] ?? null;
   return {
-    verified: contract.is_verified,
-    name: contract.name,
-    compilerVersion: contract.compiler_version,
-    optimizationEnabled: contract.optimization_enabled,
-    licenseType: contract.license_type && contract.license_type !== "none" ? contract.license_type : null,
-    language: contract.language,
-    proxyType: contract.proxy_type,
+    verified: contract ? contract.is_verified : address.is_verified,
+    isContract: contract !== null ? true : address.is_contract,
+    name: contract?.name ?? null,
+    compilerVersion: contract?.compiler_version ?? null,
+    optimizationEnabled: contract?.optimization_enabled ?? null,
+    licenseType: contract?.license_type && contract.license_type !== "none" ? contract.license_type : null,
+    language: contract?.language ?? null,
+    proxyType: contract?.proxy_type ?? null,
     implementationAddress: implementation?.address_hash ?? null,
     implementationName: implementation?.name ?? null,
     creatorAddress: address.creator_address_hash,
@@ -107,6 +133,7 @@ export function mapTokenTransfers(raw: RawTokenTransfersResponse): TokenTransfer
         timestamp: item.timestamp,
         from: item.from.hash,
         to: item.to.hash,
+        blockNumber: item.block_number,
         amount,
       };
     });

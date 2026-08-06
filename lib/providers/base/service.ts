@@ -3,13 +3,24 @@
 import { fetchChainIdHex, fetchGasPriceHex, fetchLatestBlock, fetchSafeBlock } from "@/lib/providers/base/client";
 import { mapFinality, mapNetworkStatus, type NetworkStatus } from "@/lib/providers/base/mapper";
 import { getOrSet } from "@/lib/providers/common/cache";
-import { assertRateLimit, type RateLimitConfig } from "@/lib/providers/common/rate-limit";
+import { assertRateLimit, getRateLimitStatus as getSharedRateLimitStatus, type RateLimitConfig } from "@/lib/providers/common/rate-limit";
 import type { ProviderResult } from "@/lib/providers/common/types";
 import { toProviderResult } from "@/lib/providers/common/utilities";
 
 const PROVIDER = "base" as const;
 const CACHE_TTL_MS = 20_000; // matches the window documented in docs/API.md — the shortest of any provider
 const RATE_LIMIT: RateLimitConfig = { limit: 30, windowMs: 60_000 };
+
+/**
+ * PR-074 REVIEW #8 — real-time read of this provider's own app-enforced
+ * rate-limit budget (see `common/rate-limit.ts`'s `getRateLimitStatus`),
+ * exposed for the Evidence & Sources panel to report exact remaining/
+ * limit/reset numbers instead of a generic "try again later" — the same
+ * pattern already built for GitHub's response-header-based tracker.
+ */
+export function getRateLimitStatus() {
+  return getSharedRateLimitStatus(PROVIDER, RATE_LIMIT);
+}
 
 export async function getBaseNetworkStatus(): Promise<ProviderResult<NetworkStatus>> {
   return toProviderResult(PROVIDER, () =>

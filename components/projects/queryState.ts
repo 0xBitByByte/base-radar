@@ -110,6 +110,7 @@ const FIELD_LABELS: Record<SortField, string> = {
   updatedDate: "Last Updated",
   stars: "GitHub Stars",
   verifiedDate: "Recently Verified",
+  movers: "Top Movers",
 };
 
 const DATE_FIELDS = new Set<SortField>(["discoveryDate", "updatedDate", "verifiedDate"]);

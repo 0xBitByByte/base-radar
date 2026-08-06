@@ -87,7 +87,21 @@ export type ProjectVerification = {
 export type ProjectGovernance = {
   /** Real, verified Snapshot.org space id, e.g. "aave.eth". */
   snapshotSpace?: string;
-  governanceType?: "snapshot";
+  /**
+   * PR-074 DATA INTEGRITY AUDIT — `"on-chain"` is for a project confirmed to
+   * govern itself via real on-chain voting instead of Snapshot (e.g.
+   * Aerodrome's ve(3,3) voting) — a genuinely different, real reason for no
+   * `snapshotSpace` than "nobody has configured one yet." Never set without
+   * confirming the project's real governance mechanism first.
+   *
+   * PR-075 — `"forum"` covers a project whose real governance process is
+   * discussion/signaling on a forum (no on-chain vote, no Snapshot space).
+   * `"none"` is for a project confirmed to have no governance mechanism at
+   * all (e.g. pure infrastructure with no token/DAO). Like `"on-chain"`,
+   * neither is ever set as a guess — only once the project's real
+   * governance model has actually been confirmed.
+   */
+  governanceType?: "snapshot" | "on-chain" | "forum" | "none";
   governanceUrl?: string;
 };
 

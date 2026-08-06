@@ -10,6 +10,29 @@ type ProfileGovernanceProps = {
   governance: GovernanceEvent[] | null;
   /** This project's real Snapshot space URL, when configured — the "View on Snapshot" source link (PR12.1 Req 7). */
   governanceUrl: string | null;
+  /** PR-074/PR-075 — `"on-chain"`/`"forum"`/`"none"` mean `governance === null` is a real, confirmed fact about how this project actually governs itself, not a registry gap — see `data/projects/types.ts`'s `ProjectGovernance.governanceType`. */
+  governanceType: "snapshot" | "on-chain" | "forum" | "none" | null;
+};
+
+/** One entry per non-Snapshot `governanceType` — keeps the three real, confirmed-mechanism empty states from drifting out of sync with each other. */
+const GOVERNANCE_TYPE_EMPTY_STATE: Record<"on-chain" | "forum" | "none", { title: string; description: string; badge: string }> = {
+  "on-chain": {
+    title: "Governance uses on-chain voting",
+    description:
+      "This project doesn't use Snapshot for governance — real decisions are made through on-chain voting instead, which Base Radar doesn't currently track. This isn't a missing registry entry; it's how this project actually governs itself.",
+    badge: "Governance Uses On-chain Voting",
+  },
+  forum: {
+    title: "Governance uses forum discussion",
+    description:
+      "This project doesn't use Snapshot for governance — real decisions are made through forum discussion and signaling instead, which Base Radar doesn't currently track. This isn't a missing registry entry; it's how this project actually governs itself.",
+    badge: "Governance Uses Forum Discussion",
+  },
+  none: {
+    title: "No governance mechanism",
+    description: "This project is confirmed to have no governance mechanism — no token vote, on-chain process, or forum. There is nothing for this section to track.",
+    badge: "No Governance",
+  },
 };
 
 /**
@@ -23,7 +46,7 @@ type ProfileGovernanceProps = {
  * all, vs. configured but currently zero live proposals) get distinct
  * `EmptyState`s so a reader never has to guess which one applies.
  */
-export function ProfileGovernance({ governance, governanceUrl }: ProfileGovernanceProps) {
+export function ProfileGovernance({ governance, governanceUrl, governanceType }: ProfileGovernanceProps) {
   return (
     <ProfileSectionCard
       id="governance"
@@ -32,17 +55,31 @@ export function ProfileGovernance({ governance, governanceUrl }: ProfileGovernan
       sourceLink={governanceUrl ? { href: governanceUrl, label: "Snapshot" } : undefined}
     >
       {governance === null ? (
-        <EmptyState
-          icon={Landmark}
-          title="No governance proposals detected"
-          description="No Snapshot space is configured for this project in the Base Radar registry. Checked just now — this section will populate automatically once one is added."
-          className="bg-radar-light-surface/60 dark:bg-white/[0.02]"
-          action={
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-radar-light-border bg-radar-light-card px-2.5 py-1 text-[11px] font-medium text-radar-light-muted dark:border-white/10 dark:bg-white/[0.04] dark:text-radar-muted">
-              Registry Status: Not Configured
-            </span>
-          }
-        />
+        governanceType === "on-chain" || governanceType === "forum" || governanceType === "none" ? (
+          <EmptyState
+            icon={Landmark}
+            title={GOVERNANCE_TYPE_EMPTY_STATE[governanceType].title}
+            description={GOVERNANCE_TYPE_EMPTY_STATE[governanceType].description}
+            className="bg-radar-light-surface/60 dark:bg-white/[0.02]"
+            action={
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-radar-light-border bg-radar-light-card px-2.5 py-1 text-[11px] font-medium text-radar-light-muted dark:border-white/10 dark:bg-white/[0.04] dark:text-radar-muted">
+                {GOVERNANCE_TYPE_EMPTY_STATE[governanceType].badge}
+              </span>
+            }
+          />
+        ) : (
+          <EmptyState
+            icon={Landmark}
+            title="No governance proposals detected"
+            description="No Snapshot space is configured for this project in the Base Radar registry. Checked just now — this section will populate automatically once one is added."
+            className="bg-radar-light-surface/60 dark:bg-white/[0.02]"
+            action={
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-radar-light-border bg-radar-light-card px-2.5 py-1 text-[11px] font-medium text-radar-light-muted dark:border-white/10 dark:bg-white/[0.04] dark:text-radar-muted">
+                Registry Missing
+              </span>
+            }
+          />
+        )
       ) : governance.length === 0 ? (
         <EmptyState
           icon={Landmark}

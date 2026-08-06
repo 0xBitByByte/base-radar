@@ -37,6 +37,8 @@ export type SourceAttribution = {
   fetchedAt: string | null;
   /** Why the status is what it is, e.g. "No coingeckoId configured" or a real provider error message. */
   detail: string | null;
+  /** PR-075 — `true` when `status: "live"` is real but stale (served from cache after a live refetch failed), mirroring `ProviderSlice.stale`. */
+  stale?: boolean;
 };
 
 export type MetricConfidence = "high" | "medium" | "low";

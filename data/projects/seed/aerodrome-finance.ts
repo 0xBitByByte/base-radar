@@ -35,7 +35,11 @@ export const aerodromeFinance: Project = {
   providerIds: {
     coingeckoId: "aerodrome-finance",
     dexscreenerChainId: "base",
-    defillamaSlug: "aerodrome-finance",
+    // PR-074 FINAL REVIEW — was "aerodrome-finance", a guess that doesn't
+    // exist on DefiLlama (confirmed via a live `api.llama.fi/protocol/`
+    // lookup) and silently produced "TVL Not Tracked" for one of Base's
+    // largest DEXs. DefiLlama's real protocol slug is "aerodrome".
+    defillamaSlug: "aerodrome",
     // PR-051 — verified via CoinGecko's own "Contract" panel / Basescan link.
     blockscoutAddress: "0x940181a94a35a4569e4529a3cdfb74e38fd98631",
   },
@@ -46,4 +50,13 @@ export const aerodromeFinance: Project = {
   // guessed. See docs/PROVIDER_DATA_COVERAGE_AUDIT.md's Recommended
   // Provider Priority (on-chain Governor as a real, future second
   // candidate) for the correct future fix, not a fabricated Snapshot space.
+  //
+  // PR-074 DATA INTEGRITY AUDIT — `governanceType: "on-chain"` records that
+  // real, confirmed reason structurally, so the Governance section and
+  // Evidence & Sources panel can say "Governance Uses On-chain Voting"
+  // instead of the generic "not configured" wording that reads as a
+  // registry gap rather than a deliberate, real fact about this project.
+  governance: {
+    governanceType: "on-chain",
+  },
 };

@@ -183,7 +183,23 @@ function buildRiskContributors(input: RiskAnalysisInput): RiskContributor[] {
   const contributors: RiskContributor[] = [];
 
   if (input.verifiedContractPct === null) {
-    contributors.push({ label: "Smart Contract Risk", detail: "No contracts registered for this project yet.", severity: "unknown" });
+    // PR-074 REVIEW #6 — `verifiedContractPct` is `null` in two genuinely
+    // different situations that read very differently to a user: no
+    // contracts registered at all, vs. contracts registered but this
+    // engine's fast-path verification check (a near-lottery match against
+    // Blockscout's single most-recently-verified contract on Base) couldn't
+    // confirm either way. Confirmed live: presenting the second case as "No
+    // contracts registered" would have been just as dishonest as the old
+    // "Only 0% verified" — the project has real, listed contracts, one of
+    // which was independently confirmed Verified elsewhere on this same
+    // page (Contracts section, Trust Center).
+    contributors.push({
+      label: "Smart Contract Risk",
+      detail: input.hasRegisteredContracts
+        ? "Verification status couldn't be confirmed for this project's contracts through this check — see the Contracts section below for real per-contract verification detail."
+        : "No contracts registered for this project yet.",
+      severity: "unknown",
+    });
   } else if (input.verifiedContractPct >= 100) {
     contributors.push({ label: "Smart Contract Risk", detail: "All registered contracts are verified on-chain.", severity: "low" });
   } else if (input.verifiedContractPct >= 50) {
@@ -226,18 +242,58 @@ function buildRiskContributors(input: RiskAnalysisInput): RiskContributor[] {
     contributors.push({ label: "TVL Stability", detail: `TVL has swung ${input.tvlChangePct7d >= 0 ? "+" : ""}${input.tvlChangePct7d.toFixed(1)}% over 7 days — volatile.`, severity: "high" });
   }
 
-  if (input.githubCommitsLast7d === null) {
-    contributors.push({ label: "Developer Health", detail: "No GitHub commit activity data available for this project.", severity: "unknown" });
-  } else if (input.githubCommitsLast7d >= 5) {
-    contributors.push({ label: "Developer Health", detail: `${input.githubCommitsLast7d} commits in the last 7 days — actively maintained.`, severity: "low" });
-  } else if (input.githubCommitsLast7d >= 1) {
-    contributors.push({ label: "Developer Health", detail: `${input.githubCommitsLast7d} commit${input.githubCommitsLast7d === 1 ? "" : "s"} in the last 7 days.`, severity: "moderate" });
+  if (input.githubCommitsLast7d !== null) {
+    if (input.githubCommitsLast7d >= 5) {
+      contributors.push({ label: "Developer Health", detail: `${input.githubCommitsLast7d} commits in the last 7 days — actively maintained.`, severity: "low" });
+    } else if (input.githubCommitsLast7d >= 1) {
+      contributors.push({ label: "Developer Health", detail: `${input.githubCommitsLast7d} commit${input.githubCommitsLast7d === 1 ? "" : "s"} in the last 7 days.`, severity: "moderate" });
+    } else {
+      contributors.push({ label: "Developer Health", detail: "No commits in the last 7 days.", severity: "high" });
+    }
+  } else if (input.githubAvailable) {
+    // PR-074 REVIEW #10 — real weekly commit counts aren't populated in this
+    // codebase's fast/batch path and can be additionally blocked by GitHub's
+    // shared rate limit even on the extended path (see the review's #1/#4
+    // findings). `pushedAt` (updated on every real push to the default
+    // branch) is the one genuinely free substitute for commit recency this
+    // same `fetchRepo()` response already carries — real, live, just less
+    // precise than an actual commit count.
+    const daysSincePush = input.githubPushedAt ? (Date.now() - Date.parse(input.githubPushedAt)) / 86_400_000 : null;
+    if (daysSincePush !== null && daysSincePush <= 30) {
+      contributors.push({
+        label: "Developer Health",
+        detail: `Repository pushed to within the last ${Math.max(1, Math.round(daysSincePush))} day${daysSincePush < 1.5 ? "" : "s"} — actively maintained (commit-level detail unavailable right now).`,
+        severity: "low",
+      });
+    } else if (daysSincePush !== null && daysSincePush <= 180) {
+      contributors.push({
+        label: "Developer Health",
+        detail: `Repository last pushed ${Math.round(daysSincePush)} days ago (commit-level detail unavailable right now).`,
+        severity: "moderate",
+      });
+    } else if (daysSincePush !== null) {
+      contributors.push({
+        label: "Developer Health",
+        detail: `No push to this repository in over ${Math.round(daysSincePush / 30)} months.`,
+        severity: "high",
+      });
+    } else {
+      contributors.push({ label: "Developer Health", detail: "GitHub repository is linked but reports no push history.", severity: "unknown" });
+    }
   } else {
-    contributors.push({ label: "Developer Health", detail: "No commits in the last 7 days.", severity: "high" });
+    contributors.push({ label: "Developer Health", detail: "No GitHub commit activity data available for this project.", severity: "unknown" });
   }
 
   if (input.governanceActiveCount === null) {
-    contributors.push({ label: "Governance Activity", detail: "This project has no on-chain governance configured.", severity: "unknown" });
+    const governanceDetail =
+      input.governanceType === "on-chain"
+        ? "This project governs itself through on-chain voting, not Snapshot — not tracked here."
+        : input.governanceType === "forum"
+          ? "This project governs itself through forum discussion, not Snapshot — not tracked here."
+          : input.governanceType === "none"
+            ? "This project is confirmed to have no governance mechanism."
+            : "No Snapshot governance space is configured for this project.";
+    contributors.push({ label: "Governance Activity", detail: governanceDetail, severity: "unknown" });
   } else if (input.governanceActiveCount > 0) {
     contributors.push({ label: "Governance Activity", detail: `${input.governanceActiveCount} active governance proposal${input.governanceActiveCount === 1 ? "" : "s"}.`, severity: "low" });
   } else {

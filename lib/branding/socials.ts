@@ -1,16 +1,20 @@
-import { BookOpen, Briefcase, Compass, Globe, MessagesSquare, Newspaper, Vote } from "lucide-react";
+import { MessagesSquare, Newspaper, Vote } from "lucide-react";
 
 import {
+  BaseScanMark,
   CoinGeckoMark,
   DefiLlamaMark,
   DiscordMark,
+  DocsMark,
   FarcasterMark,
   GithubMark,
+  LinkedInMark,
   LinktreeMark,
   MediumMark,
   MirrorMark,
   RedditMark,
   TelegramMark,
+  WebsiteMark,
   XMark,
   YoutubeMark,
 } from "@/components/ui/BrandIcons";
@@ -21,9 +25,14 @@ import type { BrandIconComponent, SocialBrand, SocialPlatform } from "@/lib/bran
  * Display metadata for every external link platform this registry supports.
  * Every platform with a real, recognizable brand mark uses one (`BrandIcons`)
  * rather than a generic lucide substitute (PR-050 Req 2 — "never use a
- * generic globe/link icon when a platform-specific icon exists"). Only
- * `website`/`docs`/`blog`/`forum`/`governance` stay on generic icons, since
- * none of those name a specific branded platform to draw a mark for.
+ * generic globe/link icon when a platform-specific icon exists"). `website`
+ * and `docs` aren't branded platforms (no company owns "documentation" or
+ * "the web"), so there's no logo to be faithful to — PR-078B review pass
+ * still upgraded both from plain lucide outlines (`Globe`/`BookOpen`) to
+ * filled, colored glyphs (`WebsiteMark`/`DocsMark`) for the same "reads as
+ * a real icon, not a wireframe" bar the branded marks meet. `blog`/`forum`/
+ * `governance` stay on generic lucide icons for the same "not a branded
+ * platform" reason, just without a custom replacement yet.
  * Farcaster isn't in PR8A's named platform list but is real, existing
  * project data (`Community.socials.farcaster`) that `QuickViewCommunity`
  * already rendered pre-PR8A — included so that link has a home here too,
@@ -48,23 +57,23 @@ import type { BrandIconComponent, SocialBrand, SocialPlatform } from "@/lib/bran
  * omitting them, per Goal 1's "never hide icons" rule.
  */
 export const SOCIAL_BRANDING: Record<SocialPlatform, SocialBrand> = {
-  website: { label: "Website", Icon: Globe },
-  docs: { label: "Docs", Icon: BookOpen },
+  website: { label: "Website", Icon: WebsiteMark },
+  docs: { label: "Docs", Icon: DocsMark },
   github: { label: "GitHub", Icon: GithubMark },
   discord: { label: "Discord", Icon: DiscordMark, hoverClassName: "hover:bg-[#5865F2]/10 hover:text-[#5865F2]" },
   telegram: { label: "Telegram", Icon: TelegramMark, hoverClassName: "hover:bg-[#26A5E4]/10 hover:text-[#26A5E4]" },
   x: { label: "X (Twitter)", Icon: XMark, hoverClassName: "hover:bg-[#1DA1F2]/10 hover:text-[#1DA1F2]" },
   medium: { label: "Medium", Icon: MediumMark },
   mirror: { label: "Mirror", Icon: MirrorMark },
-  farcaster: { label: "Farcaster", Icon: FarcasterMark, hoverClassName: "hover:bg-[#8A63D2]/10 hover:text-[#8A63D2]" },
-  linktree: { label: "Linktree", Icon: LinktreeMark, hoverClassName: "hover:bg-[#43E660]/10 hover:text-[#43E660]" },
+  farcaster: { label: "Farcaster", Icon: FarcasterMark, hoverClassName: "hover:bg-[#855DCD]/10 hover:text-[#855DCD]" },
+  linktree: { label: "Linktree", Icon: LinktreeMark, hoverClassName: "hover:bg-[#43E55E]/10 hover:text-[#43E55E]" },
   blog: { label: "Blog", Icon: Newspaper },
   forum: { label: "Forum", Icon: MessagesSquare },
-  linkedin: { label: "LinkedIn", Icon: Briefcase, hoverClassName: "hover:bg-[#0A66C2]/10 hover:text-[#0A66C2]" },
+  linkedin: { label: "LinkedIn", Icon: LinkedInMark, hoverClassName: "hover:bg-[#0A66C2]/10 hover:text-[#0A66C2]" },
   governance: { label: "Governance", Icon: Vote },
   coingecko: { label: "CoinGecko", Icon: CoinGeckoMark, hoverClassName: "hover:bg-[#8DC63F]/10 hover:text-[#8DC63F]" },
   defillama: { label: "DefiLlama", Icon: DefiLlamaMark },
-  explorer: { label: "BaseScan", Icon: Compass },
+  explorer: { label: "BaseScan", Icon: BaseScanMark },
   reddit: { label: "Reddit", Icon: RedditMark, hoverClassName: "hover:bg-[#FF4500]/10 hover:text-[#FF4500]" },
   youtube: { label: "YouTube", Icon: YoutubeMark, hoverClassName: "hover:bg-[#FF0000]/10 hover:text-[#FF0000]" },
 };

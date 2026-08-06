@@ -20,6 +20,16 @@ export type RawLlamaProtocol = {
   category?: string;
   /** PR-072 — real per-protocol logo URL, already present on DefiLlama's `/protocols` response; simply never typed/read before. */
   logo?: string;
+  /**
+   * PR-074 DATA INTEGRITY AUDIT — real field DefiLlama already sets on
+   * every versioned/product sub-protocol (e.g. `"parent#uniswap"` on
+   * "Uniswap V3"), pointing back at its parent grouping. The bulk
+   * `/protocols` list often has no single top-level entry for a protocol
+   * family (Uniswap, Aerodrome, Moonwell, ...) — only these tagged
+   * children — so this is required to reconstruct a parent's real
+   * aggregate TVL. Simply never typed/read before.
+   */
+  parentProtocol?: string | null;
 };
 
 export async function fetchHistoricalChainTvl(chain: string): Promise<RawHistoricalTvlPoint[]> {

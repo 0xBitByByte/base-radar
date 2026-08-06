@@ -10,7 +10,13 @@ import { cn } from "@/lib/utils";
  */
 export function MetricItemSkeleton({ emphasize, className }: { emphasize?: boolean; className?: string }) {
   return (
-    <div className={cn("flex animate-pulse flex-col gap-1.5 motion-reduce:animate-none", className)} aria-hidden="true">
+    <div
+      className={cn("flex animate-pulse flex-col gap-1.5 motion-reduce:animate-none", className)}
+      aria-hidden="true"
+      // PR-074 REVIEW #2 — see `WidgetSkeleton`'s matching comment: this is
+      // the real "still loading" marker `SplashScreen` scans for.
+      data-loading-skeleton="true"
+    >
       <div className="h-2.5 w-16 rounded bg-radar-light-border dark:bg-white/10" />
       <div className={cn("rounded bg-radar-light-border dark:bg-white/10", emphasize ? "h-5 w-20" : "h-3.5 w-12")} />
     </div>

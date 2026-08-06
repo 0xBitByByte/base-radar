@@ -8,7 +8,6 @@ import { HeaderLogo } from "@/components/branding/HeaderLogo";
 import { cn } from "@/lib/utils";
 import { DASHBOARD_NAV_GROUPS, DASHBOARD_SETTINGS_ITEM, APP_VERSION } from "@/constants/dashboard";
 import { SidebarItem } from "@/components/dashboard/SidebarItem";
-import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { buildSocialNavLinks } from "@/lib/branding/socials";
 import { useIntelligenceAlerts } from "@/lib/hooks/useIntelligenceAlerts";
@@ -92,8 +91,6 @@ export function SidebarNav({ onNavigate, className }: SidebarNavProps) {
       </nav>
 
       <div className="mt-4 flex flex-col gap-4 border-t border-radar-light-border pt-5 dark:border-white/10">
-        <ThemeToggle />
-
         <Tooltip content="Back to the marketing site">
           <Link
             href="/"

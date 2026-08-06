@@ -157,6 +157,7 @@ export function buildLiveProjectFromIntelligence(
     governance: governanceSummary,
     contracts: contractSummary,
     lastUpdated: metadata.generatedAt,
+    registryUpdatedAt: project.lifecycle?.updatedAt ?? null,
     discoveryMetadata: matchedDiscovery
       ? {
           sources: matchedDiscovery.sources,
@@ -261,6 +262,7 @@ export function buildLiveProjectFromDiscovery(discoveryProject: DiscoveryProject
     governance: governanceSummary,
     contracts: contractSummary,
     lastUpdated: discoveryProject.discoveredAt,
+    registryUpdatedAt: null,
     discoveryMetadata: {
       sources: discoveryProject.sources,
       discoveredAt: discoveryProject.discoveredAt,

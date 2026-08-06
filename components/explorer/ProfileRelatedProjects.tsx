@@ -26,9 +26,23 @@ const MAX_RELATED = 6;
  * Relationship is purely deterministic registry metadata: same category
  * first (confidence-ranked), backfilled with any project sharing at least
  * one tag when the category alone has fewer than `MAX_RELATED` peers.
- * Rendered via the existing `LiveProjectCard`'s `"compact"` variant — the
- * same card the Projects list page's curated rails already use, never a
- * second card component (Task 10).
+ *
+ * UX polish pass, Section 12 — rendered via `LiveProjectCard`'s existing
+ * `"detailed"` variant (the same card the Full Directory page uses) rather
+ * than `"compact"`, so each card shows Logo, Name, Confidence, Category, and
+ * TVL (as its primary or secondary metric, whichever this project has real
+ * data for) plus the same hover-elevation treatment that variant already
+ * has — no new card component (Task 10 still holds), no new provider call.
+ * "Open" has no separate button: the whole card is already the click target
+ * (`LiveProjectCard`'s established, consistent convention everywhere else
+ * it's used) — a second nested link inside it isn't valid HTML. A per-card
+ * Health score was asked for but is intentionally not shown: `LiveProject`
+ * (the lighter, batch-computed model every Projects-list surface reads) has
+ * no `health` field — only the deep, single-project Intelligence Engine
+ * computes Health, and running that for up to `MAX_RELATED` other projects
+ * here would mean new, non-trivial provider calls this pass isn't meant to
+ * add. Showing a fabricated or estimated score instead would break this
+ * whole page's "every figure is real" rule.
  */
 export async function ProfileRelatedProjects({ currentProjectId, category, tags }: ProfileRelatedProjectsProps) {
   let related: LiveProject[] = [];
@@ -79,7 +93,7 @@ export async function ProfileRelatedProjects({ currentProjectId, category, tags 
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {related.map((project) => (
-            <LiveProjectCard key={project.id} project={project} variant="compact" />
+            <LiveProjectCard key={project.id} project={project} variant="detailed" />
           ))}
         </div>
       )}

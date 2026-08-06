@@ -16,6 +16,7 @@
 
 import { clampScore } from "@/lib/intelligence/helpers";
 import type { Confidence, GithubIntel, Health, Market, Risk, Trading, Tvl } from "@/lib/intelligence/types";
+import type { RiskContributor } from "@/lib/intelligence-engine";
 import type { GovernanceEvent } from "@/lib/governance/types";
 import type { WhaleEvent } from "@/lib/whale/types";
 import type { ProviderName } from "@/lib/providers/common/types";
@@ -70,19 +71,40 @@ const SEVERITY_STATUS: Record<ScorecardSeverity, string> = {
   unknown: "Not Assessed",
 };
 
-/** Maps a `RiskContributor`'s own severity (already computed by `buildRiskContributors`) onto a scorecard tile — never a second, independent scoring pass. */
+/**
+ * Maps a `RiskContributor`'s own severity (already computed by
+ * `generateRiskAnalysis`, `lib/intelligence-engine/rule-based-provider.ts`)
+ * onto a scorecard tile — never a second, independent scoring pass. When
+ * there's no real signal (severity "unknown"), this reuses the
+ * contributor's own real per-case `detail` (e.g. "No GitHub commit activity
+ * data available for this project.") as the "What's missing" reason instead
+ * of the generic `detail` param — that generic string is written as
+ * evidence framing ("Derived from X in the Risk Analysis") and reads as
+ * nonsense once prefixed with "What's missing:" (confirmed live on Aave's
+ * Developer/Liquidity tiles before this fix — see PR-073).
+ */
 function tileFromContributorSeverity(
   id: ScorecardTileId,
   label: string,
-  severity: "low" | "moderate" | "high" | "unknown" | undefined,
+  contributor: RiskContributor | undefined,
   detail: string,
   source: string
 ): ScorecardTile {
+  const severity = contributor?.severity;
   const mapped: ScorecardSeverity =
     severity === "low" ? "excellent" : severity === "moderate" ? "moderate" : severity === "high" ? "weak" : "unknown";
 
   if (mapped === "unknown") {
-    return { id, label, score: null, scoreLabel: "Not enough verified data", statusLabel: "Not Assessed", severity: "unknown", detail, source };
+    return {
+      id,
+      label,
+      score: null,
+      scoreLabel: "Not enough verified data",
+      statusLabel: "Not Assessed",
+      severity: "unknown",
+      detail: contributor?.detail ?? detail,
+      source,
+    };
   }
 
   return {
@@ -106,6 +128,8 @@ export type ScorecardInput = {
   trading: Trading;
   github: GithubIntel;
   governance: GovernanceEvent[] | null;
+  /** PR-075 — same real, confirmed-mechanism distinction `ProfileGovernance`/`ProfileKeySignals` use: `governance === null` with a non-`"snapshot"` type means this project genuinely doesn't use Snapshot, not that nothing was configured. */
+  governanceType: "snapshot" | "on-chain" | "forum" | "none" | null;
   whaleEvents: WhaleEvent[];
   narrativeLabel: string | null;
   communityLinkCount: number;
@@ -114,12 +138,12 @@ export type ScorecardInput = {
 
 export function buildHealthScorecard(input: ScorecardInput): ScorecardTile[] {
   const contributors = input.risk.contributors;
-  const findSeverity = (label: string) => contributors.find((c) => c.label === label)?.severity;
+  const findContributor = (label: string) => contributors.find((c) => c.label === label);
 
   const security = tileFromContributorSeverity(
     "security",
     "Security",
-    findSeverity("Smart Contract Risk"),
+    findContributor("Smart Contract Risk"),
     "Derived from registered contract verification status and centralization signals in the Risk Analysis.",
     "Blockscout contract verification"
   );
@@ -127,30 +151,45 @@ export function buildHealthScorecard(input: ScorecardInput): ScorecardTile[] {
   const liquidity = tileFromContributorSeverity(
     "liquidity",
     "Liquidity",
-    findSeverity("Liquidity Risk"),
+    findContributor("Liquidity Risk"),
     "Derived from live DexScreener-aggregated liquidity depth in the Risk Analysis.",
     "DexScreener trading data"
   );
 
-  const developer = tileFromContributorSeverity(
+  // PR-074 REVIEW #4/#9 — `findContributor("Developer Health")` is itself
+  // derived entirely from `commitsLast7d`, which this codebase's fast/batch
+  // path never populates (see `buildFastPathDeveloperTile`'s doc comment) —
+  // meaning this always came back "unknown" on first paint, and stayed that
+  // way forever if GitHub's rate limit later blocked the extended commit/
+  // contributor/release calls too. Falls back to a real heuristic computed
+  // from the same free `fetchRepo()` fields (stars/forks/pushedAt/releases)
+  // instead of leaving the tile "Not Assessed" whenever the richer,
+  // commit-based signal isn't available.
+  const developerFromRisk = tileFromContributorSeverity(
     "developer",
     "Engineering Health",
-    findSeverity("Developer Health"),
+    findContributor("Developer Health"),
     "Derived from recent GitHub commit activity in the Risk Analysis.",
     "GitHub repository stats"
   );
+  const developer = developerFromRisk.severity === "unknown" ? buildFastPathDeveloperTile(input.github) : developerFromRisk;
 
-  const governanceSeverity = findSeverity("Governance Activity");
   const activeProposals = input.governance?.filter((event) => event.status === "active").length ?? null;
-  const governance = tileFromContributorSeverity(
-    "governance",
-    "Governance",
-    governanceSeverity,
+  const confirmedGovernanceType =
+    input.governance === null && (input.governanceType === "on-chain" || input.governanceType === "forum" || input.governanceType === "none")
+      ? input.governanceType
+      : null;
+  const governanceDetail =
     activeProposals !== null
       ? `${activeProposals} active proposal${activeProposals === 1 ? "" : "s"} out of ${input.governance?.length ?? 0} tracked on Snapshot.`
-      : "This project has no on-chain governance configured in the registry.",
-    "Snapshot governance data"
-  );
+      : confirmedGovernanceType === "on-chain"
+        ? "This project governs itself through on-chain voting, not Snapshot — not tracked here."
+        : confirmedGovernanceType === "forum"
+          ? "This project governs itself through forum discussion, not Snapshot — not tracked here."
+          : confirmedGovernanceType === "none"
+            ? "This project is confirmed to have no governance mechanism."
+            : "No Snapshot governance space is configured for this project in the registry.";
+  const governance = tileFromContributorSeverity("governance", "Governance", findContributor("Governance Activity"), governanceDetail, "Snapshot governance data");
 
   // Momentum is the one tile with a real continuous input (a live % change)
   // rather than a discrete severity bucket — the score is a direct, bounded
@@ -259,6 +298,103 @@ export function buildHealthScorecard(input: ScorecardInput): ScorecardTile[] {
   };
 
   return [security, liquidity, momentum, developer, governance, community, whale, aiRating];
+}
+
+/**
+ * PR-074 REVIEW #4/#9 — an Engineering Health assessment computed entirely
+ * from the single `fetchRepo()` response that already determines
+ * `github.available` (stars, forks, open issues, last push, latest release)
+ * — zero extra GitHub calls. This is what lets Engineering Health/the
+ * Scorecard's Developer tile show a real, evidence-backed verdict even when
+ * GitHub's rate limit blocks the heavier extended-only endpoints (commit
+ * activity, contributors, releases list) that `buildDeveloperEvidenceTile`
+ * needs — confirmed live during this review: with GitHub's 60/hr
+ * unauthenticated limit exhausted, every project's Developer tile was stuck
+ * on "Not Assessed" even though its basic repo stats had already loaded.
+ * `pushedAt` (updated on every real push to the default branch) is the one
+ * genuinely free substitute for commit recency this response carries —
+ * not as precise as a real commit count, but real, live, and free.
+ */
+export function buildFastPathDeveloperTile(github: GithubIntel): ScorecardTile {
+  if (!github.available) {
+    return {
+      id: "developer",
+      label: "Engineering Health",
+      score: null,
+      scoreLabel: "Not enough verified data",
+      statusLabel: "Not Assessed",
+      severity: "unknown",
+      detail: "No GitHub repository data is currently available for this project.",
+      source: "GitHub repository stats",
+    };
+  }
+
+  let score = 30;
+  const parts: string[] = [];
+
+  if (github.pushedAt) {
+    const daysSincePush = (Date.now() - Date.parse(github.pushedAt)) / 86_400_000;
+    if (daysSincePush <= 30) {
+      score += 30;
+      parts.push("pushed to within the last 30 days");
+    } else if (daysSincePush <= 90) {
+      score += 18;
+      parts.push("pushed to within the last 90 days");
+    } else if (daysSincePush <= 365) {
+      score += 5;
+      parts.push(`last pushed ${Math.round(daysSincePush / 30)} months ago`);
+    } else {
+      parts.push(`no push in over a year (last: ${new Date(github.pushedAt).toISOString().slice(0, 10)})`);
+    }
+  }
+
+  if (github.latestReleasePublishedAt) {
+    const daysSinceRelease = (Date.now() - Date.parse(github.latestReleasePublishedAt)) / 86_400_000;
+    if (daysSinceRelease <= 180) {
+      score += 15;
+      parts.push("shipped a tagged release within the last 6 months");
+    } else {
+      score += 5;
+      parts.push("has tagged releases, though none recently");
+    }
+  }
+
+  if (github.stars !== null && github.stars > 0) {
+    if (github.stars >= 1000) {
+      score += 20;
+      parts.push(`${github.stars.toLocaleString()} GitHub stars`);
+    } else if (github.stars >= 100) {
+      score += 12;
+      parts.push(`${github.stars.toLocaleString()} GitHub stars`);
+    } else {
+      score += 4;
+      parts.push(`${github.stars.toLocaleString()} GitHub stars`);
+    }
+  }
+
+  // A real, bounded backlog-health proxy (open issues relative to fork
+  // count) — never claimed as precise as a maintainer-triaged number, just
+  // a genuine signal this same response already carries for free.
+  if (github.openIssues !== null && github.forks !== null && github.forks > 0 && github.openIssues / github.forks < 0.5) {
+    score += 5;
+  }
+
+  score = clampScore(score);
+  const severity: ScorecardSeverity = score >= 80 ? "excellent" : score >= 60 ? "strong" : score >= 40 ? "moderate" : "weak";
+
+  return {
+    id: "developer",
+    label: "Engineering Health",
+    score,
+    scoreLabel: `${score}/100`,
+    statusLabel: SEVERITY_STATUS[severity],
+    severity,
+    detail:
+      parts.length > 0
+        ? `Based on real repository signals: ${parts.join(", ")}. Commit-frequency and contributor-count evidence refines this further once GitHub's extended data resolves.`
+        : "Repository is linked but carries no strong recency or traction signal yet.",
+    source: "GitHub repository stats (stars, forks, releases, last push)",
+  };
 }
 
 /**

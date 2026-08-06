@@ -147,7 +147,8 @@ export function ProfileExecutiveIntelligence({ report, freshness, sources, verif
             RISK_SENTIMENT_BORDER[report.riskLevel]
           )}
         >
-          <div className="flex items-center gap-4">
+          {/* PR-073 refinement pass — Recommendation is the single most decision-relevant piece of text on this whole page, so it now reads as a bold headline sentence next to the grade rather than a pill competing equally with Confidence/Risk; those two stay as smaller supporting pills directly beneath it. */}
+          <div className="flex items-start gap-4">
             <span
               className={cn(
                 "flex size-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-2xl font-extrabold ring-1",
@@ -159,17 +160,17 @@ export function ProfileExecutiveIntelligence({ report, freshness, sources, verif
             </span>
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
               <p className="text-[10.5px] font-semibold tracking-wider text-radar-light-muted uppercase dark:text-radar-muted">Overall Rating</p>
+              <p className="flex items-center gap-1.5 text-base font-bold text-radar-light-text dark:text-radar-white">
+                <Compass className={cn("size-4 shrink-0", sentimentColor)} aria-hidden="true" />
+                {report.recommendation}
+              </p>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-radar-light-border bg-radar-light-card px-3 py-1 text-xs font-semibold text-radar-light-text dark:border-white/10 dark:bg-white/[0.04] dark:text-radar-white">
-                  <Compass className={cn("size-3.5 shrink-0", sentimentColor)} aria-hidden="true" />
-                  {report.recommendation}
-                </span>
-                <span className={cn("inline-flex w-fit items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold", CONFIDENCE_PILL_CLASS[report.confidenceLabel])}>
-                  <Gauge className="size-3.5 shrink-0" aria-hidden="true" />
+                <span className={cn("inline-flex w-fit items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold", CONFIDENCE_PILL_CLASS[report.confidenceLabel])}>
+                  <Gauge className="size-3 shrink-0" aria-hidden="true" />
                   {report.confidenceLabel} Confidence
                 </span>
-                <span className={cn("inline-flex w-fit items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold capitalize", sentimentColor, "border-current/30 bg-current/10")}>
-                  <ShieldAlert className="size-3.5 shrink-0" aria-hidden="true" />
+                <span className={cn("inline-flex w-fit items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold capitalize", sentimentColor, "border-current/30 bg-current/10")}>
+                  <ShieldAlert className="size-3 shrink-0" aria-hidden="true" />
                   {report.riskLevel} Risk
                 </span>
               </div>

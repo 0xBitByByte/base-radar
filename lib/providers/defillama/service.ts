@@ -16,7 +16,7 @@ import {
 } from "@/lib/providers/defillama/mapper";
 import { getOrSet } from "@/lib/providers/common/cache";
 import { ProviderParseError } from "@/lib/providers/common/errors";
-import { assertRateLimit, type RateLimitConfig } from "@/lib/providers/common/rate-limit";
+import { assertRateLimit, getRateLimitStatus as getSharedRateLimitStatus, type RateLimitConfig } from "@/lib/providers/common/rate-limit";
 import type { ProviderResult } from "@/lib/providers/common/types";
 import { nowIso, toProviderResult } from "@/lib/providers/common/utilities";
 import type { SparklinePoint } from "@/lib/data/types";
@@ -25,6 +25,17 @@ const PROVIDER = "defillama" as const;
 const CHAIN = "Base";
 const CACHE_TTL_MS = 120_000; // matches the window documented in docs/API.md
 const RATE_LIMIT: RateLimitConfig = { limit: 30, windowMs: 60_000 };
+
+/**
+ * PR-074 REVIEW #8 — real-time read of this provider's own app-enforced
+ * rate-limit budget (see `common/rate-limit.ts`'s `getRateLimitStatus`),
+ * exposed for the Evidence & Sources panel to report exact remaining/
+ * limit/reset numbers instead of a generic "try again later" — the same
+ * pattern already built for GitHub's response-header-based tracker.
+ */
+export function getRateLimitStatus() {
+  return getSharedRateLimitStatus(PROVIDER, RATE_LIMIT);
+}
 
 export async function getBaseChainTvl(): Promise<ProviderResult<ChainTvl>> {
   return toProviderResult(PROVIDER, () =>

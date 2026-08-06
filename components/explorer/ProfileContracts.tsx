@@ -7,14 +7,13 @@ import { ProfileSectionCard } from "@/components/explorer/ProfileSectionCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { CHAIN_BRANDING } from "@/lib/branding/chains";
 import type { ChainInfo, Contracts } from "@/lib/intelligence/types";
-import type { ContractDetail } from "@/lib/providers/blockscout/service";
-import type { ProviderResult } from "@/lib/providers/common/types";
+import type { ContractDetailEntry } from "@/lib/providers/blockscout/service";
 
 type ProfileContractsProps = {
   contracts: Contracts;
   chain: ChainInfo;
   /** PR13.7 Goal 10 — real per-address Blockscout verification detail for every contract in `contracts.items`, kicked off unawaited by `page.tsx`. */
-  contractDetailsPromise: Promise<Array<{ address: string; result: ProviderResult<ContractDetail> }>>;
+  contractDetailsPromise: Promise<ContractDetailEntry[]>;
 };
 
 /**
@@ -53,7 +52,19 @@ export function ProfileContracts({ contracts, chain, contractDetailsPromise }: P
           }
         />
       ) : (
-        <Suspense fallback={<ContractsList contracts={contracts} />}>
+        // PR-074 FINAL UX POLISH — same stale-registry-vs-real-Blockscout
+        // contradiction as the Trust Center / Network stat: each row's
+        // Verified/Not Verified Yet badge here uses `contract.verified`
+        // until the real per-address check resolves, and can flip. Marked
+        // `data-loading-skeleton` so the splash waits for the real badges
+        // instead of completing while they can still change.
+        <Suspense
+          fallback={
+            <span data-loading-skeleton="true" className="contents">
+              <ContractsList contracts={contracts} />
+            </span>
+          }
+        >
           <ProfileContractDetailsAsync contracts={contracts} detailsPromise={contractDetailsPromise} />
         </Suspense>
       )}
