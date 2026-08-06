@@ -57,7 +57,7 @@ export function ProfileActivityFeed({
   discoverySource,
 }: ProfileActivityFeedProps) {
   return (
-    <ProfileSectionCard title="Activity Feed" icon={Activity} className="gap-5">
+    <ProfileSectionCard id="timeline" title="Activity Feed" icon={Activity} className="gap-5">
       <p className="text-xs text-radar-light-muted dark:text-radar-muted">
         Whale transfers, governance, GitHub releases and commits, TVL swings, risk alerts, registry updates, discovery
         events, and signals, merged into one newest-first feed — no event type shown twice.

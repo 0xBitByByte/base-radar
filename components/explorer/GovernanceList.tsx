@@ -26,7 +26,39 @@ function formatTimeRemaining(endIso: string): string {
   return `Voting ends in ${days}d`;
 }
 
+/**
+ * PR-079 follow-up — Snapshot's `body` field is raw markdown and sometimes
+ * carries a leading YAML frontmatter block (`---\ntitle: ...\nauthor: ...\n
+ * ---`) that Snapshot's own UI never renders directly, but this component's
+ * plain-text preview previously did, verbatim (confirmed live on Aave, both
+ * in the full Governance section and the Key Signals "Governance Activity"
+ * card, which both render through this same component). Strips the
+ * frontmatter block plus common inline markdown syntax so only prose is
+ * left for the line-clamped preview — presentation-only, `event.description`
+ * itself is never modified.
+ */
+function cleanProposalDescription(description: string): string {
+  let text = description;
+  // Leading YAML frontmatter delimited by `---` on its own line.
+  text = text.replace(/^\s*---\r?\n[\s\S]*?\r?\n---\s*/, "");
+  // Heading markers (#, ##, ... up to ######).
+  text = text.replace(/^#{1,6}\s+/gm, "");
+  // Bold/italic emphasis markers.
+  text = text.replace(/(\*\*|__)(.*?)\1/g, "$2");
+  text = text.replace(/(\*|_)(.*?)\1/g, "$2");
+  // Markdown links -> link text only.
+  text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+  // Inline code, blockquote, and list markers.
+  text = text.replace(/`([^`]+)`/g, "$1");
+  text = text.replace(/^>\s?/gm, "");
+  text = text.replace(/^[-*+]\s+/gm, "");
+  // The preview is a single line-clamped block, not a multi-line document —
+  // collapse all remaining whitespace/newlines into single spaces.
+  return text.replace(/\s+/g, " ").trim();
+}
+
 function ProposalRow({ event, timeLabel }: { event: GovernanceEvent; timeLabel: string }) {
+  const description = event.description ? cleanProposalDescription(event.description) : null;
   return (
     <li className="flex flex-col gap-1.5 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 dark:border-white/10 dark:bg-white/[0.02]">
       <div className="flex items-start justify-between gap-3">
@@ -42,10 +74,8 @@ function ProposalRow({ event, timeLabel }: { event: GovernanceEvent; timeLabel: 
           {event.status}
         </GlowBadge>
       </div>
-      {/* PR13.7 Goal 12 — real proposal description, from Snapshot's own `body` field (previously never requested). Truncated to 2 lines; the full text is one click away via the title link. */}
-      {event.description && (
-        <p className="line-clamp-2 text-[11px] text-radar-light-muted dark:text-radar-muted">{event.description}</p>
-      )}
+      {/* PR13.7 Goal 12 — real proposal description, from Snapshot's own `body` field. Cleaned of frontmatter/markdown syntax (see `cleanProposalDescription`), truncated to 2 lines; the full text is one click away via the title link. */}
+      {description && <p className="line-clamp-2 text-[11px] text-radar-light-muted dark:text-radar-muted">{description}</p>}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-radar-light-muted dark:text-radar-muted">
         <span>{timeLabel}</span>
         {event.participation !== null && <span>{event.participation.toFixed(0)}% participation</span>}

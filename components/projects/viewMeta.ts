@@ -84,13 +84,23 @@ export const PROJECTS_VIEW_META: Record<Exclude<ProjectsView, "all">, ProjectsVi
   },
   topActivity: {
     slug: "fast-growing",
-    title: "Top Activity",
-    description: "Most active development, ranked by real commits in the last 7 days — the ecosystem's fastest-growing projects by engineering output.",
+    title: "Most Starred",
+    // PR-074 — was "ranked by real commits in the last 7 days," which this
+    // codebase's list-wide computation (`getAllProjectIntelligence`) never
+    // actually fetches for any project — commit history is a genuinely slow
+    // GitHub endpoint, deliberately fetched only for the single Project
+    // Profile page's streamed/extended path, never across the full ~1,000-
+    // project catalog (that would mean ~1,000 extra GitHub calls on every
+    // list-page load). Ranking by commits therefore always returned "no
+    // qualifying project" — confirmed live, not a display bug. Re-ranked by
+    // GitHub stars, the one engineering signal this catalog's fast path
+    // already has for every project with a linked repository.
+    description: "Ranked by GitHub stars — the clearest engineering-popularity signal available across the full tracked catalog. (Commit-velocity ranking would require fetching commit history for every tracked project on every page load, which isn't done at catalog scale — see a single project's own Engineering Health section for its real recent commit activity.)",
     icon: GitBranch,
     accent: "purple",
     maxCards: 10,
-    emptyTitle: "No projects with recent GitHub activity yet",
-    emptyDescription: "Activity appears here once a project's linked repository shows real recent commits.",
+    emptyTitle: "No projects with a starred GitHub repository yet",
+    emptyDescription: "This appears here once a project's linked repository reports real GitHub stars.",
   },
   needsReview: {
     slug: "needs-review",
@@ -115,12 +125,16 @@ export const PROJECTS_VIEW_META: Record<Exclude<ProjectsView, "all">, ProjectsVi
   recentlyUpdated: {
     slug: "recently-updated",
     title: "Recently Updated",
-    description: "Tracked projects with new discovery evidence since their last registry update.",
+    description: "Tracked registry projects whose entry was genuinely edited in the last 30 days.",
     icon: RefreshCw,
     accent: "accent",
     maxCards: 10,
-    emptyTitle: "No tracked projects have new discovery evidence yet",
-    emptyDescription: "This fills in once a rediscovered project carries data the registry doesn't have yet.",
+    emptyTitle: "No recently updated projects",
+    // PR-074 REVIEW #3 — confirmed via `grep -rl updatedAt data/projects/seed/*.ts`
+    // (zero matches): this is empty because no registry project has ever
+    // had its real `lifecycle.updatedAt` timestamp set, not a bug. Named
+    // explicitly rather than a vague "check back later," per review.
+    emptyDescription: "None of the registry's tracked projects currently have a recorded last-edited date. This appears the moment a project's registry entry is genuinely updated.",
   },
   blueChips: {
     slug: "blue-chips",

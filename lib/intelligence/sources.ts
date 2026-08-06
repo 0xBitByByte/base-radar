@@ -16,7 +16,7 @@ import * as blockscout from "@/lib/providers/blockscout/service";
 import * as github from "@/lib/providers/github/service";
 import * as base from "@/lib/providers/base/service";
 import type { ProviderName, ProviderResult } from "@/lib/providers/common/types";
-import { normalizeName, slugify } from "@/lib/intelligence/helpers";
+import { normalizeName, slugify, sumBy } from "@/lib/intelligence/helpers";
 import type {
   ProjectSources,
   ProviderSlice,
@@ -226,6 +226,42 @@ function matchTrading(
   return { data: matches, status: "live", fetchedAt: result.fetchedAt, matchQuality: "exact", detail: null };
 }
 
+/**
+ * PR-074 DATA INTEGRITY AUDIT — reconstructs a parent protocol's real
+ * aggregate TVL from its tagged DefiLlama sub-protocols (see `matchTvl`
+ * below). Generic: driven entirely by the real `parentProtocol` field
+ * DefiLlama already sets on each child, never a hardcoded project name.
+ * Sums each child's own `tvlUsd` (mirrors what `/protocol/{slug}`'s own
+ * aggregate total is built from — verified live against DefiLlama:
+ * summing Uniswap's V1-V4 children reproduces `/protocol/uniswap`'s total
+ * to within rounding). `changePct24h` is a TVL-weighted average across
+ * whichever children report one — real arithmetic over real data, not a
+ * guess — and `null` when none do, rather than fabricating a blend.
+ */
+function aggregateParentProtocolTvl(children: defillama.Protocol[]): defillama.Protocol {
+  const tvlUsd = sumBy(children, (c) => c.tvlUsd);
+  const weighted = children.filter((c) => c.changePct24h !== null && c.tvlUsd > 0);
+  const weightedTvl = sumBy(weighted, (c) => c.tvlUsd);
+  const changePct24h = weighted.length && weightedTvl > 0 ? sumBy(weighted, (c) => c.changePct24h! * c.tvlUsd) / weightedTvl : null;
+  // Every child of one parent shares the same real category/logo in
+  // practice (DefiLlama groups by product line, e.g. all "Dexs" or all
+  // "Lending") — the largest child is the most representative single
+  // source for display-only fields that can't be meaningfully summed.
+  const largest = [...children].sort((a, b) => b.tvlUsd - a.tvlUsd)[0];
+
+  return {
+    name: largest.name,
+    symbol: largest.symbol,
+    chains: largest.chains,
+    tvlUsd,
+    marketCapUsd: null,
+    changePct24h,
+    category: largest.category,
+    logoUrl: largest.logoUrl,
+    parentProtocol: largest.parentProtocol,
+  };
+}
+
 function matchTvl(project: Project, result: ProviderResult<defillama.Protocol[]>): ProviderSlice<defillama.Protocol> {
   const slug = project.providerIds.defillamaSlug;
   if (!slug) return notConfiguredSlice("No defillamaSlug configured on this project");
@@ -235,15 +271,34 @@ function matchTvl(project: Project, result: ProviderResult<defillama.Protocol[]>
   // against exactly (see docs/API.md) — this is a best-effort match on a
   // slugified protocol name, tracked as "fuzzy" so confidence.ts can weigh
   // it accordingly.
-  const match = result.data.find((protocol) => slugify(protocol.name) === slug) ?? null;
-  if (!match) return unavailableSlice(`No DefiLlama protocol matched slug "${slug}"`);
+  const exactMatch = result.data.find((protocol) => slugify(protocol.name) === slug) ?? null;
+  if (exactMatch) {
+    return {
+      data: exactMatch,
+      status: "live",
+      fetchedAt: result.fetchedAt,
+      matchQuality: "fuzzy",
+      detail: "Matched by normalized protocol name, not an exact slug",
+    };
+  }
+
+  // Many protocols (Uniswap, Aerodrome, Moonwell, ...) have no single
+  // top-level bulk-list entry at all — DefiLlama splits them into
+  // versioned/product sub-protocols (e.g. "Uniswap V3", "Aerodrome
+  // Slipstream"), each carrying a real `parentProtocol: "parent#<slug>"`
+  // field pointing back at the family. This is DefiLlama's own grouping
+  // convention, not a heuristic this codebase invented — so matching on it
+  // is generic and applies to any future project with the same shape, not
+  // just the three confirmed during this audit.
+  const children = result.data.filter((protocol) => protocol.parentProtocol === `parent#${slug}`);
+  if (!children.length) return unavailableSlice(`No DefiLlama protocol matched slug "${slug}"`);
 
   return {
-    data: match,
+    data: aggregateParentProtocolTvl(children),
     status: "live",
     fetchedAt: result.fetchedAt,
     matchQuality: "fuzzy",
-    detail: "Matched by normalized protocol name, not an exact slug",
+    detail: `Aggregated from ${children.length} DefiLlama sub-protocol(s) grouped under this project's parent (no single top-level bulk-list entry exists)`,
   };
 }
 
@@ -309,7 +364,13 @@ async function matchGithub(project: Project): Promise<ProviderSlice<github.RepoS
   const result = await github.getRepoStats(`${project.github.owner}/${project.github.repo}`);
   if (!result.ok) return unavailableSlice(result.error.message);
 
-  return { data: result.data, status: "live", fetchedAt: result.fetchedAt, matchQuality: "exact", detail: null };
+  // PR-075 — `result.stale` means GitHub's live API just failed (almost
+  // always a rate limit) and this is real, previously-fetched data instead
+  // — `status` stays "live" (nothing fabricated, nothing hidden) but
+  // `detail` carries the honest reason so the UI can label it, rather than
+  // silently presenting stale data as fresh.
+  const detail = result.stale ? "Stale — GitHub is currently rate limited. Showing the last successfully fetched data." : null;
+  return { data: result.data, status: "live", fetchedAt: result.fetchedAt, matchQuality: "exact", detail, stale: result.stale };
 }
 
 /**
@@ -346,6 +407,7 @@ export function buildSourcesSummary(sources: ProjectSources): Sources {
       status: slice.status,
       fetchedAt: slice.fetchedAt,
       detail: slice.detail,
+      stale: slice.stale,
     };
     return [provider, attribution] as const;
   });

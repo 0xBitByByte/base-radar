@@ -61,3 +61,28 @@ export function assertRateLimit(provider: ProviderName, config: RateLimitConfig)
 export function resetRateLimit(key: string): void {
   buckets.delete(key);
 }
+
+/**
+ * PR-074 REVIEW #8 — real-time read of a key's current budget window,
+ * without mutating it (unlike `tryAcquire`). This is what lets the Evidence
+ * & Sources panel show exact "N/M requests remaining, resets in Ts" for
+ * every rate-limited provider (previously only GitHub had this, via a
+ * separate ad hoc mechanism reading GitHub's own response headers — this
+ * covers every provider using this shared app-enforced limiter the same
+ * way). `null` when this key has never made a request yet in the current
+ * process lifetime — there's honestly nothing to report.
+ */
+export function getRateLimitStatus(key: string, config: RateLimitConfig): { remaining: number; limit: number; resetAt: string } | null {
+  const bucket = buckets.get(key);
+  if (!bucket) return null;
+  const now = Date.now();
+  if (now - bucket.windowStart >= config.windowMs) {
+    // This window has already lapsed — the next real call will start a fresh one at `config.limit`.
+    return { remaining: config.limit, limit: config.limit, resetAt: new Date(now).toISOString() };
+  }
+  return {
+    remaining: Math.max(0, config.limit - bucket.count),
+    limit: config.limit,
+    resetAt: new Date(bucket.windowStart + config.windowMs).toISOString(),
+  };
+}

@@ -1,9 +1,20 @@
 /**
- * GitHub REST API — free, unauthenticated (rate-limited to 60 req/hr per IP).
+ * GitHub REST API. Unauthenticated requests are capped at 60 req/hr per IP —
+ * confirmed, live-reproducible root cause behind Engineering Health/Community
+ * Metrics/Evidence & Sources all going "Unavailable" simultaneously during
+ * this codebase's own testing (a single Project Profile page load already
+ * makes 3 GitHub calls — repo, commit activity, contributors/releases — so
+ * ~20 page views exhausts the budget). GitHub honors an optional
+ * `Authorization` header on every one of these endpoints and raises the
+ * limit to 5,000 req/hr for the same unauthenticated-scope, no-permissions
+ * "read public data" token — this is the real, standard fix, not a
+ * workaround. `GITHUB_TOKEN` is read once at module load; when unset, every
+ * call here behaves exactly as before (unauthenticated, 60/hr).
  * https://docs.github.com/en/rest
  */
 
 import { fetchJson } from "@/lib/providers/common/utilities";
+import { recordGithubRateLimitHeaders } from "@/lib/providers/github/rateLimit";
 
 export type RawRepo = {
   stargazers_count: number;
@@ -38,23 +49,46 @@ export type RawContributor = {
   contributions: number;
 };
 
-const HEADERS = { accept: "application/vnd.github+json" };
+/**
+ * PR-075 — `x-github-api-version` pins every request to a specific,
+ * documented GitHub REST API version (2022-11-28, the current stable one)
+ * so a future GitHub-side default-version bump can't silently change this
+ * app's response shapes out from under it. Sent on every request whether
+ * or not `GITHUB_TOKEN` is set — it isn't an auth header.
+ */
+const HEADERS: Record<string, string> = process.env.GITHUB_TOKEN
+  ? {
+      accept: "application/vnd.github+json",
+      authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+      "x-github-api-version": "2022-11-28",
+    }
+  : { accept: "application/vnd.github+json", "x-github-api-version": "2022-11-28" };
 
 export async function fetchRepo(fullName: string): Promise<RawRepo> {
-  return fetchJson<RawRepo>("github", `https://api.github.com/repos/${fullName}`, { headers: HEADERS });
+  return fetchJson<RawRepo>("github", `https://api.github.com/repos/${fullName}`, { headers: HEADERS }, undefined, undefined, recordGithubRateLimitHeaders);
 }
 
 export async function fetchLatestRelease(fullName: string): Promise<RawRelease> {
-  return fetchJson<RawRelease>("github", `https://api.github.com/repos/${fullName}/releases/latest`, {
-    headers: HEADERS,
-  });
+  return fetchJson<RawRelease>(
+    "github",
+    `https://api.github.com/repos/${fullName}/releases/latest`,
+    { headers: HEADERS },
+    undefined,
+    undefined,
+    recordGithubRateLimitHeaders
+  );
 }
 
 /** Up to 10 most recent releases, newest first — real version history (PR13.7 Goal 13), not just the single latest tag. */
 export async function fetchReleases(fullName: string, perPage = 10): Promise<RawRelease[]> {
-  return fetchJson<RawRelease[]>("github", `https://api.github.com/repos/${fullName}/releases?per_page=${perPage}`, {
-    headers: HEADERS,
-  });
+  return fetchJson<RawRelease[]>(
+    "github",
+    `https://api.github.com/repos/${fullName}/releases?per_page=${perPage}`,
+    { headers: HEADERS },
+    undefined,
+    undefined,
+    recordGithubRateLimitHeaders
+  );
 }
 
 /**
@@ -64,9 +98,14 @@ export async function fetchReleases(fullName: string, perPage = 10): Promise<Raw
  * (never claims an exact count beyond what was actually counted).
  */
 export async function fetchContributors(fullName: string): Promise<RawContributor[]> {
-  return fetchJson<RawContributor[]>("github", `https://api.github.com/repos/${fullName}/contributors?per_page=100&anon=true`, {
-    headers: HEADERS,
-  });
+  return fetchJson<RawContributor[]>(
+    "github",
+    `https://api.github.com/repos/${fullName}/contributors?per_page=100&anon=true`,
+    { headers: HEADERS },
+    undefined,
+    undefined,
+    recordGithubRateLimitHeaders
+  );
 }
 
 /**
@@ -87,6 +126,9 @@ export async function fetchCommitActivity(fullName: string): Promise<RawCommitAc
   return fetchJson<RawCommitActivityWeek[]>(
     "github",
     `https://api.github.com/repos/${fullName}/stats/commit_activity`,
-    { headers: HEADERS }
+    { headers: HEADERS },
+    undefined,
+    undefined,
+    recordGithubRateLimitHeaders
   );
 }

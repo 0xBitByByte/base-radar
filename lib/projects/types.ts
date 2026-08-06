@@ -158,6 +158,16 @@ export type LiveProject = {
   contracts: ContractSummary;
   /** ISO timestamp — the intelligence record's `metadata.generatedAt` for a registry project, or the discovery project's `discoveredAt` for a discovery-only one. */
   lastUpdated: string;
+  /**
+   * PR-074 — the registry entry's own real, static `lifecycle.updatedAt`
+   * (`data/projects/types.ts`'s `ProjectLifecycle`) — distinct from
+   * `lastUpdated` above, which is really "when this intelligence report was
+   * generated" (effectively "now," on every request, for every project) and
+   * carries no real recency signal at all. `null` for a discovery-only
+   * project (no registry entry to have an edit date) or a registry project
+   * whose entry has never recorded one.
+   */
+  registryUpdatedAt: string | null;
   /** `null` when this project was never surfaced by this run's Discovery pipeline (a pure registry project with no discovery corroboration this run). */
   discoveryMetadata: DiscoveryMetadata | null;
 };
@@ -198,6 +208,8 @@ export const SORT_FIELDS = [
   "stars",
   /** PR-056 — `verification.verifiedAt`. Powers an interactive "Recently Verified" sort on the Full Directory, distinct from the `recentlyVerified` collection's own fixed 30-day window. */
   "verifiedDate",
+  /** PR-074 REVIEW #2 — `Math.abs(market.changePct24h)`, biggest 24h move in either direction. Powers the "Top Movers" fallback leaderboard shown when GitHub-derived rankings (`"stars"`/`"activity"`) have zero qualifying projects (e.g. GitHub rate-limited), so a provider outage never empties an entire section. */
+  "movers",
 ] as const;
 export type SortField = (typeof SORT_FIELDS)[number];
 
@@ -228,6 +240,10 @@ export type FilterOptions = {
   hasTvl?: boolean;
   /** PR-056 — mirrors `hasTvl` exactly: `true` requires a non-null `market.volume24hUsd`. */
   hasVolume?: boolean;
+  /** PR-074 REVIEW #2 — mirrors `hasTvl` exactly: `true` requires a non-null `market.marketCapUsd`. Powers the "Top Market Cap" fallback leaderboard. */
+  hasMarketCap?: boolean;
+  /** PR-074 REVIEW #2 — mirrors `hasTvl` exactly: `true` requires a non-null `market.changePct24h`. Powers the "Top Movers" fallback leaderboard. */
+  hasChangePct24h?: boolean;
   hasGithub?: boolean;
   hasGovernance?: boolean;
   hasContracts?: boolean;

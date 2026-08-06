@@ -91,10 +91,16 @@ function buildFeaturedProject(spec: FeaturedProjectSpec): ProjectIntelligence {
     freshness: "fresh",
     hasRecentWhaleActivity: false,
     verifiedContractPct: null,
+    hasRegisteredContracts: false,
     liquidityUsd: null,
     tvlChangePct7d: null,
     githubCommitsLast7d: null,
+    githubAvailable: false,
+    githubStars: null,
+    githubPushedAt: null,
+    githubLatestReleasePublishedAt: null,
     governanceActiveCount: null,
+    governanceType: null,
   });
 
   return {
@@ -173,6 +179,8 @@ function buildFeaturedProject(spec: FeaturedProjectSpec): ProjectIntelligence {
       commitsPrev7d: null,
       commitTrendPct: null,
       avatarUrl: null,
+      stale: false,
+      dataFetchedAt: null,
     },
     chain: {
       chains: spec.chains,
@@ -182,6 +190,7 @@ function buildFeaturedProject(spec: FeaturedProjectSpec): ProjectIntelligence {
     community: {
       socials: { twitter: null, discord: null, telegram: null, farcaster: null, docs: null, blog: null, forum: null, medium: null, mirror: null, linkedin: null },
       governanceUrl: null,
+      governanceType: null,
       verificationStatus: spec.verificationStatus,
     },
     health: { score: spec.health.score, label: spec.health.label, factors: [] },

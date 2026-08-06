@@ -18,6 +18,15 @@ type ProfileChartProps = {
   color?: string;
   height?: number;
   className?: string;
+  /**
+   * PR-079 — a dense, axis-free rendering for embedding inside an
+   * `ExpandableMetricCard` (Price/TVL expanded states), reusing the exact
+   * same data/gradient/area recipe rather than a second chart component —
+   * the old dedicated `Sparkline` was deliberately removed in PR-048 #12,
+   * so this is the one chart primitive in the codebase, now covering both
+   * the full axis-bearing view and this compact mini-chart view.
+   */
+  compact?: boolean;
 };
 
 const FORMATTERS: Record<NonNullable<ProfileChartProps["variant"]>, (value: number) => string> = {
@@ -53,16 +62,18 @@ export function ProfileChart({
   data,
   variant = "currency",
   color = "var(--color-radar-primary)",
-  height = 220,
+  height,
   className,
+  compact = false,
 }: ProfileChartProps) {
   const gradientId = `profile-chart-${color.replace(/[^a-zA-Z0-9]/g, "")}`;
   const formatValue = FORMATTERS[variant];
+  const resolvedHeight = height ?? (compact ? 48 : 220);
 
   return (
-    <div className={className} style={{ height }}>
+    <div className={className} style={{ height: resolvedHeight }}>
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+        <AreaChart data={data} margin={compact ? { top: 2, right: 2, bottom: 2, left: 2 } : { top: 8, right: 8, bottom: 0, left: 0 }}>
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={color} stopOpacity={0.3} />
@@ -70,20 +81,23 @@ export function ProfileChart({
             </linearGradient>
           </defs>
           <XAxis dataKey="t" hide />
-          <YAxis
-            domain={["dataMin", "dataMax"]}
-            width={56}
-            tick={{ fontSize: 10, fill: "var(--color-radar-muted)" }}
-            tickFormatter={formatValue}
-            axisLine={false}
-            tickLine={false}
-          />
-          <Tooltip content={<ChartTooltip formatValue={formatValue} />} />
+          {!compact && (
+            <YAxis
+              domain={["dataMin", "dataMax"]}
+              width={56}
+              tick={{ fontSize: 10, fill: "var(--color-radar-muted)" }}
+              tickFormatter={formatValue}
+              axisLine={false}
+              tickLine={false}
+            />
+          )}
+          {compact && <YAxis domain={["dataMin", "dataMax"]} hide />}
+          {!compact && <Tooltip content={<ChartTooltip formatValue={formatValue} />} />}
           <Area
             type="monotone"
             dataKey="v"
             stroke={color}
-            strokeWidth={1.75}
+            strokeWidth={compact ? 1.5 : 1.75}
             fill={`url(#${gradientId})`}
             isAnimationActive={false}
           />

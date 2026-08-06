@@ -1,9 +1,11 @@
 import { Suspense } from "react";
-import { BadgeCheck, Code2, Droplets, Gauge, HeartPulse, Landmark, ShieldAlert, Users, type LucideIcon } from "lucide-react";
+import { BadgeCheck, Code2, Droplets, Gauge, HeartPulse, Info, Landmark, ShieldAlert, Users, type LucideIcon } from "lucide-react";
 
 import { ProfileDeveloperTileAsync } from "@/components/explorer/ProfileDeveloperTileAsync";
 import { ProfileSectionCard } from "@/components/explorer/ProfileSectionCard";
 import { RelativeTime } from "@/components/shared/RelativeTime";
+import { RichTooltip } from "@/components/ui/RichTooltip";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";
 import type { ScorecardSeverity, ScorecardTile } from "@/lib/intelligence/scorecard";
 import type { Confidence, Health, Risk } from "@/lib/intelligence/types";
@@ -156,6 +158,18 @@ const SCORECARD_EXPLANATION: Record<string, { measures: string; matters: string 
  * Component, imports this directly rather than receiving it as a render-prop,
  * since functions can't cross the Server→Client boundary as props).
  */
+/**
+ * PR-074 REVIEW #10 — was 4 stacked blocks per card (header, progress bar,
+ * a static "Measures:"/"Why it matters:" explanation always rendered in
+ * full, and the real per-project evidence line) — confirmed via repeated
+ * review feedback as too tall across 8 tiles. The "Measures"/"Why it
+ * matters" text never changes per project (it's a fixed definition of what
+ * the tile means), so it moves into an info-icon hover tooltip — the exact
+ * pattern `MetricItem`'s `infoTooltip` already uses elsewhere on this page
+ * — while the real, per-project evidence line (`Evidence:`/`What's
+ * missing:`) stays always-visible since that's the part that's actually
+ * dynamic and worth the space. No information removed, only relocated.
+ */
 export function ScorecardCardView({ card }: { card: MetaCard }) {
   const explanation = SCORECARD_EXPLANATION[card.id];
   const isUnassessed = card.severity === "unknown";
@@ -163,27 +177,47 @@ export function ScorecardCardView({ card }: { card: MetaCard }) {
   return (
     <div
       role="listitem"
-      className="flex flex-col gap-3 rounded-xl border border-radar-light-border bg-radar-light-surface p-4 dark:border-white/10 dark:bg-white/[0.02]"
+      className="flex flex-col gap-2 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 dark:border-white/10 dark:bg-white/[0.02]"
     >
-      <div className="flex items-start gap-3">
-        <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg", SEVERITY_ICON_BG[card.severity])}>
-          <card.icon className={cn("size-4.5 shrink-0", SEVERITY_CLASS[card.severity])} aria-hidden="true" />
+      <div className="flex items-start gap-2.5">
+        <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg", SEVERITY_ICON_BG[card.severity])}>
+          <card.icon className={cn("size-4 shrink-0", SEVERITY_CLASS[card.severity])} aria-hidden="true" />
         </span>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
-            <span className="text-[10.5px] font-semibold tracking-wide text-radar-light-muted uppercase dark:text-radar-muted">
+            <span className="flex items-center gap-1 text-[10.5px] font-semibold tracking-wide text-radar-light-muted uppercase dark:text-radar-muted">
               {card.title}
+              {explanation && (
+                // PR-074 REVIEW #10/#15 fix — confirmed live via real browser QA
+                // (production build): a raw `onClick` here broke the page with
+                // "Event handlers cannot be passed to Client Component props,"
+                // because this file is a Server Component (see this component's
+                // own doc comment above on why the Developer tile can't cross
+                // that boundary either) — unlike `MetricItem.tsx`'s identical-
+                // looking `infoTooltip` button, which works because that file is
+                // `"use client"`. No handler is needed here: there's no outer
+                // click target on this card for a click to bubble into.
+                <Tooltip content={<RichTooltip title={card.title} description={`${explanation.measures} ${explanation.matters}`} />}>
+                  <button
+                    type="button"
+                    aria-label={`About ${card.title}`}
+                    className="cursor-pointer text-radar-light-muted/60 outline-none transition-colors hover:text-radar-light-muted focus-visible:text-radar-light-muted dark:text-radar-muted/50 dark:hover:text-radar-muted dark:focus-visible:text-radar-muted"
+                  >
+                    <Info className="size-3" aria-hidden="true" />
+                  </button>
+                </Tooltip>
+              )}
             </span>
             <span className="shrink-0 rounded-full bg-radar-light-border/60 px-1.5 py-0.5 text-[10px] font-medium text-radar-light-muted dark:bg-white/5 dark:text-radar-muted">
               {card.helper}
             </span>
           </div>
-          <span className={cn("truncate text-xl font-bold tabular-nums", SEVERITY_CLASS[card.severity])}>{card.value}</span>
+          <span className={cn("truncate text-lg font-bold tabular-nums", SEVERITY_CLASS[card.severity])}>{card.value}</span>
         </div>
       </div>
 
       {card.progress !== null && (
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-radar-light-border dark:bg-white/10">
+        <div className="h-1 w-full overflow-hidden rounded-full bg-radar-light-border dark:bg-white/10">
           <div
             className={cn("h-full rounded-full transition-[width] duration-700 ease-out motion-reduce:transition-none", SEVERITY_BAR_GRADIENT[card.severity])}
             style={{ width: `${card.progress}%` }}
@@ -191,29 +225,15 @@ export function ScorecardCardView({ card }: { card: MetaCard }) {
         </div>
       )}
 
-      {explanation && (
-        <div className="flex flex-col gap-1.5 border-t border-radar-light-border pt-2.5 text-[11.5px] leading-relaxed dark:border-white/10">
-          <p className="text-radar-light-muted dark:text-radar-muted">
-            <span className="font-semibold text-radar-light-text dark:text-radar-white">Measures: </span>
-            {explanation.measures}
-          </p>
-          <p className="text-radar-light-muted dark:text-radar-muted">
-            <span className="font-semibold text-radar-light-text dark:text-radar-white">Why it matters: </span>
-            {explanation.matters}
-          </p>
-        </div>
-      )}
-
       <p
         className={cn(
-          "rounded-lg border p-2 text-[11.5px] leading-relaxed",
-          isUnassessed
-            ? "border-dashed border-radar-light-border text-radar-light-muted dark:border-white/10 dark:text-radar-muted"
-            : "border-radar-light-border bg-radar-light-card text-radar-light-text dark:border-white/10 dark:bg-white/[0.03] dark:text-radar-white"
+          "truncate text-[11px] leading-relaxed",
+          isUnassessed ? "text-radar-light-muted dark:text-radar-muted" : "text-radar-light-text dark:text-radar-white"
         )}
+        title={card.tooltip}
       >
         <span className={cn("font-semibold", isUnassessed ? "text-radar-light-muted dark:text-radar-muted" : SEVERITY_CLASS[card.severity])}>
-          {isUnassessed ? "What's missing: " : "Evidence: "}
+          {isUnassessed ? "Missing: " : "Evidence: "}
         </span>
         {card.tooltip}
       </p>
@@ -320,12 +340,31 @@ export function ProjectHealthScorecard({
           )}
         </span>
       </div>
-      <div role="list" aria-label="Project health score matrix" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {/* PR-074 FINAL REVIEW — was `sm:grid-cols-2` (4 rows of 8 tiles) on a
+          content column wide enough that each tile stretched to ~570px,
+          far more width than a compact stat card needs — "still too large,
+          still dominates the page" was a real, measurable density problem,
+          not a subjective one. `lg:grid-cols-4` halves the row count to 2
+          on desktop without touching card content — the evidence line was
+          already `truncate` (a real, already-tested single-line clamp), so
+          narrower cards don't wrap or clip. */}
+      <div role="list" aria-label="Project health score matrix" className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
         {metaCards.map((card) => (
           <ScorecardCardView key={card.id} card={card} />
         ))}
 
-        <Suspense fallback={<ScorecardCardView card={developerFallback} />}>
+        {/* PR-074 FINAL UX POLISH — the fast-path Developer tile is always
+            "Not Assessed" (commit activity only resolves in the extended/
+            streamed fetch); marking it `data-loading-skeleton` so the splash
+            genuinely waits for the real grade instead of completing on a
+            placeholder that's about to be replaced. */}
+        <Suspense
+          fallback={
+            <span data-loading-skeleton="true" className="contents">
+              <ScorecardCardView card={developerFallback} />
+            </span>
+          }
+        >
           <ProfileDeveloperTileAsync
             commitActivityPromise={commitActivityPromise}
             contributorCountPromise={contributorCountPromise}

@@ -1,3 +1,5 @@
+import { unstable_rethrow } from "next/navigation";
+
 import {
   ProviderError,
   ProviderHttpError,
@@ -33,13 +35,17 @@ async function fetchJsonOnce<T>(
   provider: ProviderName,
   url: string,
   init: RequestInit | undefined,
-  timeoutMs: number
+  timeoutMs: number,
+  onHeaders?: (headers: Headers) => void
 ): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const res = await fetch(url, { cache: "no-store", ...init, signal: controller.signal });
+    // Read response headers before checking `.ok` — a rate-limited 403/429
+    // still carries real, useful headers (e.g. GitHub's `x-ratelimit-*`).
+    onHeaders?.(res.headers);
     if (!res.ok) {
       throw new ProviderHttpError(provider, res.status, `${provider} request failed: ${res.status} ${url}`);
     }
@@ -49,6 +55,12 @@ async function fetchJsonOnce<T>(
       throw new ProviderParseError(provider, `Failed to parse JSON from ${url}`, parseErr);
     }
   } catch (err) {
+    // Next.js signals its own control-flow (e.g. a `no-store` fetch hit
+    // during a static-shell render pass throws `DynamicServerError`) by
+    // throwing — it must be rethrown as-is here, before `toProviderError`
+    // replaces it with a plain `ProviderError` that loses the `digest` Next
+    // needs to recognize it. See `unstable_rethrow` in the Next.js docs.
+    unstable_rethrow(err);
     throw toProviderError(provider, err);
   } finally {
     clearTimeout(timeout);
@@ -77,11 +89,13 @@ export async function fetchJson<T>(
   url: string,
   init?: RequestInit,
   timeoutMs: number = DEFAULT_TIMEOUT_MS,
-  retries: number = DEFAULT_RETRY_ATTEMPTS
+  retries: number = DEFAULT_RETRY_ATTEMPTS,
+  /** PR-074 REVIEW #11 — lets a provider's `client.ts` inspect real response headers (e.g. GitHub's `x-ratelimit-*`) without every provider needing its own fetch wrapper. */
+  onHeaders?: (headers: Headers) => void
 ): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     try {
-      return await fetchJsonOnce<T>(provider, url, init, timeoutMs);
+      return await fetchJsonOnce<T>(provider, url, init, timeoutMs, onHeaders);
     } catch (err) {
       if (attempt >= retries || !isRetryable(err)) throw err;
       await delay(RETRY_BASE_DELAY_MS * 2 ** attempt);
@@ -119,8 +133,21 @@ export async function toProviderResult<T>(
     recordProviderSuccess(provider, fetchedAt);
     return { ok: true, data, source: provider, fetchedAt };
   } catch (err) {
+    // Defense in depth: `fn` isn't necessarily `fetchJson` (e.g. cache-layer
+    // code could call a Next API directly) — same rethrow requirement as
+    // `fetchJsonOnce` above.
+    unstable_rethrow(err);
     const providerError = toProviderError(provider, err);
     recordProviderFailure(provider, providerError.message);
-    return { ok: false, source: provider, error: providerError };
+    // `providerError` is a `ProviderError` instance (extends `Error`). Any
+    // `Promise` resolving to a value containing a live `Error` instance gets
+    // its message silently redacted by React's Flight serializer the moment
+    // it crosses into a "use client" component via `use()` — production
+    // builds replace it with a generic "Server Components render" message,
+    // discarding the real, specific reason this whole layer exists to
+    // surface. Spreading into a plain object keeps the same
+    // `ProviderErrorInfo` shape without the `Error` prototype, so it
+    // serializes untouched.
+    return { ok: false, source: provider, error: { code: providerError.code, message: providerError.message } };
   }
 }

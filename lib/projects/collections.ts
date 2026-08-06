@@ -25,14 +25,27 @@ function isNew(project: LiveProject): boolean {
 }
 
 /**
- * "Recently updated" — driven by Discovery's own `"recently-updated"`
- * status (assigned when a rediscovered candidate carries data the registry
- * doesn't have yet). A registry-side `lifecycle.updatedAt` recency check
- * isn't available here because `LiveProject` doesn't carry `lifecycle` —
- * that field would need to be threaded through `build.ts` first.
+ * PR-074 — "Recently updated," now driven by the registry's own real
+ * `lifecycle.updatedAt` timestamp (`LiveProject.registryUpdatedAt`,
+ * threaded through `build.ts`) instead of Discovery's `"recently-updated"`
+ * status. Confirmed root cause of this collection being permanently empty
+ * across the ~1,000-project catalog: that status is only ever assigned to a
+ * project that happens to also come back as a "matches an existing entry
+ * with new data" candidate in THIS SAME stateless request's Discovery scan
+ * — which only samples a handful of live-source categories, never the full
+ * registry — so the overwhelming majority of registry projects can never
+ * carry it, no matter how recently their real registry entry actually
+ * changed. `registryUpdatedAt` is real, static, and already present on
+ * every registry project regardless of whether Discovery happened to
+ * re-surface it this run.
  */
+const RECENTLY_UPDATED_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+
 function isRecentlyUpdated(project: LiveProject): boolean {
-  return project.discoveryStatus === "recently-updated";
+  if (!project.registryUpdatedAt) return false;
+  const updatedAtMs = Date.parse(project.registryUpdatedAt);
+  if (Number.isNaN(updatedAtMs)) return false;
+  return Date.now() - updatedAtMs <= RECENTLY_UPDATED_WINDOW_MS;
 }
 
 /**

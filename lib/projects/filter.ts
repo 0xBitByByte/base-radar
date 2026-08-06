@@ -36,6 +36,8 @@ function matches(project: LiveProject, options: FilterOptions): boolean {
   if (options.hasMarket !== undefined && project.market.available !== options.hasMarket) return false;
   if (options.hasTvl !== undefined && (project.market.tvlUsd !== null) !== options.hasTvl) return false;
   if (options.hasVolume !== undefined && (project.market.volume24hUsd !== null) !== options.hasVolume) return false;
+  if (options.hasMarketCap !== undefined && (project.market.marketCapUsd !== null) !== options.hasMarketCap) return false;
+  if (options.hasChangePct24h !== undefined && (project.market.changePct24h !== null) !== options.hasChangePct24h) return false;
   if (options.hasGithub !== undefined && project.engineering.available !== options.hasGithub) return false;
   if (options.hasGovernance !== undefined && project.governance.configured !== options.hasGovernance) return false;
   if (options.hasContracts !== undefined && (project.contracts.count > 0) !== options.hasContracts) return false;

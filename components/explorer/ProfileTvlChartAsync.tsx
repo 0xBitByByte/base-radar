@@ -18,15 +18,18 @@ import type { ProviderResult } from "@/lib/providers/common/types";
 export function ProfileTvlChartAsync({
   resultPromise,
   tvlAvailable,
+  compact = false,
 }: {
   resultPromise: Promise<ProviderResult<SparklinePoint[]> | null>;
   tvlAvailable: boolean;
+  /** PR-079 — dense, axis-free rendering for the Overview TVL card's expanded state, reusing this exact async unwrap + the same `ProfileChart` compact mode Price's mini-chart uses. */
+  compact?: boolean;
 }) {
   const result = use(resultPromise);
   const tvlHistory = result?.ok ? result.data : null;
 
   if (tvlHistory && tvlHistory.length > 1) {
-    return <ProfileChart data={tvlHistory} variant="currency" color="var(--color-radar-accent)" height={130} />;
+    return <ProfileChart data={tvlHistory} variant="currency" color="var(--color-radar-accent)" compact={compact} />;
   }
 
   if (tvlAvailable) {

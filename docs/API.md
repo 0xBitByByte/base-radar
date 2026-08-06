@@ -224,18 +224,36 @@ strategy discussion.
 
 ### GitHub
 
-- **Module**: `lib/data/providers/github.ts`
-- **Used for**: Repository stats and release activity (`getRepoStats`) for
-  known Base protocol repos and the Activity Feed
-- **Endpoint base**: `https://api.github.com` (public REST API, called
-  **unauthenticated**)
+- **Module**: `lib/providers/github/{client,mapper,service}.ts`
+- **Used for**: Repository stats, releases, contributor counts, and commit
+  activity (`getRepoStats`, `getReleases`, `getContributorCount`,
+  `getCommitActivity`) for every registry project with a linked repo, plus
+  the Activity Feed
+- **Endpoint base**: `https://api.github.com` (public REST API)
+- **Auth**: Optional `GITHUB_TOKEN` — see `.env.example`. Set to a classic
+  personal access token with **no scopes selected** (public-data-only read
+  access; never grant `repo` or any write scope for this). When set,
+  `lib/providers/github/client.ts` sends it as a `Bearer` `Authorization`
+  header on every GitHub request. When unset, every call runs exactly as
+  before — fully unauthenticated, no code path change, no error.
 - **Cache window**: 600s (10 minutes) — the longest of any provider, since
-  repo stats change slowly
-- **Rate limits**: GitHub's unauthenticated REST API is capped at **60
-  requests/hour per IP** — explicit and enforced. The long cache window
-  exists specifically to stay well under this limit. Adding a GitHub token
-  (raising the limit to 5,000 requests/hour) is a natural future change,
-  but is not required today at current traffic levels.
+  repo stats change slowly.
+- **Rate limits**: GitHub's REST API is capped at **60 requests/hour per
+  IP unauthenticated**, or **5,000 requests/hour** with `GITHUB_TOKEN` set.
+  This app's own self-imposed budget (`lib/providers/github/service.ts`'s
+  `RATE_LIMIT`) tracks whichever ceiling actually applies — confirmed via a
+  live bug during PR-074's review: an earlier version hardcoded 55/hour
+  regardless of whether a token was present, which would have silently
+  capped an authenticated deployment at unauthenticated-tier throughput.
+  Real-time remaining/reset status (from GitHub's own `x-ratelimit-*`
+  response headers) is tracked in `lib/providers/github/rateLimit.ts` and
+  surfaced in the Project Profile page's Evidence & Sources panel whenever
+  GitHub is rate-limited, instead of a generic "Unavailable."
+- **Without a token**: at 60 requests/hour shared across every visitor,
+  and 2–4 GitHub calls per Project Profile page view, this budget is easy
+  to exhaust under real traffic (confirmed live during PR-074's review —
+  a handful of page loads in one session fully exhausted it). A token is
+  strongly recommended for any deployment beyond local development.
 
 ## Alert Engine & AI Intelligence API
 

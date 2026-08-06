@@ -12,6 +12,7 @@ import { ExplorerErrorState } from "@/components/explorer/ExplorerErrorState";
 import { buildDirectoryPipeline } from "@/components/projects/collectionPipeline";
 import { loadProjectsPageData } from "@/components/projects/loadProjectsData";
 import { ProjectsCollectionPage } from "@/components/projects/ProjectsCollectionPage";
+import { TopActivityFallback } from "@/components/projects/TopActivityFallback";
 import type { ProjectsView, RawSearchParams } from "@/components/projects/queryState";
 
 export async function renderProjectsCollectionRoute(
@@ -27,6 +28,18 @@ export async function renderProjectsCollectionRoute(
 
   if (data.projects.length === 0) {
     return <ExplorerEmptyState />;
+  }
+
+  // PR-074 REVIEW #2 — "Top Activity" ranks by GitHub stars; when GitHub's
+  // shared rate limit is exhausted, `engineering.available` is false for
+  // every project at once and this leaderboard is genuinely empty. Rather
+  // than waste the whole section on one provider's outage, show real
+  // alternate rankings (TVL/Volume/Market Cap/Movers) instead. Only applies
+  // when no search/filter is active — an intentionally empty *filtered*
+  // result still shows the normal "no matches" state, since that's a real,
+  // correct answer to the user's own query, not a provider outage.
+  if (view === "topActivity" && data.leaderboards.topActivity.length === 0 && Object.keys(rawSearchParams).length === 0) {
+    return <TopActivityFallback leaderboards={data.leaderboards} />;
   }
 
   const { state, directoryPage, directoryTitle, directorySubtitle, emptyState, financialSummary } = buildDirectoryPipeline({

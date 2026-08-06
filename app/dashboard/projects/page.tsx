@@ -17,6 +17,7 @@ import { ProjectsKpiPulse } from "@/components/projects/ProjectsKpiPulse";
 import { PROJECTS_PATH, type RawSearchParams } from "@/components/projects/queryState";
 import { SmartViews } from "@/components/projects/SmartViews";
 import { PROJECTS_VIEW_META } from "@/components/projects/viewMeta";
+import { dedupeCuratedRails } from "@/lib/projects/curation";
 import type { LiveProject } from "@/lib/projects/types";
 
 export const metadata: Metadata = {
@@ -97,6 +98,23 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
     return `${PROJECTS_PATH}/${PROJECTS_VIEW_META[view].slug}`;
   }
 
+  // PR-077 — cross-rail dedup, in the page's real display order (Curated
+  // Discovery -> Leaderboards -> Needs Your Attention). Only governs these
+  // 9 curated rails: each rail's own ranking/filtering (`collections`/
+  // `leaderboards`) is untouched, and the Full Directory below still shows
+  // every project. See `lib/projects/curation.ts`.
+  const dedupedRails = dedupeCuratedRails([
+    { key: "verified", ranked: collections.verified, maxCards: PROJECTS_VIEW_META.verified.maxCards },
+    { key: "trending", ranked: collections.trending, maxCards: PROJECTS_VIEW_META.trending.maxCards },
+    { key: "new", ranked: collections.new, maxCards: PROJECTS_VIEW_META.new.maxCards },
+    { key: "topTvl", ranked: leaderboards.topTvl, maxCards: PROJECTS_VIEW_META.topTvl.maxCards },
+    { key: "topVolume", ranked: leaderboards.topVolume, maxCards: PROJECTS_VIEW_META.topVolume.maxCards },
+    { key: "topActivity", ranked: leaderboards.topActivity, maxCards: PROJECTS_VIEW_META.topActivity.maxCards },
+    { key: "needsReview", ranked: collections.needsReview, maxCards: PROJECTS_VIEW_META.needsReview.maxCards },
+    { key: "recentlyDiscovered", ranked: collections.recentlyDiscovered, maxCards: PROJECTS_VIEW_META.recentlyDiscovered.maxCards },
+    { key: "recentlyUpdated", ranked: collections.recentlyUpdated, maxCards: PROJECTS_VIEW_META.recentlyUpdated.maxCards },
+  ]);
+
   return (
     <div className="flex flex-col gap-10 pb-10">
       <ProjectsHeader totalCount={projects.length} lastUpdated={mostRecentTimestamp(projects)} />
@@ -128,33 +146,33 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
       <div className="flex flex-col gap-6">
         <h2 className={ZONE_LABEL_CLASS}>Curated Discovery</h2>
         <div className="flex flex-col gap-8">
-          <ProjectRail {...PROJECTS_VIEW_META.verified} projects={collections.verified} viewAllHref={railHref("verified")} />
-          <ProjectRail {...PROJECTS_VIEW_META.trending} projects={collections.trending} viewAllHref={railHref("trending")} />
-          <ProjectRail {...PROJECTS_VIEW_META.new} projects={collections.new} viewAllHref={railHref("new")} />
+          <ProjectRail {...PROJECTS_VIEW_META.verified} projects={dedupedRails.verified} viewAllHref={railHref("verified")} />
+          <ProjectRail {...PROJECTS_VIEW_META.trending} projects={dedupedRails.trending} viewAllHref={railHref("trending")} />
+          <ProjectRail {...PROJECTS_VIEW_META.new} projects={dedupedRails.new} viewAllHref={railHref("new")} />
         </div>
       </div>
 
       <div className="flex flex-col gap-6">
         <h2 className={ZONE_LABEL_CLASS}>Leaderboards</h2>
         <div className="flex flex-col gap-8">
-          <ProjectRail {...PROJECTS_VIEW_META.topTvl} projects={leaderboards.topTvl} viewAllHref={railHref("topTvl")} />
-          <ProjectRail {...PROJECTS_VIEW_META.topVolume} projects={leaderboards.topVolume} viewAllHref={railHref("topVolume")} />
-          <ProjectRail {...PROJECTS_VIEW_META.topActivity} projects={leaderboards.topActivity} viewAllHref={railHref("topActivity")} />
+          <ProjectRail {...PROJECTS_VIEW_META.topTvl} projects={dedupedRails.topTvl} viewAllHref={railHref("topTvl")} />
+          <ProjectRail {...PROJECTS_VIEW_META.topVolume} projects={dedupedRails.topVolume} viewAllHref={railHref("topVolume")} />
+          <ProjectRail {...PROJECTS_VIEW_META.topActivity} projects={dedupedRails.topActivity} viewAllHref={railHref("topActivity")} />
         </div>
       </div>
 
       <div className="flex flex-col gap-6">
         <h2 className={ZONE_LABEL_CLASS}>Needs Your Attention</h2>
         <div className="flex flex-col gap-8">
-          <ProjectRail {...PROJECTS_VIEW_META.needsReview} projects={collections.needsReview} viewAllHref={railHref("needsReview")} />
+          <ProjectRail {...PROJECTS_VIEW_META.needsReview} projects={dedupedRails.needsReview} viewAllHref={railHref("needsReview")} />
           <ProjectRail
             {...PROJECTS_VIEW_META.recentlyDiscovered}
-            projects={collections.recentlyDiscovered}
+            projects={dedupedRails.recentlyDiscovered}
             viewAllHref={railHref("recentlyDiscovered")}
           />
           <ProjectRail
             {...PROJECTS_VIEW_META.recentlyUpdated}
-            projects={collections.recentlyUpdated}
+            projects={dedupedRails.recentlyUpdated}
             viewAllHref={railHref("recentlyUpdated")}
           />
         </div>

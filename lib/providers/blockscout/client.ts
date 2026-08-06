@@ -35,6 +35,15 @@ export type RawTokenTransfer = {
   to: { hash: string };
   /** `null` for a small minority of malformed entries — filtered out by the mapper. */
   total: { value: string; decimals: string } | null;
+  /**
+   * PR-078 §2 — confirmed live on `/tokens/{address}/transfers` (a real USDC
+   * transfer returned `block_number: 49566752`). `gas`/`fee`/`status` are
+   * NOT present on this endpoint — those are transaction-level fields this
+   * transfer-log endpoint doesn't carry; fetching them would mean one extra
+   * `/transactions/{hash}` request per row shown, which isn't done here (see
+   * `RecentTransactions.tsx`'s doc comment).
+   */
+  block_number: number;
 };
 
 export type RawTokenTransfersResponse = {
@@ -65,10 +74,20 @@ export type RawContractDetail = {
  * Creation date/block isn't included here — resolving it would need a
  * further lookup of `creation_transaction_hash`'s block/timestamp, out of
  * scope for this pass (documented as Not Currently Available).
+ *
+ * PR-078 §1 — `is_contract`/`is_verified` added: confirmed live against
+ * `base.blockscout.com/api/v2/addresses/{address}` for three real cases
+ * (a verified contract, an EOA, and the standard burn address) that this
+ * endpoint reliably answers both questions even when `/smart-contracts/
+ * {address}` 404s (i.e. the address is an EOA, or a real contract with no
+ * verified source on record) — see `getContractDetail` in `service.ts` for
+ * why that distinction now matters.
  */
 export type RawAddressInfo = {
   creator_address_hash: string | null;
   creation_transaction_hash: string | null;
+  is_contract: boolean;
+  is_verified: boolean;
 };
 
 export async function fetchChainStats(): Promise<RawChainStats> {

@@ -59,7 +59,7 @@ export function MetricItem({ label, value, unavailable, className, infoTooltip, 
               type="button"
               onClick={(event) => event.stopPropagation()}
               aria-label={`About ${label}`}
-              className="text-radar-light-muted/60 outline-none transition-colors hover:text-radar-light-muted focus-visible:text-radar-light-muted dark:text-radar-muted/50 dark:hover:text-radar-muted dark:focus-visible:text-radar-muted"
+              className="cursor-pointer text-radar-light-muted/60 outline-none transition-colors hover:text-radar-light-muted focus-visible:text-radar-light-muted dark:text-radar-muted/50 dark:hover:text-radar-muted dark:focus-visible:text-radar-muted"
             >
               <Info className="size-3" aria-hidden="true" />
             </button>

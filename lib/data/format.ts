@@ -18,19 +18,26 @@ const compactNumber = new Intl.NumberFormat("en-US", {
 
 const plainNumber = new Intl.NumberFormat("en-US");
 
-const preciseCurrency = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
+// Sub-$1 tokens (the majority of altcoins) need more than whole-dollar
+// precision to read as anything but "$0" — confirmed live against AERO
+// ($0.4x), which rendered as a flat "$0" everywhere this formatter is used
+// (KPI tile, chart axis/tooltip, ATH/ATL). Tiered by magnitude so prices
+// >= $1 stay clean 2-decimal currency instead of gaining unnecessary digits.
+const priceFormattersByDigits: Record<2 | 4 | 6, Intl.NumberFormat> = {
+  2: new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+  4: new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 4, maximumFractionDigits: 4 }),
+  6: new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 6, maximumFractionDigits: 6 }),
+};
 
 export function formatCompactCurrency(value: number): string {
   return compactCurrency.format(value);
 }
 
-/** Full-precision price display (e.g. ticker rows) — never abbreviated. */
+/** Full-precision price display (e.g. ticker rows) — never abbreviated, and never rounds a real sub-$1 price down to a misleading "$0". */
 export function formatPrice(value: number): string {
-  return preciseCurrency.format(value);
+  const abs = Math.abs(value);
+  const digits = abs === 0 || abs >= 1 ? 2 : abs >= 0.01 ? 4 : 6;
+  return priceFormattersByDigits[digits].format(value);
 }
 
 export function formatCompactNumber(value: number): string {

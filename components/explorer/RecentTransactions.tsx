@@ -1,7 +1,7 @@
 import { ArrowRightLeft, ExternalLink } from "lucide-react";
 
 import { RelativeTime } from "@/components/shared/RelativeTime";
-import { formatCompactNumber } from "@/lib/data/format";
+import { formatCompactNumber, formatNumber } from "@/lib/data/format";
 import type { TokenTransfer } from "@/lib/providers/blockscout/service";
 
 type RecentTransactionsProps = {
@@ -40,37 +40,66 @@ export function RecentTransactions({ transfers, tokenSymbol, explorerUrl, unavai
         <ArrowRightLeft className="size-3.5 shrink-0" aria-hidden="true" />
         Recent {tokenSymbol ?? "Token"} Transfers
       </p>
-      <ul className="flex flex-col gap-1.5">
-        {transfers.slice(0, 5).map((transfer) => (
-          <li
-            key={`${transfer.txHash}-${transfer.logIndex}`}
-            className="flex items-center justify-between gap-3 rounded-xl border border-radar-light-border bg-radar-light-surface p-2.5 text-xs dark:border-white/10 dark:bg-white/[0.02]"
-          >
-            <span className="min-w-0 truncate text-radar-light-text dark:text-radar-white">
-              {truncate(transfer.from)} → {truncate(transfer.to)}
-            </span>
-            <span className="flex shrink-0 items-center gap-2">
-              <span className="font-medium tabular-nums text-radar-light-text dark:text-radar-white">
-                {formatCompactNumber(transfer.amount)} {tokenSymbol ?? ""}
-              </span>
-              <span className="text-radar-light-muted dark:text-radar-muted">
-                {transfer.timestamp ? <RelativeTime iso={transfer.timestamp} /> : "—"}
-              </span>
-              {explorerUrl && (
-                <a
-                  href={`${explorerUrl}/tx/${transfer.txHash}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="View transaction on block explorer"
-                  className="text-radar-light-muted/70 outline-none transition-colors hover:text-radar-light-muted focus-visible:text-radar-light-muted dark:text-radar-muted/60 dark:hover:text-radar-muted dark:focus-visible:text-radar-muted"
-                >
-                  <ExternalLink className="size-3" aria-hidden="true" />
-                </a>
-              )}
-            </span>
-          </li>
-        ))}
-      </ul>
+      <div className="overflow-x-auto rounded-xl border border-radar-light-border dark:border-white/10">
+        <table className="w-full min-w-[560px] border-collapse text-xs">
+          <thead>
+            <tr className="border-b border-radar-light-border bg-radar-light-surface text-[10px] font-medium tracking-wide text-radar-light-muted uppercase dark:border-white/10 dark:bg-white/[0.02] dark:text-radar-muted">
+              <th scope="col" className="px-3 py-2 text-left font-medium">From</th>
+              <th scope="col" className="px-3 py-2 text-left font-medium">To</th>
+              <th scope="col" className="px-3 py-2 text-right font-medium">Block</th>
+              <th scope="col" className="px-3 py-2 text-right font-medium">Amount</th>
+              <th scope="col" className="px-3 py-2 text-right font-medium">Time</th>
+              <th scope="col" className="px-3 py-2 text-right font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {transfers.slice(0, 5).map((transfer) => (
+              <tr
+                key={`${transfer.txHash}-${transfer.logIndex}`}
+                className="border-b border-radar-light-border last:border-0 dark:border-white/10"
+              >
+                <td className="px-3 py-2 font-mono text-radar-light-text dark:text-radar-white" title={transfer.from}>
+                  {truncate(transfer.from)}
+                </td>
+                <td className="px-3 py-2 font-mono text-radar-light-text dark:text-radar-white" title={transfer.to}>
+                  {truncate(transfer.to)}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums text-radar-light-muted dark:text-radar-muted">
+                  {formatNumber(transfer.blockNumber)}
+                </td>
+                <td className="px-3 py-2 text-right font-medium tabular-nums text-radar-light-text dark:text-radar-white">
+                  {formatCompactNumber(transfer.amount)} {tokenSymbol ?? ""}
+                </td>
+                <td className="px-3 py-2 text-right whitespace-nowrap text-radar-light-muted dark:text-radar-muted">
+                  {transfer.timestamp ? <RelativeTime iso={transfer.timestamp} /> : "—"}
+                </td>
+                <td className="px-3 py-2 text-right">
+                  <span className="inline-flex items-center gap-1 justify-end">
+                    {/* Every transfer this endpoint returns already has a `blockNumber` — i.e. it's
+                        mined and included in a block. There's no separate pending/failed state to
+                        surface (Blockscout's transfers endpoint never returns those), so "Confirmed"
+                        is a real derived fact about every row here, not a fabricated per-row value. */}
+                    <span className="rounded-full bg-radar-success/10 px-1.5 py-0.5 text-[10px] font-medium text-radar-success dark:bg-radar-success/15">
+                      Confirmed
+                    </span>
+                    {explorerUrl && (
+                      <a
+                        href={`${explorerUrl}/tx/${transfer.txHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="View transaction on block explorer"
+                        className="text-radar-light-muted/70 outline-none transition-colors hover:text-radar-light-muted focus-visible:text-radar-light-muted dark:text-radar-muted/60 dark:hover:text-radar-muted dark:focus-visible:text-radar-muted"
+                      >
+                        <ExternalLink className="size-3" aria-hidden="true" />
+                      </a>
+                    )}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

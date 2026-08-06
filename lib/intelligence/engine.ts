@@ -161,8 +161,20 @@ export async function buildProjectIntelligence(
   // every Explorer load. Whale activity stays a dashboard/ecosystem-wide
   // signal (`lib/whale`); this risk factor is simply never triggered here
   // rather than fabricating a "no activity" claim.
+  // PR-074 REVIEW #6 — `contract.verified === true` is a real, confirmed
+  // positive (`matchVerifiedContract` only sets it on an exact address
+  // match against Blockscout's real verified-contract data). A non-match is
+  // NOT a confirmed negative — the underlying check only ever succeeds when
+  // this project's contract happens to be the single most-recently-verified
+  // contract on all of Base, so it misses real, verified contracts almost
+  // always (confirmed live on Aave: shown "Verified" with real compiler
+  // detail in Contracts/Trust Center, yet this fast-path count found zero
+  // matches). Reporting that as "0% verified" asserted false confidence, so
+  // any zero-match result is treated as unknown (`null`), same as having no
+  // contracts at all — only a real match ever produces a percentage.
+  const verifiedContractCount = contracts.items.filter((c) => c.verified === true).length;
   const verifiedContractPct =
-    contracts.count > 0 ? (contracts.items.filter((c) => c.verified === true).length / contracts.count) * 100 : null;
+    contracts.count > 0 && verifiedContractCount > 0 ? (verifiedContractCount / contracts.count) * 100 : null;
 
   let risk: ProjectIntelligence["risk"];
   try {
@@ -173,10 +185,16 @@ export async function buildProjectIntelligence(
       freshness: freshness.overall,
       hasRecentWhaleActivity: false,
       verifiedContractPct,
+      hasRegisteredContracts: contracts.count > 0,
       liquidityUsd: trading.liquidityUsd,
       tvlChangePct7d: tvl.changePct7d,
       githubCommitsLast7d: githubIntel.commitsLast7d,
+      githubAvailable: githubIntel.available,
+      githubStars: githubIntel.stars,
+      githubPushedAt: githubIntel.pushedAt,
+      githubLatestReleasePublishedAt: githubIntel.latestReleasePublishedAt,
       governanceActiveCount: governance ? governance.filter((event) => event.status === "active").length : null,
+      governanceType: community.governanceType,
     });
   } catch {
     risk = { level: "moderate", explanation: "Risk analysis unavailable.", contributors: [] };

@@ -1,12 +1,14 @@
 "use client";
 
-import { BarChart3, Bell, Star } from "lucide-react";
+import { BarChart3, Bell, Share2, Star } from "lucide-react";
 
 import { useWatchlist } from "@/lib/hooks/useWatchlist";
 import { cn } from "@/lib/utils";
 
+/** PR-079 Section 1 — `Share` added between `Alert` and `Compare`, UI-only per spec ("export implementation comes later"); same disabled idiom as the other two placeholders. */
 const DISABLED_ACTIONS = [
   { key: "alert", label: "Alert", icon: Bell },
+  { key: "share", label: "Share", icon: Share2 },
   { key: "compare", label: "Compare", icon: BarChart3 },
 ] as const;
 
@@ -36,7 +38,7 @@ export function ProfileQuickActions({ projectId, projectName }: ProfileQuickActi
         aria-label={watched ? `Remove ${projectName} from Watchlist` : `Add ${projectName} to Watchlist`}
         onClick={() => toggle(projectId)}
         className={cn(
-          "flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-radar-primary/50",
+          "flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-radar-primary/50",
           watched
             ? "border-radar-warning/30 bg-radar-warning/10 text-radar-warning"
             : "border-radar-light-border text-radar-light-muted hover:bg-radar-light-surface dark:border-white/10 dark:text-radar-muted dark:hover:bg-white/5"

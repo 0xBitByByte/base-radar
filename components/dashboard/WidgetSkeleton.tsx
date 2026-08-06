@@ -15,6 +15,13 @@ export function WidgetSkeleton({ className }: { className?: string }) {
         className
       )}
       aria-hidden="true"
+      // PR-074 REVIEW #2 — a real, page-agnostic "still loading" marker
+      // `SplashScreen` scans for (`components/branding/SplashScreen.tsx`)
+      // instead of guessing readiness from a timeout. Every Suspense
+      // fallback that renders a generic pulsing placeholder (as opposed to
+      // real, already-known content) carries this attribute; the splash
+      // only completes once none remain in the DOM.
+      data-loading-skeleton="true"
     />
   );
 }

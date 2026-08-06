@@ -13,6 +13,7 @@
 type CacheEntry<T> = {
   value: T;
   expiresAt: number;
+  fetchedAt: number;
 };
 
 const store = new Map<string, CacheEntry<unknown>>();
@@ -31,7 +32,7 @@ export async function getOrSet<T>(key: string, ttlMs: number, fn: () => Promise<
 
   const promise = fn()
     .then((value) => {
-      store.set(key, { value, expiresAt: Date.now() + ttlMs });
+      store.set(key, { value, expiresAt: Date.now() + ttlMs, fetchedAt: Date.now() });
       return value;
     })
     .finally(() => {
@@ -40,6 +41,21 @@ export async function getOrSet<T>(key: string, ttlMs: number, fn: () => Promise<
 
   inFlight.set(key, promise);
   return promise;
+}
+
+/**
+ * PR-074 DATA INTEGRITY AUDIT — the last real, successfully-fetched value
+ * for `key`, regardless of whether its TTL has expired (entries are never
+ * evicted on expiry, only overwritten on the next successful fetch — so
+ * this is always available once a fetch has ever succeeded). Lets a
+ * provider degrade gracefully to real, honestly-timestamped stale data
+ * when a live call fails, instead of surfacing nothing. `undefined` if
+ * this key has never been successfully fetched in this process.
+ */
+export function getStale<T>(key: string): { value: T; fetchedAt: string } | undefined {
+  const entry = store.get(key);
+  if (!entry) return undefined;
+  return { value: entry.value as T, fetchedAt: new Date(entry.fetchedAt).toISOString() };
 }
 
 /** Removes a single cached entry, forcing the next call to refetch. */

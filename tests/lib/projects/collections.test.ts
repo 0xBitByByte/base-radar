@@ -21,9 +21,29 @@ describe("buildCollections", () => {
     expect(buildCollections([project]).new).toContain(project);
   });
 
-  it("puts discoveryStatus 'recently-updated' projects into recentlyUpdated", () => {
-    const project = liveProject({ discoveryStatus: "recently-updated" });
+  // PR-074 REVIEW #3 — `discoveryStatus: "recently-updated"` alone used to
+  // qualify a project (asserted below as the old behavior), but that status
+  // is only ever assigned to the small subset of projects Discovery's
+  // stateless, partial-sample scan happens to re-surface in one specific
+  // request — confirmed live to leave this collection permanently empty
+  // across the ~1,000-project catalog. Replaced with a check against the
+  // registry's own real `registryUpdatedAt` timestamp within a 30-day
+  // window (`lib/projects/collections.ts`'s `isRecentlyUpdated`).
+  it("does not put a project into recentlyUpdated from discoveryStatus alone", () => {
+    const project = liveProject({ discoveryStatus: "recently-updated", registryUpdatedAt: null });
+    expect(buildCollections([project]).recentlyUpdated).not.toContain(project);
+  });
+
+  it("puts a project with a registryUpdatedAt within 30 days into recentlyUpdated", () => {
+    const recent = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
+    const project = liveProject({ registryUpdatedAt: recent });
     expect(buildCollections([project]).recentlyUpdated).toContain(project);
+  });
+
+  it("excludes a project with a registryUpdatedAt older than 30 days from recentlyUpdated", () => {
+    const old = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+    const project = liveProject({ registryUpdatedAt: old });
+    expect(buildCollections([project]).recentlyUpdated).not.toContain(project);
   });
 
   it("puts any project with discoveryMetadata into recentlyDiscovered", () => {

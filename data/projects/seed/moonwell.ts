@@ -15,7 +15,16 @@ export const moonwell: Project = {
   contracts: [
     {
       chain: "base",
-      address: "0x511ab53f793683763e5a8829738301368a2411e3",
+      // PR-074 DATA INTEGRITY AUDIT — was "0x511ab53f793683763e5a8829738301368a2411e3",
+      // which is WELL's Moonbeam contract address, not its Base one. Confirmed via
+      // CoinGecko's own `platforms` field for "moonwell-artemis" (moonbeam vs base
+      // are two distinct addresses) and cross-checked on Base Blockscout: the old
+      // address resolves to "MoonwellViewsV2" (a protocol helper contract, not a
+      // token — explaining the prior "Recent WELL Transfers" 404 and the missing
+      // DexScreener liquidity/volume). This is the real Base WELL token, confirmed
+      // on Base Blockscout (name "Moonwell", symbol "WELL") and DexScreener (a
+      // live Aerodrome pair).
+      address: "0xa88594d404727625a9437c3f886c7643872296ae",
       type: "token",
       label: "WELL token (Base)",
     },
@@ -43,7 +52,7 @@ export const moonwell: Project = {
     // coin page before changing.
     coingeckoId: "moonwell-artemis",
     defillamaSlug: "moonwell",
-    blockscoutAddress: "0x511ab53f793683763e5a8829738301368a2411e3",
+    blockscoutAddress: "0xa88594d404727625a9437c3f886c7643872296ae",
   },
   governance: {
     // Verified real, active Snapshot space via a direct GraphQL query

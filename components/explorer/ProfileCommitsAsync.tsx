@@ -24,8 +24,10 @@ export function ProfileCommitsAsync({ resultPromise }: { resultPromise: Promise<
   const commitsLast7d = result?.ok ? result.data.commitsLast7d : null;
 
   return (
+    // PR-080 Task 3 — no `bare`: renders as its own bordered card, matching
+    // the other three individual GitHub tiles (Stars/Forks/Open Issues)
+    // beside it.
     <MetricItem
-      bare
       emphasize
       label="Commits (7d)"
       value={commitsLast7d !== null ? formatNumber(commitsLast7d) : undefined}

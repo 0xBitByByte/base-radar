@@ -23,6 +23,8 @@ export type Protocol = {
   category: string | null;
   /** PR-072 — real DefiLlama-hosted protocol logo, `null` when this protocol has none on record (never fabricated). */
   logoUrl: string | null;
+  /** PR-074 DATA INTEGRITY AUDIT — real DefiLlama parent-grouping id (e.g. `"parent#uniswap"`), `null` when this entry isn't a tagged sub-protocol. See `sources.ts`'s `matchTvl`. */
+  parentProtocol: string | null;
 };
 
 // Centralized exchanges and bridges show up in DefiLlama's protocol list
@@ -57,6 +59,7 @@ export function mapProtocol(raw: RawLlamaProtocol): Protocol {
     changePct24h: raw.change_1d,
     category: raw.category ?? null,
     logoUrl: raw.logo ?? null,
+    parentProtocol: raw.parentProtocol ?? null,
   };
 }
 

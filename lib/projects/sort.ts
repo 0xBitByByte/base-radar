@@ -53,6 +53,8 @@ function valueForField(project: LiveProject, field: SortField): SortValue {
       return project.engineering.stars;
     case "verifiedDate":
       return toEpochMs(project.verification.verifiedAt);
+    case "movers":
+      return project.market.changePct24h !== null ? Math.abs(project.market.changePct24h) : null;
     default:
       return null;
   }

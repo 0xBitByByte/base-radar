@@ -43,8 +43,15 @@ export const aave: Project = {
     blockscoutAddress: "0x63706e401c06ac8513145b7687a14804d17f814b",
   },
   governance: {
-    snapshotSpace: "aave.eth",
+    // PR-074 REVIEW #9 — was "aave.eth", a dead Snapshot space (confirmed via
+    // a direct query against Snapshot's public GraphQL API: `space(id:
+    // "aave.eth")` returns null). Aave's real, active governance space is
+    // "aavedao.eth" (966 proposals, most recent still open at time of
+    // writing) — the dead slug was silently returning zero proposals every
+    // time, which read as "Aave has no governance activity," masking a
+    // registry data bug as a real absence of activity.
+    snapshotSpace: "aavedao.eth",
     governanceType: "snapshot",
-    governanceUrl: "https://snapshot.org/#/aave.eth",
+    governanceUrl: "https://snapshot.org/#/aavedao.eth",
   },
 };

@@ -1,4 +1,4 @@
-import { History, Sparkles, Tag, TrendingUp, Vote, Waves, type LucideIcon } from "lucide-react";
+import { Compass, History, RefreshCw, Sparkles, Tag, TrendingUp, Vote, Waves, type LucideIcon } from "lucide-react";
 
 import { ProfileSectionCard } from "@/components/explorer/ProfileSectionCard";
 import type { DevelopmentCategory, DevelopmentEntry } from "@/lib/intelligence/report";
@@ -13,6 +13,8 @@ const CATEGORY_ICON: Record<DevelopmentCategory, LucideIcon> = {
   governance: Vote,
   tvl: TrendingUp,
   whale: Waves,
+  registry: RefreshCw,
+  discovery: Compass,
 };
 
 const CATEGORY_LABEL: Record<DevelopmentCategory, string> = {
@@ -20,6 +22,8 @@ const CATEGORY_LABEL: Record<DevelopmentCategory, string> = {
   governance: "Governance",
   tvl: "TVL",
   whale: "Whale Activity",
+  registry: "Registry",
+  discovery: "Discovery",
 };
 
 /**
@@ -68,9 +72,10 @@ export function ProfileRecentHighlights({ entries }: ProfileRecentHighlightsProp
         <div className="flex items-start gap-2.5 rounded-xl border border-radar-light-border bg-radar-light-surface p-3.5 dark:border-white/10 dark:bg-white/[0.02]">
           <History className="mt-0.5 size-4 shrink-0 text-radar-light-muted dark:text-radar-muted" aria-hidden="true" />
           <p className="text-sm leading-relaxed text-radar-light-muted dark:text-radar-muted">
-            No recent project activity has been detected — no new releases, governance proposals, notable TVL swings, or large
-            on-chain transfers in the tracked window. Real releases, governance activity, TVL moves, and whale transfers will
-            appear here automatically as they happen.
+            No recent project activity has been detected — no new releases, governance proposals, notable TVL swings, large
+            on-chain transfers, or registry/discovery updates in the last 30 days. This isn&apos;t a data gap: it means this
+            project has been quiet, not that something failed to load. Real activity will appear here automatically as it
+            happens.
           </p>
         </div>
       )}
