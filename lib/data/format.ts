@@ -48,6 +48,11 @@ export function formatNumber(value: number): string {
   return plainNumber.format(Math.round(value));
 }
 
+/** PR-084.07 — the one address-truncation recipe (`0x1234…abcd`) five separate Explorer/Profile components had each independently re-pasted. */
+export function shortenAddress(address: string): string {
+  return `${address.slice(0, 6)}…${address.slice(-4)}`;
+}
+
 export function formatGwei(value: number): string {
   return `${value.toFixed(3)} gwei`;
 }

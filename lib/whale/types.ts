@@ -37,6 +37,12 @@ export type WhaleEvent = {
   usdValue: number;
   txHash: string | null;
   fromAddress: string;
+  /** PR-084.05 — real, from the same already-fetched Blockscout transfer; previously captured on `TokenTransfer` but never carried onto this type. */
+  toAddress: string;
+  /** PR-084.05 — whether `toAddress` is a contract (Blockscout's own `is_contract` flag) — a real fact about address type, never a buy/sell or exchange claim. */
+  toIsContract: boolean;
+  /** PR-084.05 — Blockscout's verified-contract-name resolution for `toAddress`, when available. `null` otherwise. */
+  toContractName: string | null;
   timestamp: string;
   sourceProvider: string;
   /** 0-100. */

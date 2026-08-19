@@ -1,6 +1,7 @@
 "use client";
 
 import { Activity, ArrowUpRight, Landmark, TrendingUp, Trophy } from "lucide-react";
+import Link from "next/link";
 
 import { ChangeValue } from "@/components/explorer/ChangeValue";
 import { ExpandableMetricCard } from "@/components/ui/ExpandableMetricCard";
@@ -32,6 +33,8 @@ type ProfileKeySignalsProps = {
   governanceQuorumPct: number | null;
   /** Already filtered to this project by `page.tsx`. */
   whaleEvents: WhaleEvent[];
+  /** PR-084.05 — the real Whale Explorer route for this project (`/dashboard/projects/{slug}/whale`), built once in `page.tsx` from `slug`. */
+  whaleHref: string;
 };
 
 /** Mirrors `ProfileGovernance`'s `GOVERNANCE_TYPE_EMPTY_STATE` — same three real, confirmed-mechanism reasons, condensed to a tile label + tooltip. */
@@ -94,6 +97,7 @@ function NavigateTile({
   helper,
   unavailable,
   targetId,
+  href,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -102,16 +106,15 @@ function NavigateTile({
   helper?: React.ReactNode;
   unavailable?: boolean;
   targetId: string;
+  /** PR-084.05 — when set, this tile navigates to a real destination route instead of scrolling to `targetId`. Every existing call site omits this and is unaffected; only used where a dedicated Explorer page now exists for the tile's full detail. */
+  href?: string;
 }) {
-  return (
-    <button
-      type="button"
-      onClick={() => scrollToAndHighlight(targetId)}
-      className={cn(
-        "flex cursor-pointer flex-col items-start gap-0.5 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 text-left shadow-sm transition-[box-shadow,transform] duration-150 ease-out outline-none hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:border-white/10 dark:bg-white/[0.02]",
-        unavailable && "opacity-70"
-      )}
-    >
+  const className = cn(
+    "flex cursor-pointer flex-col items-start gap-0.5 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 text-left shadow-sm transition-[box-shadow,transform] duration-150 ease-out outline-none hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:border-white/10 dark:bg-white/[0.02]",
+    unavailable && "opacity-70"
+  );
+  const content = (
+    <>
       <span className="flex w-full items-center justify-between gap-2">
         <span className="flex items-center gap-1 text-[10.5px] font-semibold tracking-wide text-radar-light-muted uppercase dark:text-radar-muted">
           {icon}
@@ -128,6 +131,20 @@ function NavigateTile({
         {value}
       </span>
       {helper && <div className="flex flex-col gap-1.5 text-[10.5px] text-radar-light-muted dark:text-radar-muted">{helper}</div>}
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className={className}>
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <button type="button" onClick={() => scrollToAndHighlight(targetId)} className={className}>
+      {content}
     </button>
   );
 }
@@ -158,6 +175,7 @@ export function ProfileKeySignals({
   governancePassed30d,
   governanceQuorumPct,
   whaleEvents,
+  whaleHref,
 }: ProfileKeySignalsProps) {
   const activeProposals = governance?.filter((event) => event.status === "active").length ?? null;
   const momentumAvailable = market.available && market.changePct7d !== null;
@@ -273,6 +291,7 @@ export function ProfileKeySignals({
         value={whaleValue}
         helper={whaleHelper}
         targetId="timeline"
+        href={whaleHref}
       />
     </div>
   );

@@ -13,6 +13,12 @@ export type SnapshotProposal = {
   participation: number | null;
   quorumMet: boolean | null;
   url: string;
+  /** Real voter count (PR-084.04) — a more honest participation basis than `participation` (voting power, skewed by large holders). `null` only if Snapshot itself omits it. */
+  voterCount: number | null;
+  /** Real forum discussion URL (PR-084.04), distinct from `url`. `null` when Snapshot has none on record. */
+  discussionUrl: string | null;
+  /** Real proposer address (PR-084.04). `null` when Snapshot has none on record. */
+  proposerAddress: string | null;
 };
 
 /**
@@ -31,6 +37,24 @@ function sanitizeExternalUrl(url: string): string {
     // Malformed URL — fall through to the safe default below.
   }
   return "https://snapshot.org";
+}
+
+/**
+ * Same untrusted-URL concern as `sanitizeExternalUrl`, for a genuinely
+ * optional field (`discussion`) — PR-084.04. Unlike `link`, there's no
+ * "always a real Snapshot page" fallback that makes sense here, so a
+ * missing or malformed value maps to `null` (rendered as no link) rather
+ * than a misleading substitute.
+ */
+function sanitizeOptionalExternalUrl(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") return url;
+  } catch {
+    // Malformed URL — falls through to `null` below.
+  }
+  return null;
 }
 
 /**
@@ -58,6 +82,9 @@ export function mapProposal(raw: RawSnapshotProposal): SnapshotProposal {
     participation: raw.scores_total || null,
     quorumMet: raw.quorum > 0 ? raw.scores_total >= raw.quorum : null,
     url: sanitizeExternalUrl(raw.link),
+    voterCount: raw.votes ?? null,
+    discussionUrl: sanitizeOptionalExternalUrl(raw.discussion),
+    proposerAddress: raw.author || null,
   };
 }
 

@@ -1,7 +1,7 @@
 import { ArrowRightLeft, ExternalLink } from "lucide-react";
 
 import { RelativeTime } from "@/components/shared/RelativeTime";
-import { formatCompactNumber, formatNumber } from "@/lib/data/format";
+import { formatCompactNumber, formatNumber, shortenAddress } from "@/lib/data/format";
 import type { TokenTransfer } from "@/lib/providers/blockscout/service";
 
 type RecentTransactionsProps = {
@@ -12,10 +12,6 @@ type RecentTransactionsProps = {
   /** Why `transfers` is `null` (no token contract configured, provider error, etc.) — always shown instead of a blank state. */
   unavailableReason: string;
 };
-
-function truncate(address: string): string {
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
-}
 
 /**
  * PR12.1 Req 5.5 — real recent on-chain transfers, reusing Blockscout's
@@ -59,10 +55,10 @@ export function RecentTransactions({ transfers, tokenSymbol, explorerUrl, unavai
                 className="border-b border-radar-light-border last:border-0 dark:border-white/10"
               >
                 <td className="px-3 py-2 font-mono text-radar-light-text dark:text-radar-white" title={transfer.from}>
-                  {truncate(transfer.from)}
+                  {shortenAddress(transfer.from)}
                 </td>
                 <td className="px-3 py-2 font-mono text-radar-light-text dark:text-radar-white" title={transfer.to}>
-                  {truncate(transfer.to)}
+                  {shortenAddress(transfer.to)}
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums text-radar-light-muted dark:text-radar-muted">
                   {formatNumber(transfer.blockNumber)}

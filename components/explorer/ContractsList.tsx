@@ -4,6 +4,7 @@ import { ChainBadge } from "@/components/branding/ChainBadge";
 import { formatLabel } from "@/components/explorer/format";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { CHAIN_BRANDING } from "@/lib/branding/chains";
+import { shortenAddress } from "@/lib/data/format";
 import { cn } from "@/lib/utils";
 import type { ContractInfo, Contracts } from "@/lib/intelligence/types";
 import type { ContractDetail } from "@/lib/providers/blockscout/service";
@@ -57,10 +58,6 @@ function groupContracts(items: ContractInfo[]): { type: ContractInfo["type"]; it
   return [...byType.entries()]
     .sort(([a], [b]) => TYPE_PRIORITY[a] - TYPE_PRIORITY[b])
     .map(([type, groupItems]) => ({ type, items: groupItems }));
-}
-
-function shortenAddress(address: string): string {
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
 /**

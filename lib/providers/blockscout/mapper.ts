@@ -53,6 +53,10 @@ export type TokenTransfer = {
   timestamp: string | null;
   from: string;
   to: string;
+  /** PR-084.05 — whether the recipient address is a contract, per Blockscout's own `is_contract` flag on this same already-fetched response. A real fact about the address type, never a buy/sell or exchange claim. */
+  toIsContract: boolean;
+  /** PR-084.05 — Blockscout's verified-contract-name resolution for `to` (e.g. "CLPool"), when `toIsContract` is true and Blockscout has one on record. `null` otherwise — never guessed. */
+  toContractName: string | null;
   /** PR-078 §2 — real, already-returned by `/tokens/{address}/transfers` — never a separate lookup. */
   blockNumber: number;
   /**
@@ -133,6 +137,8 @@ export function mapTokenTransfers(raw: RawTokenTransfersResponse): TokenTransfer
         timestamp: item.timestamp,
         from: item.from.hash,
         to: item.to.hash,
+        toIsContract: item.to.is_contract ?? false,
+        toContractName: item.to.implementations?.[0]?.name ?? null,
         blockNumber: item.block_number,
         amount,
       };

@@ -9,9 +9,16 @@ export type RawDexScreenerPair = {
   chainId: string;
   dexId: string;
   baseToken: { address: string; name: string; symbol: string };
+  /** PR-084 — present on the live response alongside `baseToken`, just not previously typed/consumed here. */
+  quoteToken?: { address: string; name: string; symbol: string };
+  /** PR-084.01 — the pool's own on-chain contract address, live-verified present on `/latest/dex/tokens/{address}` (`curl` against Aave's real Base address returned it on every one of 22 real pairs). Distinct from `baseToken.address`/`quoteToken.address` — this is the pair/pool contract itself. */
+  pairAddress?: string;
+  /** PR-084.01 — the pair's real DexScreener page, live-verified present alongside `pairAddress`. */
+  url?: string;
   priceUsd: string;
   priceChange?: { h24?: number };
-  volume?: { h24?: number };
+  /** PR-084.02 — `h6` added alongside the existing `h24`, live-verified present on the same response (`curl` against Aave's real Base address). Powers the Pool Curation Engine's Trending category — a single 24h total can't show whether a pool is accelerating, but comparing 6h pace to 24h average pace can. */
+  volume?: { h24?: number; h6?: number };
   liquidity?: { usd?: number };
   txns?: { h24?: { buys: number; sells: number } };
   pairCreatedAt?: number;

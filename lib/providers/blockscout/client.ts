@@ -32,7 +32,13 @@ export type RawTokenTransfer = {
   log_index: number;
   timestamp: string | null;
   from: { hash: string };
-  to: { hash: string };
+  /**
+   * PR-084.05 — `is_contract`/`implementations` confirmed live on this same
+   * already-called endpoint (a real Base CLPool AMM pool as `to`, with
+   * `is_contract: true` and `implementations: [{name: "CLPool"}]`). Real,
+   * already-fetched fields this codebase simply hadn't parsed yet.
+   */
+  to: { hash: string; is_contract?: boolean; implementations?: Array<{ name: string | null }> };
   /** `null` for a small minority of malformed entries — filtered out by the mapper. */
   total: { value: string; decimals: string } | null;
   /**
@@ -106,7 +112,26 @@ export async function fetchAddressInfo(address: string): Promise<RawAddressInfo>
   return fetchJson<RawAddressInfo>("blockscout", `${BASE_URL}/addresses/${address}`);
 }
 
-/** Most recent transfers for a given ERC-20 token contract, newest first — used for whale-transfer detection (`lib/whale`). */
+/**
+ * Most recent transfers for a given ERC-20 token contract, newest first —
+ * used for whale-transfer detection (`lib/whale`) and `RecentTransactions`.
+ *
+ * PERFORMANCE (measured, not a blind tuning pass) — this endpoint is
+ * genuinely slow for high-volume tokens: live testing found USDC at 10.66s
+ * and AERO at 6.86s, both against Blockscout's real API directly, no app
+ * code involved. `fetchJson`'s default (8s timeout, 2 retries) turns a
+ * single ~10s request into ~30s of compounding timeouts here, and because
+ * `lib/whale/blockscout-provider.ts`'s `detect()` scans every watched token
+ * concurrently via `Promise.allSettled`, one slow token stalls the entire
+ * ecosystem-wide scan for every caller (homepage, every project page, the
+ * Whale Explorer). Retrying doesn't help: the slowness is a consistent
+ * property of this endpoint under current load, not a transient blip, so a
+ * retry just re-hits the same wall. `timeoutMs: 12_000` covers the observed
+ * 6-11s range with headroom; `retries: 0` stops compounding a working-but-
+ * slow response into a 3x wait for zero benefit. Every other Blockscout
+ * endpoint keeps the shared default — this override is scoped to this one
+ * call site only.
+ */
 export async function fetchTokenTransfers(tokenAddress: string): Promise<RawTokenTransfersResponse> {
-  return fetchJson<RawTokenTransfersResponse>("blockscout", `${BASE_URL}/tokens/${tokenAddress}/transfers`);
+  return fetchJson<RawTokenTransfersResponse>("blockscout", `${BASE_URL}/tokens/${tokenAddress}/transfers`, undefined, 12_000, 0);
 }

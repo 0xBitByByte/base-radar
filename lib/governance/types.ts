@@ -24,6 +24,12 @@ export type GovernanceEvent = {
   participation: number | null;
   quorumMet: boolean | null;
   url: string;
+  /** Real voter count (PR-084.04) — a more honest participation basis than `participation` (voting power, skewed by large holders). `null` only if Snapshot itself omits it. */
+  voterCount: number | null;
+  /** Real forum discussion URL (PR-084.04), distinct from `url`. `null` when Snapshot has none on record. */
+  discussionUrl: string | null;
+  /** Real proposer address (PR-084.04). `null` when Snapshot has none on record. */
+  proposerAddress: string | null;
   /** 0-100. */
   confidence: number;
 };
