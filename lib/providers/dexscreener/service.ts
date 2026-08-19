@@ -1,6 +1,6 @@
 /** Public API for the DexScreener provider — cache- and rate-limit-guarded. */
 
-import { fetchSearchPairs, fetchTokenPairsV1 } from "@/lib/providers/dexscreener/client";
+import { fetchPairsByTokenAddresses, fetchSearchPairs, fetchTokenPairsV1 } from "@/lib/providers/dexscreener/client";
 import { mapBasePairs, mapTokenPairs, type Pair } from "@/lib/providers/dexscreener/mapper";
 import { getOrSet } from "@/lib/providers/common/cache";
 import { assertRateLimit, getRateLimitStatus as getSharedRateLimitStatus, type RateLimitConfig } from "@/lib/providers/common/rate-limit";
@@ -75,6 +75,46 @@ export async function getPairsByTokenAddresses(addresses: string[]): Promise<Pro
         results.push(...mapTokenPairs(raw));
       }
       return results;
+    })
+  );
+}
+
+/**
+ * PR-084.01 — every real pool for ONE project's own token address, via the
+ * single-address form of the legacy `/latest/dex/tokens/{address}` endpoint
+ * (`fetchPairsByTokenAddresses`, previously unused at runtime). This is a
+ * second, additional DexScreener request beyond `getPairsByTokenAddresses`'s
+ * bulk call above — justified, not accidental:
+ *
+ *  - The bulk path structurally can't return this: `fetchTokenPairsV1`
+ *    returns only one pair per address by design (see its doc comment), so
+ *    no amount of client-side filtering of the bulk result recovers the
+ *    other real pools.
+ *  - Extending the *bulk* fetch to call this richer endpoint for every
+ *    registered project (avoiding a per-project on-demand call) was
+ *    considered and rejected: that would cost one live request per
+ *    registered project per cache cycle regardless of whether anyone is
+ *    viewing it — for ~100+ tracked projects, strictly worse than one
+ *    extra request only for the specific project a user is actually on.
+ *  - No background/cron sync exists anywhere in this codebase to amortize
+ *    the cost outside a page view (checked `lib/sync/*` — that's the
+ *    user-facing watchlist/account sync layer, unrelated to provider data).
+ *
+ * Mitigation: its own longer cache TTL (5 min vs. the 60s used above) —
+ * which real pools exist for a project changes far less often than their
+ * liquidity/volume figures, so this specific call can safely stay fresher
+ * for longer than price-sensitive data.
+ */
+const PAIRS_FOR_TOKEN_CACHE_TTL_MS = 300_000;
+
+export async function getPairsForToken(address: string): Promise<ProviderResult<Pair[]>> {
+  return toProviderResult(PROVIDER, () =>
+    getOrSet(`${PROVIDER}:pairs-for-token:${address.toLowerCase()}`, PAIRS_FOR_TOKEN_CACHE_TTL_MS, async () => {
+      assertRateLimit(PROVIDER, RATE_LIMIT);
+      const raw = await fetchPairsByTokenAddresses([address]);
+      return mapTokenPairs(raw.pairs)
+        .filter((p) => p.chainId === "base")
+        .sort((a, b) => (b.liquidityUsd ?? 0) - (a.liquidityUsd ?? 0));
     })
   );
 }

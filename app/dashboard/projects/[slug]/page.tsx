@@ -7,6 +7,7 @@ import { CATEGORY_BRANDING } from "@/lib/branding/categories";
 import { SITE, SITE_TWITTER_HANDLE } from "@/constants/site";
 import { getProjectAIIntelligence, getRawWhaleEvents, getSignals } from "@/lib/data/aggregate";
 import { buildProjectIntelligence } from "@/lib/intelligence/engine";
+import { pairToTradingPool } from "@/lib/intelligence/merge";
 import { buildIntelligenceReport } from "@/lib/intelligence/report";
 import { buildHealthScorecard } from "@/lib/intelligence/scorecard";
 import { normalizeName } from "@/lib/intelligence/helpers";
@@ -18,6 +19,7 @@ import * as base from "@/lib/providers/base/service";
 import * as blockscout from "@/lib/providers/blockscout/service";
 import * as coingecko from "@/lib/providers/coingecko/service";
 import * as defillama from "@/lib/providers/defillama/service";
+import * as dexscreener from "@/lib/providers/dexscreener/service";
 import * as github from "@/lib/providers/github/service";
 import { ProfileActivityFeed } from "@/components/explorer/ProfileActivityFeed";
 import { ProfileBreadcrumb } from "@/components/explorer/ProfileBreadcrumb";
@@ -27,6 +29,7 @@ import { ProfileKeySignals } from "@/components/explorer/ProfileKeySignals";
 import { ProfileQuickActions } from "@/components/explorer/ProfileQuickActions";
 import { ProfileTokenAndPriceLive } from "@/components/explorer/ProfileTokenAndPriceLive";
 import { ProfileMetrics } from "@/components/explorer/ProfileMetrics";
+import { ProfilePairIntelligence } from "@/components/explorer/ProfilePairIntelligence";
 import { ProfileExecutiveIntelligence } from "@/components/explorer/ProfileExecutiveIntelligence";
 import { ProfileIntelligence } from "@/components/explorer/ProfileIntelligence";
 import { ProfileIntelligencePanel } from "@/components/explorer/ProfileIntelligencePanel";
@@ -205,10 +208,33 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
   // `genesisPromise` above rather than a new streamed component.
   const finalityPromise = base.getFinality();
 
+  // PERFORMANCE (measured, not a blind tuning pass) — `getRawWhaleEvents()`
+  // scans every registry-eligible token's real Blockscout transfer history
+  // and was found to occasionally consume its entire allowed window (up to
+  // ~12s, see `fetchTokenTransfers`'s own doc comment) even after that
+  // endpoint's retry/timeout fix — and because this whole page waits for
+  // every member of the batch below before its first byte, one slow token
+  // was gating the *entire* project page, even though the page's own real
+  // data (`buildProjectIntelligence`) reliably resolves in well under 2.5s.
+  // Whale activity only feeds a small Key Signals tile, a Scorecard/Report
+  // line, and Timeline rows — none of it is required for the page's core
+  // identity/market/contracts content. Racing it against a 5s ceiling (real
+  // headroom above every other batch member's observed worst case, well
+  // under the pathological 12s case) means a slow token can no longer hold
+  // up the whole page; on timeout this render simply proceeds with no whale
+  // data, the same honest fallback already used whenever this promise
+  // rejects (see `whaleRes.status !== "fulfilled"` below). The dedicated
+  // Whale Explorer (`[slug]/whale/page.tsx`) does NOT do this — whale data
+  // is that route's actual purpose, so it correctly waits the full window.
+  const whalePromise = Promise.race([
+    getRawWhaleEvents(),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Whale detection timed out for this page render")), 5_000)),
+  ]);
+
   const [profileRes, genesisRes, whaleRes, signalsRes, finalityRes, aiIntelligenceRes] = await Promise.allSettled([
     buildProjectIntelligence(registryProject, undefined, { extended: false }),
     genesisPromise,
-    getRawWhaleEvents(),
+    whalePromise,
     getSignals(),
     finalityPromise,
     getProjectAIIntelligence(registryProject.id),
@@ -284,6 +310,21 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
   const tokenContract = profile.contracts.items.find(
     (item) => item.chain === profile.chain.primaryChain && item.type === "token"
   );
+
+  // PR-084.01 — real multi-pool Trading Intelligence data for this one
+  // project, on demand (see `dexscreener.getPairsForToken`'s doc comment
+  // for why this is a justified second DexScreener request rather than a
+  // change to the shared bulk `profile.trading` every other section reads).
+  // Plain awaited call, not deferred behind Suspense — DexScreener isn't
+  // this page's slow provider (that's DefiLlama/GitHub, already deferred
+  // elsewhere), and `profile.trading` is already fetched synchronously the
+  // same way. Falls back to the original single-pool `profile.trading.pools`
+  // on any failure or empty result — Trading Intelligence is never broken,
+  // never empty because of this call.
+  const richerPairsResult = tokenContract ? await dexscreener.getPairsForToken(tokenContract.address) : null;
+  const tradingPools =
+    richerPairsResult?.ok && richerPairsResult.data.length > 0 ? richerPairsResult.data.map(pairToTradingPool) : profile.trading.pools;
+
   const transfersPromise =
     tokenContract && profile.chain.primaryChain === "base"
       ? blockscout.getTokenTransfers(tokenContract.address)
@@ -374,7 +415,20 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
   const primaryCategory = profile.identity.categories[0];
   if (primaryCategory && profile.tvl.available && profile.tvl.tvlUsd !== null) {
     try {
-      const liveProjects = await getLiveProjects();
+      // PERFORMANCE (measured, not a blind tuning pass) — `getLiveProjects()`
+      // rebuilds full `ProjectIntelligence` (its own GitHub/governance/market
+      // calls) for every registry project, not just this one, purely to rank
+      // this project among its peers. Measured at 1-2s on its own, sequential
+      // (awaited after the main batch above, not concurrent with it) — real
+      // cost for a comparison this page's core content doesn't depend on.
+      // Same race-with-honest-fallback treatment as the whale fetch above:
+      // on timeout this throws into the catch below, which already leaves
+      // every rank `null` (the UI already renders that as "unavailable") —
+      // reusing the existing failure path, not a new one.
+      const liveProjects = await Promise.race([
+        getLiveProjects(),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Category rank comparison timed out for this page render")), 4_000)),
+      ]);
       const categoryPeers = sortLiveProjects(
         filterLiveProjects(liveProjects, { category: primaryCategory, hasTvl: true }),
         "tvl",
@@ -502,6 +556,7 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
         governancePassed30d={governancePassed30d}
         governanceQuorumPct={governanceQuorumPct}
         whaleEvents={whaleEvents}
+        whaleHref={`/dashboard/projects/${slug}/whale`}
       />
 
       <ProfileSectionNav />
@@ -517,18 +572,6 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
         always-visible glance strip, not scoped to one zone); the Overview
         zone below is the Token & Price metric cards.
       */}
-      <ZoneHeading>Overview</ZoneHeading>
-
-      <ProfileTokenAndPriceLive
-        identity={profile.identity}
-        market={market}
-        trading={profile.trading}
-        tvl={profile.tvl}
-        priceHistory={priceHistory}
-        coingeckoId={registryProject.providerIds.coingeckoId ?? null}
-        tvlHistoryPromise={tvlHistoryPromise}
-      />
-
       <ZoneHeading>Intelligence</ZoneHeading>
 
       <ProfileSummary thesis={intelligenceReport.thesis} />
@@ -538,6 +581,7 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
         freshness={profile.freshness}
         sources={profile.sources}
         verificationStatus={profile.community.verificationStatus}
+        aiHref={`/dashboard/projects/${slug}/ai`}
       />
 
       <ProfileWhyItMatters highlights={intelligenceReport.highlights} />
@@ -578,13 +622,38 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
         />
       )}
 
-      {/* PR-079 Section 14 — this "Market" zone groups Contracts/Network
-          together deliberately; a future Token Pairs section (PR-080) slots
-          in here between the Overview cards above and Contracts below
-          without another page reorder. No Pairs UI is added in this PR. */}
+      {/* PR-084.01 — Overview zone (Token & Price) relocated here from above
+          the Intelligence zone: Price naturally leads into Trading, so the
+          reading flow is now Project -> Market (Price) -> Trading -> Contracts
+          -> Governance. Zone heading text unchanged, only its position moved
+          — ProfileSectionNav's SECTIONS array was reordered to match. */}
+      <ZoneHeading>Overview</ZoneHeading>
+
+      <ProfileTokenAndPriceLive
+        identity={profile.identity}
+        market={market}
+        trading={profile.trading}
+        tvl={profile.tvl}
+        priceHistory={priceHistory}
+        coingeckoId={registryProject.providerIds.coingeckoId ?? null}
+        tvlHistoryPromise={tvlHistoryPromise}
+      />
+
+      {/* PR-084 Stage 1 / PR-084.01 — Token Pair Intelligence now fills the
+          slot this "Market" zone reserved since PR-080; `pools` is the
+          richer, real multi-pool data resolved above, falling back to
+          `profile.trading.pools` untouched — Market Overview above still
+          reads `profile.trading` directly and is unaffected by this. */}
       <ZoneHeading>Market</ZoneHeading>
 
-      <ProfileContracts contracts={profile.contracts} chain={profile.chain} contractDetailsPromise={contractDetailsPromise} />
+      <ProfilePairIntelligence pools={tradingPools} tokenSymbol={profile.market.symbol} poolsHref={`/dashboard/projects/${slug}/pools`} />
+
+      <ProfileContracts
+        contracts={profile.contracts}
+        chain={profile.chain}
+        contractDetailsPromise={contractDetailsPromise}
+        contractsHref={`/dashboard/projects/${slug}/contracts`}
+      />
 
       <ProfileMetrics
         identity={profile.identity}
@@ -619,6 +688,7 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
         governance={profile.governance}
         governanceUrl={profile.community.governanceUrl}
         governanceType={profile.community.governanceType}
+        governanceHref={`/dashboard/projects/${slug}/governance`}
       />
 
       {/* PR-079 Section 6 — Recent Highlights docked immediately above

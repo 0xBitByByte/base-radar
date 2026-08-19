@@ -1,4 +1,5 @@
-import { Landmark } from "lucide-react";
+import { ArrowRight, Landmark } from "lucide-react";
+import Link from "next/link";
 
 import { GovernanceList } from "@/components/explorer/GovernanceList";
 import { ProfileSectionCard } from "@/components/explorer/ProfileSectionCard";
@@ -12,6 +13,8 @@ type ProfileGovernanceProps = {
   governanceUrl: string | null;
   /** PR-074/PR-075 — `"on-chain"`/`"forum"`/`"none"` mean `governance === null` is a real, confirmed fact about how this project actually governs itself, not a registry gap — see `data/projects/types.ts`'s `ProjectGovernance.governanceType`. */
   governanceType: "snapshot" | "on-chain" | "forum" | "none" | null;
+  /** PR-084.04 — the real Governance Explorer route for this project (`/dashboard/projects/{slug}/governance`), built once in `page.tsx` from `slug`. */
+  governanceHref: string;
 };
 
 /** One entry per non-Snapshot `governanceType` — keeps the three real, confirmed-mechanism empty states from drifting out of sync with each other. */
@@ -46,7 +49,7 @@ const GOVERNANCE_TYPE_EMPTY_STATE: Record<"on-chain" | "forum" | "none", { title
  * all, vs. configured but currently zero live proposals) get distinct
  * `EmptyState`s so a reader never has to guess which one applies.
  */
-export function ProfileGovernance({ governance, governanceUrl, governanceType }: ProfileGovernanceProps) {
+export function ProfileGovernance({ governance, governanceUrl, governanceType, governanceHref }: ProfileGovernanceProps) {
   return (
     <ProfileSectionCard
       id="governance"
@@ -93,7 +96,19 @@ export function ProfileGovernance({ governance, governanceUrl, governanceType }:
           }
         />
       ) : (
-        <GovernanceList events={governance} />
+        <>
+          <GovernanceList events={governance} />
+          {/* PR-084.04 — real destination: Base Radar Intelligence categories
+              (Active/Passed/Failed/Outcome Uncertain/Participation/...),
+              search/sort over every fetched proposal. */}
+          <Link
+            href={governanceHref}
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-radar-light-border py-2 text-xs font-medium text-radar-light-muted outline-none transition-colors hover:border-radar-primary/40 hover:text-radar-primary focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:border-white/10 dark:text-radar-muted dark:hover:border-radar-accent/40 dark:hover:text-radar-accent"
+          >
+            View All Governance ({governance.length})
+            <ArrowRight className="size-3.5" aria-hidden="true" />
+          </Link>
+        </>
       )}
     </ProfileSectionCard>
   );

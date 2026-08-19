@@ -29,6 +29,12 @@ export type RawSnapshotProposal = {
   scores_total: number;
   quorum: number;
   link: string;
+  /** Real voter *count*, distinct from `scores_total`'s voting *power* — PR-084.04, live-verified against Snapshot's real schema. `null` only if Snapshot itself omits it. */
+  votes: number | null;
+  /** Real forum discussion URL, distinct from `link` (Snapshot's own permalink) — PR-084.04, live-verified real. */
+  discussion: string | null;
+  /** Real proposer address — PR-084.04, live-verified real. */
+  author: string | null;
 };
 
 type RawProposalsResponse = {
@@ -48,6 +54,9 @@ const PROPOSALS_QUERY = `
       scores_total
       quorum
       link
+      votes
+      discussion
+      author
     }
   }
 `;

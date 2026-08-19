@@ -1,5 +1,6 @@
 import { Suspense } from "react";
-import { Blocks } from "lucide-react";
+import { ArrowRight, Blocks } from "lucide-react";
+import Link from "next/link";
 
 import { ContractsList } from "@/components/explorer/ContractsList";
 import { ProfileContractDetailsAsync } from "@/components/explorer/ProfileContractDetailsAsync";
@@ -14,6 +15,8 @@ type ProfileContractsProps = {
   chain: ChainInfo;
   /** PR13.7 Goal 10 — real per-address Blockscout verification detail for every contract in `contracts.items`, kicked off unawaited by `page.tsx`. */
   contractDetailsPromise: Promise<ContractDetailEntry[]>;
+  /** PR-084.03 — the real Contract Explorer route for this project (`/dashboard/projects/{slug}/contracts`), built once in `page.tsx` from `slug`. */
+  contractsHref: string;
 };
 
 /**
@@ -29,7 +32,7 @@ type ProfileContractsProps = {
  * candidate — Blockscout's address endpoint has the field, it just isn't
  * wired), so it's omitted rather than fabricated.
  */
-export function ProfileContracts({ contracts, chain, contractDetailsPromise }: ProfileContractsProps) {
+export function ProfileContracts({ contracts, chain, contractDetailsPromise, contractsHref }: ProfileContractsProps) {
   const explorerUrl = CHAIN_BRANDING[chain.primaryChain]?.explorerUrl;
 
   return (
@@ -58,15 +61,27 @@ export function ProfileContracts({ contracts, chain, contractDetailsPromise }: P
         // until the real per-address check resolves, and can flip. Marked
         // `data-loading-skeleton` so the splash waits for the real badges
         // instead of completing while they can still change.
-        <Suspense
-          fallback={
-            <span data-loading-skeleton="true" className="contents">
-              <ContractsList contracts={contracts} />
-            </span>
-          }
-        >
-          <ProfileContractDetailsAsync contracts={contracts} detailsPromise={contractDetailsPromise} />
-        </Suspense>
+        <>
+          <Suspense
+            fallback={
+              <span data-loading-skeleton="true" className="contents">
+                <ContractsList contracts={contracts} />
+              </span>
+            }
+          >
+            <ProfileContractDetailsAsync contracts={contracts} detailsPromise={contractDetailsPromise} />
+          </Suspense>
+          {/* PR-084.03 — real destination: Base Radar Intelligence badges
+              (Verified/Upgradeable/Attention Required), category tabs,
+              search/filter/sort over every registered contract. */}
+          <Link
+            href={contractsHref}
+            className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-radar-light-border py-2 text-xs font-medium text-radar-light-muted outline-none transition-colors hover:border-radar-primary/40 hover:text-radar-primary focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:border-white/10 dark:text-radar-muted dark:hover:border-radar-accent/40 dark:hover:text-radar-accent"
+          >
+            View All Contracts ({contracts.count})
+            <ArrowRight className="size-3.5" aria-hidden="true" />
+          </Link>
+        </>
       )}
     </ProfileSectionCard>
   );

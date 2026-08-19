@@ -103,6 +103,14 @@ export type TradingPool = {
   pairCreatedAt: number | null;
   /** DexScreener's `baseToken.symbol` — already produced by the mapper, just not previously carried through `mergeTrading` (PR13.7 Goal 9). */
   baseTokenSymbol: string | null;
+  /** PR-084 — DexScreener's `quoteToken.symbol`, e.g. `"USDC"`; `null` when unavailable. Powers Token Pair Intelligence's "Pair" display (`"{base}/{quote}"`, falling back to base-only when this is null — never fabricated). */
+  quoteTokenSymbol: string | null;
+  /** PR-084.01 — the pool's own on-chain contract address, live-verified on DexScreener's response; `null` when unavailable. Powers the "Copy Pool Address" action — never falls back to a token address, since that would misrepresent which contract is being copied. */
+  pairAddress: string | null;
+  /** PR-084.01 — the pair's real DexScreener page URL; `null` when unavailable. Powers the "View on DexScreener" action. */
+  url: string | null;
+  /** PR-084.02 — 6-hour volume window; `null` when unavailable. Powers the Pool Curation Engine's Trending category (compares 6h pace to 24h average pace — a single 24h total alone can't show acceleration). */
+  volume6hUsd: number | null;
 };
 
 export type Trading = {

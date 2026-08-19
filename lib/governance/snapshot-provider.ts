@@ -31,6 +31,9 @@ export class SnapshotGovernanceProvider implements GovernanceProvider {
       participation: proposal.participation,
       quorumMet: proposal.quorumMet,
       url: proposal.url,
+      voterCount: proposal.voterCount,
+      discussionUrl: proposal.discussionUrl,
+      proposerAddress: proposal.proposerAddress,
       confidence: BASE_CONFIDENCE,
     }));
   }

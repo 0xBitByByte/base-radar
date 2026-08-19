@@ -19,12 +19,17 @@ import { cn } from "@/lib/utils";
 // position. `tvl` removed (absorbed into the `price` card's Overview metric
 // cards, Section 3); `community`/`developer` merged into one `intelligence`
 // id (Section 4's "Project Intelligence").
+// PR-084.01 — `price` moved after `intelligence` (was first) and `trading`
+// added, matching page.tsx's relocated Overview zone now sitting between
+// Intelligence and Market/Contracts: Price naturally leads into Trading,
+// per this same PR's reorder of the actual page content.
 const SECTIONS = [
-  { id: "price", label: "Price" },
   { id: "summary", label: "Summary" },
   { id: "overview", label: "Health & Trust" },
   { id: "why-it-matters", label: "Why It Matters" },
   { id: "intelligence", label: "Intelligence" },
+  { id: "price", label: "Price" },
+  { id: "trading", label: "Trading" },
   { id: "contracts", label: "Contracts" },
   { id: "network", label: "Network" },
   { id: "trust-center", label: "Trust" },

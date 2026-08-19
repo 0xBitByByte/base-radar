@@ -14,6 +14,7 @@
 import type { Project } from "@/data/projects/types";
 import { normalizeName, sumBy } from "@/lib/intelligence/helpers";
 import { resolveMetric } from "@/lib/providers/common/resolution";
+import type { Pair } from "@/lib/providers/dexscreener/service";
 import type {
   ChainInfo,
   Community,
@@ -141,20 +142,27 @@ export function mergeMarket(sources: ProjectSources, genesisDate: string | null 
  * candidate (DexScreener) in this codebase's Provider Layer today; it's
  * still wrapped in the same resolution shape for a consistent UI contract.
  */
+/** PR-084.01 — extracted so `page.tsx` can map a single project's richer, on-demand `Pair[]` fetch (`getPairsForToken`) into the same `TradingPool` shape `mergeTrading` already produces for the bulk path, without duplicating this 8-field projection. */
+export function pairToTradingPool(p: Pair): TradingPool {
+  return {
+    dexId: p.dexId,
+    liquidityUsd: p.liquidityUsd,
+    volume24hUsd: p.volume24hUsd,
+    pairCreatedAt: p.pairCreatedAt,
+    baseTokenSymbol: p.baseToken.symbol,
+    quoteTokenSymbol: p.quoteTokenSymbol,
+    pairAddress: p.pairAddress,
+    url: p.url,
+    volume6hUsd: p.volume6hUsd,
+  };
+}
+
 export function mergeTrading(sources: ProjectSources): Trading {
   const pairs = sources.trading.data ?? [];
   const available = sources.trading.status === "live" && pairs.length > 0;
 
   const pools: TradingPool[] = available
-    ? pairs
-        .map((p) => ({
-          dexId: p.dexId,
-          liquidityUsd: p.liquidityUsd,
-          volume24hUsd: p.volume24hUsd,
-          pairCreatedAt: p.pairCreatedAt,
-          baseTokenSymbol: p.baseToken.symbol,
-        }))
-        .sort((a, b) => (b.liquidityUsd ?? 0) - (a.liquidityUsd ?? 0))
+    ? pairs.map(pairToTradingPool).sort((a, b) => (b.liquidityUsd ?? 0) - (a.liquidityUsd ?? 0))
     : [];
 
   const dexVolume = available ? sumBy(pairs, (p) => p.volume24hUsd ?? 0) : null;

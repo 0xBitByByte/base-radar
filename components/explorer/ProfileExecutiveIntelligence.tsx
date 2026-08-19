@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  ArrowRight,
   Check,
   CircleCheck,
   CircleX,
@@ -12,6 +13,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import Link from "next/link";
 
 import { ProfileSectionCard } from "@/components/explorer/ProfileSectionCard";
 import { RelativeTime } from "@/components/shared/RelativeTime";
@@ -26,6 +28,8 @@ type ProfileExecutiveIntelligenceProps = {
   /** Real per-provider status, already computed for the Evidence & Sources panel below — reused here (not recalculated) to explain, in plain checkmarks, why Confidence sits where it does. */
   sources: Sources;
   verificationStatus: VerificationStatus;
+  /** PR-084.06 — the real AI Intelligence Report route for this project (`/dashboard/projects/{slug}/ai`), built once in `page.tsx` from `slug`. */
+  aiHref: string;
 };
 
 type ConfidenceFactor = { label: string; met: boolean };
@@ -125,7 +129,7 @@ function ReportBucket({ icon: Icon, label, tone, items }: { icon: LucideIcon; la
  * lives. Every remaining field still comes from `buildIntelligenceReport()`
  * (`lib/intelligence/report.ts`) — nothing here is computed twice.
  */
-export function ProfileExecutiveIntelligence({ report, freshness, sources, verificationStatus }: ProfileExecutiveIntelligenceProps) {
+export function ProfileExecutiveIntelligence({ report, freshness, sources, verificationStatus, aiHref }: ProfileExecutiveIntelligenceProps) {
   const sentimentColor = RISK_SENTIMENT_COLOR[report.riskLevel];
   const confidenceFactors = buildConfidenceFactors(sources, verificationStatus);
   const hasKeyTakeaways =
@@ -244,6 +248,18 @@ export function ProfileExecutiveIntelligence({ report, freshness, sources, verif
             ))}
           </ul>
         </div>
+
+        {/* PR-084.06 — the full-depth destination: every Scorecard tile
+            (including the four never shown elsewhere), the complete Risk
+            Analysis, and a cross-domain summary linking to the Pool/
+            Contract/Governance/Whale Explorers. */}
+        <Link
+          href={aiHref}
+          className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-radar-light-border py-2 text-xs font-medium text-radar-light-muted outline-none transition-colors hover:border-radar-primary/40 hover:text-radar-primary focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:border-white/10 dark:text-radar-muted dark:hover:border-radar-accent/40 dark:hover:text-radar-accent"
+        >
+          View Full AI Intelligence Report
+          <ArrowRight className="size-3.5" aria-hidden="true" />
+        </Link>
       </div>
     </ProfileSectionCard>
   );
