@@ -301,6 +301,28 @@ history).
   returns the current snapshot for all 7 providers plus GitHub's real
   `authenticated`/`limit`/`remaining` state (from the existing
   `lib/providers/github/rateLimit.ts` tracker).
+- **Cross-route sharing (PR-111)**: Next.js compiles each route (a Page,
+  a Route Handler) into its own server bundle, and a plain module-scope
+  `Map`/`let` is not guaranteed to be `require()`'d only once across
+  them — confirmed live by PR-110.1: a real provider call made while
+  serving a Page route was invisible to `GET /api/admin/observability/
+  providers` (a Route Handler) reading a separately-evaluated copy of the
+  same module, reproduced against both `next dev` and a clean production
+  build. Both `common/telemetry.ts` and `github/rateLimit.ts` (the two
+  modules this admin route reads directly) now store their state behind
+  a `Symbol.for(...)`-keyed `globalThis` entry instead of a bare
+  module-scope binding — `globalThis` is the one true per-process object
+  regardless of how many separate bundle copies of a module's code exist,
+  so every copy resolves to the identical shared store. This is still
+  genuinely **process-local**, not a step toward cross-instance
+  aggregation: a separate Vercel serverless instance is a separate
+  process with its own separate `globalThis`, so this fixes visibility
+  *within* one process only. `common/cache.ts`, `common/circuitBreaker.ts`
+  (its own breaker state — its opens/rejections *counts* are already
+  correctly shared via `telemetry.ts`'s own fix), and `common/
+  rate-limit.ts` were deliberately left untouched — nothing in PR-111's
+  investigation proved they needed the same treatment, only the two
+  modules this specific admin route reads directly.
 - **Scope — read this before trusting a number**: every counter is
   **process-local, in-memory, since that process's last cold start** —
   exactly like `common/cache.ts`/`common/circuitBreaker.ts`/`common/

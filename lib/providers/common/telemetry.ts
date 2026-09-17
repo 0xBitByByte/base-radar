@@ -102,12 +102,66 @@ function createEmptyCounters(): ProviderCounters {
   };
 }
 
-const counters = new Map<TelemetryProviderName, ProviderCounters>(TELEMETRY_PROVIDER_NAMES.map((provider) => [provider, createEmptyCounters()]));
+/**
+ * PR-111 — Next.js compiles each route (a Page, a Route Handler) into its
+ * own server bundle, and a "shared" module like this one is not
+ * guaranteed to be `require()`'d only once across those bundles — PR-110.1
+ * proved, by directly grepping `.next/server`'s compiled output, that this
+ * module's code is genuinely duplicated into several separate chunk files.
+ * A plain module-scope `const counters = new Map(...)` is then NOT a true
+ * process-wide singleton: each bundle that pulls in its own copy gets its
+ * own private `Map`, so a real provider call recorded from a Page route
+ * (one bundle) was invisible to the Admin Observability Route Handler
+ * reading from a different bundle — reproduced live, repeatedly, in
+ * PR-110.1's investigation, including against a clean production build.
+ *
+ * `globalThis` is not scoped to any module or bundle at all — it is the
+ * one real JS global object for this Node.js process, identical no matter
+ * how many separate copies of this module's code got compiled. Storing
+ * the counters there (behind a `Symbol.for(...)` key, which — unlike a
+ * plain string property — is guaranteed to resolve to the exact same
+ * global registry entry for the same key from any module, with no
+ * realistic risk of colliding with some unrelated global) makes every
+ * bundle's copy of `getCounters()` resolve to the identical `Map`
+ * instance. This is the same, well-established pattern Next.js's own
+ * documented Prisma Client setup uses for the analogous "one client
+ * instance, not one per hot-reloaded/re-bundled module" problem.
+ *
+ * Still genuinely process-local: `globalThis` is per-process, not
+ * per-machine or cross-instance — a separate Vercel serverless instance
+ * has its own separate process and therefore its own separate
+ * `globalThis`, so this fixes cross-ROUTE visibility within one process
+ * only, never cross-INSTANCE aggregation (still explicitly out of scope —
+ * see this module's top-of-file comment on `scope: "process-local"`).
+ *
+ * Idempotent by construction: re-evaluating this module (a dev-mode Fast
+ * Refresh reload, or simply a different bundle's own first `require()`)
+ * finds the existing global entry, if one exists, and reuses it rather
+ * than resetting real counters back to zero — the desired behavior, since
+ * a file save mid-session should not silently wipe real telemetry.
+ */
+const TELEMETRY_GLOBAL_KEY = Symbol.for("base-radar:provider-telemetry:v1");
 
-/** The one process-lifetime timestamp every snapshot reports alongside its counters, so a consumer can tell "23 calls" apart from "23 calls since 6 hours ago" vs "23 calls in the 4 minutes since a cold start." */
-const processStartedAt = new Date().toISOString();
+type TelemetryGlobalStore = {
+  counters: Map<TelemetryProviderName, ProviderCounters>;
+  processStartedAt: string;
+};
+
+function getGlobalStore(): TelemetryGlobalStore {
+  const globalRef = globalThis as Record<symbol, TelemetryGlobalStore | undefined>;
+  let store = globalRef[TELEMETRY_GLOBAL_KEY];
+  if (!store) {
+    store = {
+      counters: new Map(TELEMETRY_PROVIDER_NAMES.map((provider) => [provider, createEmptyCounters()])),
+      processStartedAt: new Date().toISOString(),
+    };
+    globalRef[TELEMETRY_GLOBAL_KEY] = store;
+  }
+  return store;
+}
 
 function getCounters(provider: TelemetryProviderName): ProviderCounters {
+  const { counters } = getGlobalStore();
   let entry = counters.get(provider);
   if (!entry) {
     entry = createEmptyCounters();
@@ -242,7 +296,7 @@ export function getProviderTelemetrySnapshot(provider: TelemetryProviderName): P
   return {
     provider,
     scope: "process-local",
-    processStartedAt,
+    processStartedAt: getGlobalStore().processStartedAt,
     calls: entry.calls,
     attempts: entry.attempts,
     retries: entry.retries,
@@ -262,6 +316,22 @@ export function getProviderTelemetrySnapshot(provider: TelemetryProviderName): P
       // top-of-module comment) — the same widening cast
       // `lib/providers/snapshot/client.ts` already applies for the exact
       // same reason, reused here rather than inventing a second approach.
+      //
+      // PR-111 — deliberately NOT globalized: `opens`/`rejectedWhileOpen`
+      // below are this module's own counters (recorded via
+      // `recordCircuitOpen`/`recordCircuitRejection`, called FROM
+      // `circuitBreaker.ts` regardless of which bundle's copy of that
+      // module runs) and are correctly cross-route-shared by this file's
+      // own `globalThis` fix. `currentState` is different: it's a live,
+      // direct read of `circuitBreaker.ts`'s OWN separate `circuits` Map,
+      // which PR-111 intentionally leaves untouched (out of scope — no
+      // evidence this PR gathered proves the breaker's own protective
+      // decision-making needs cross-bundle sharing, only that this
+      // observability snapshot's *visibility* of it does). Practical
+      // effect: `currentState` reflects whichever bundle's own circuit
+      // instance is reachable from here, which may lag or differ from a
+      // trip that happened via a different route's bundle — a known,
+      // accepted limitation, not a bug this PR claims to have fixed.
       currentState: getCircuitState(provider as ProviderName).state,
       opens: entry.circuitOpens,
       rejectedWhileOpen: entry.circuitRejections,
@@ -280,8 +350,18 @@ export function getAllProviderTelemetrySnapshots(): ProviderTelemetrySnapshot[] 
   return TELEMETRY_PROVIDER_NAMES.map((provider) => getProviderTelemetrySnapshot(provider));
 }
 
-/** Test-only reset — production code never calls this. Mirrors `cache.ts`'s `__resetProviderCacheForTests()`/`circuitBreaker.ts`'s `__resetCircuitBreakerForTests()` exactly. */
+/**
+ * Test-only reset — production code never calls this. Mirrors `cache.ts`'s
+ * `__resetProviderCacheForTests()`/`circuitBreaker.ts`'s
+ * `__resetCircuitBreakerForTests()` exactly.
+ *
+ * PR-111 — resets the real shared `globalThis` store's contents in place
+ * (not just a local reference), so every test file — regardless of
+ * whether its own module import happens to be a fresh evaluation or a
+ * cached one — observes the reset through the one real shared store.
+ */
 export function __resetProviderTelemetryForTests(): void {
+  const { counters } = getGlobalStore();
   for (const provider of TELEMETRY_PROVIDER_NAMES) {
     counters.set(provider, createEmptyCounters());
   }
