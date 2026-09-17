@@ -269,6 +269,63 @@ strategy discussion.
   a handful of page loads in one session fully exhausted it). A token is
   strongly recommended for any deployment beyond local development.
 
+### Provider Observability (PR-110)
+
+`lib/providers/common/telemetry.ts` measures the 7 providers above
+(Base RPC, Blockscout, CoinGecko, DefiLlama, DexScreener, GitHub,
+Snapshot) without changing any of their behavior — added specifically so
+a future capacity decision (e.g. PR-109's distributed rate limiter) can
+be based on real evidence instead of synthetic sampling (see
+`docs/MASTER_ROADMAP.md`'s PR-108/PR-108.4/PR-110 entries for that
+history).
+
+- **What it measures, per provider**: logical calls vs. real upstream
+  attempts (a call that retries twice before succeeding is one logical
+  call, not three), retry count, outcome (`success` / `http_error` /
+  `timeout` / `network_error` / `rate_limited` / `circuit_open` /
+  `parse_error` — a real external HTTP 429 is `rate_limited`, distinct
+  from this app's own self-limiter rejecting a call before any network
+  attempt), cache hit/miss and hit rate, this app's own rate-limiter
+  allow/reject counts, circuit-breaker opens and rejections, and latency
+  (avg/min/max, plus p95 — only once at least 20 real samples exist;
+  otherwise reported as `null` rather than a fabricated percentile).
+- **Where it hooks in**: `common/cache.ts`'s `getOrSet` (hit/miss),
+  `common/rate-limit.ts`'s `assertRateLimit` (allow/reject),
+  `common/circuitBreaker.ts`'s `shouldAllowRequest`/`recordRequestOutcome`
+  (opens/rejections), and `common/utilities.ts`'s `fetchJson` (the
+  logical-call/attempt/outcome/latency record) — the four shared
+  boundaries every provider call already funnels through, so no
+  individual `service.ts` needed its own instrumentation.
+- **Reading it**: `GET /api/admin/observability/providers` (admin-only,
+  same `resolveAdminAccess` gate as every other `/api/admin/*` route)
+  returns the current snapshot for all 7 providers plus GitHub's real
+  `authenticated`/`limit`/`remaining` state (from the existing
+  `lib/providers/github/rateLimit.ts` tracker).
+- **Scope — read this before trusting a number**: every counter is
+  **process-local, in-memory, since that process's last cold start** —
+  exactly like `common/cache.ts`/`common/circuitBreaker.ts`/`common/
+  health.ts` already are, and deliberately not a new architecture. On
+  Vercel's stateless, multi-instance deployment (PR-108/PR-108.4 directly
+  observed multiple independent processes with independent state in real
+  production traffic) this is necessarily a **partial view** — it never
+  claims to be a global, cross-instance total, and the API response's own
+  `scope`/`note` fields say so explicitly. It resets on every redeploy or
+  cold start, holds no persisted history, and is never written to
+  SQLite — it works identically, and independently, on both Vercel and
+  Fly.
+- **Failure safety**: every recording function is fail-open (wrapped in
+  its own internal try/catch) — a bug in telemetry itself can never break
+  the real provider call it's observing.
+- **Never recorded**: `GITHUB_TOKEN`, any `Authorization` header value,
+  any other provider API key, response bodies, or full cache keys (only
+  the safe `provider:` prefix is read from a cache key, never the rest of
+  it, which can contain real project/repo identifiers).
+- **What this still cannot answer**: real organic production traffic
+  volume, a true cross-instance total for any counter, or historical
+  data beyond the current process's own lifetime — closing those gaps
+  would need either real Vercel Analytics/log access or a persistent,
+  cross-instance aggregation layer, neither of which this PR introduces.
+
 ## Alert Engine & AI Intelligence API
 
 Internal function reference for `lib/alerts/`. See

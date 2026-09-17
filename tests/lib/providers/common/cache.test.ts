@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { __resetProviderCacheForTests, getOrSet, getStale, invalidate } from "@/lib/providers/common/cache";
+import { __resetProviderTelemetryForTests, getProviderTelemetrySnapshot } from "@/lib/providers/common/telemetry";
 
 /**
  * MASTER HARDENING PASS — Concern 2 (concurrency deduplication). Direct,
@@ -26,6 +27,7 @@ function deferred<T>() {
 describe("getOrSet — concurrency dedup", () => {
   beforeEach(() => {
     __resetProviderCacheForTests();
+    __resetProviderTelemetryForTests();
   });
 
   it("1 caller: fetches once and returns the value", async () => {
@@ -154,5 +156,26 @@ describe("getOrSet — concurrency dedup", () => {
     invalidate("key-9");
     await getOrSet("key-9", 60_000, fn);
     expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  describe("PR-110 — cache telemetry", () => {
+    it("a real provider-prefixed key records a genuine miss on first fetch, then a genuine hit on the cached re-read", async () => {
+      const fn = vi.fn(async () => "value");
+      await getOrSet("github:repo:aave/aave-v3-core", 60_000, fn);
+      expect(getProviderTelemetrySnapshot("github").cache).toEqual({ hits: 0, misses: 1, hitRatePercent: 0 });
+
+      await getOrSet("github:repo:aave/aave-v3-core", 60_000, fn);
+      expect(getProviderTelemetrySnapshot("github").cache).toEqual({ hits: 1, misses: 1, hitRatePercent: 50 });
+    });
+
+    it("a key with no recognizable provider prefix records no telemetry for any provider — cache.ts stays genuinely provider-agnostic", async () => {
+      const fn = vi.fn(async () => "value");
+      await getOrSet("not-a-provider-key", 60_000, fn);
+      await getOrSet("not-a-provider-key", 60_000, fn);
+      for (const provider of ["github", "coingecko", "base", "blockscout", "defillama", "dexscreener", "snapshot"] as const) {
+        expect(getProviderTelemetrySnapshot(provider).cache).toEqual({ hits: 0, misses: 0, hitRatePercent: null });
+      }
+    });
+
   });
 });

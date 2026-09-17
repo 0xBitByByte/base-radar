@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { __resetCircuitBreakerForTests, CIRCUIT_BREAKER_CONFIG, getCircuitState } from "@/lib/providers/common/circuitBreaker";
+import { __resetProviderTelemetryForTests, getProviderTelemetrySnapshot } from "@/lib/providers/common/telemetry";
 import { fetchJson } from "@/lib/providers/common/utilities";
 
 /**
@@ -39,6 +40,7 @@ describe("fetchJson — circuit breaker integration", () => {
 
   beforeEach(() => {
     __resetCircuitBreakerForTests();
+    __resetProviderTelemetryForTests();
     vi.useFakeTimers();
     delete process.env.CIRCUIT_BREAKER_DISABLED;
     fetchMock = vi.fn();
@@ -139,5 +141,113 @@ describe("fetchJson — circuit breaker integration", () => {
 
     const result = await fetchJson<{ ok: boolean }>(PROVIDER, URL, undefined, 1000, 0);
     expect(result).toEqual({ ok: true }); // real network attempt happened despite the open circuit
+  });
+});
+
+describe("fetchJson — PR-110 telemetry integration", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    __resetCircuitBreakerForTests();
+    __resetProviderTelemetryForTests();
+    vi.useFakeTimers();
+    delete process.env.CIRCUIT_BREAKER_DISABLED;
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("a plain success records exactly one logical call, one attempt, zero retries, outcome success", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { ok: true }));
+    await fetchJson<{ ok: boolean }>(PROVIDER, URL);
+
+    const snapshot = getProviderTelemetrySnapshot(PROVIDER);
+    expect(snapshot.calls).toBe(1);
+    expect(snapshot.attempts).toBe(1);
+    expect(snapshot.retries).toBe(0);
+    expect(snapshot.outcomes.success).toBe(1);
+    expect(snapshot.latency.sampleCount).toBe(1);
+  });
+
+  it("a real HTTP 429 is classified rate_limited, distinct from a generic http_error", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(429));
+    await expect(fetchJson(PROVIDER, URL, undefined, 1000, 0)).rejects.toThrow();
+
+    const snapshot = getProviderTelemetrySnapshot(PROVIDER);
+    expect(snapshot.outcomes.rate_limited).toBe(1);
+    expect(snapshot.outcomes.http_error).toBe(0);
+  });
+
+  it("a 5xx is classified http_error", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(503));
+    await expect(fetchJson(PROVIDER, URL, undefined, 1000, 0)).rejects.toThrow();
+
+    expect(getProviderTelemetrySnapshot(PROVIDER).outcomes.http_error).toBe(1);
+  });
+
+  it("a call that retries after a timeout then succeeds records ONE logical call, TWO attempts, ONE retry, timedOut true, outcome success — never counted as two logical calls", async () => {
+    fetchMock.mockImplementationOnce(abortableHang).mockResolvedValueOnce(jsonResponse(200, { ok: true }));
+
+    const pending = fetchJson<{ ok: boolean }>(PROVIDER, URL, undefined, 1000, 1);
+    await vi.advanceTimersByTimeAsync(1000); // the hung first attempt times out
+    await vi.advanceTimersByTimeAsync(300); // retry backoff
+    const result = await pending;
+
+    expect(result).toEqual({ ok: true });
+    const snapshot = getProviderTelemetrySnapshot(PROVIDER);
+    expect(snapshot.calls).toBe(1); // ONE logical call, not two
+    expect(snapshot.attempts).toBe(2);
+    expect(snapshot.retries).toBe(1);
+    expect(snapshot.outcomes.success).toBe(1);
+    expect(snapshot.outcomes.timeout).toBe(0); // the eventual outcome is success — the timeout is only reflected in timedOut, not double-counted as its own outcome
+  });
+
+  it("a call that exhausts its retries records ONE logical call with the final outcome and the real total attempt count", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(500));
+
+    const pending = fetchJson(PROVIDER, URL, undefined, 1000, 2); // 3 total attempts
+    const assertion = expect(pending).rejects.toThrow();
+    await vi.advanceTimersByTimeAsync(250);
+    await vi.advanceTimersByTimeAsync(500);
+    await assertion;
+
+    const snapshot = getProviderTelemetrySnapshot(PROVIDER);
+    expect(snapshot.calls).toBe(1);
+    expect(snapshot.attempts).toBe(3);
+    expect(snapshot.retries).toBe(2);
+    expect(snapshot.outcomes.http_error).toBe(1);
+  });
+
+  it("a circuit-open rejection is recorded as its own outcome, with zero attempts — no network call was ever made", async () => {
+    fetchMock.mockResolvedValue(jsonResponse(500));
+    for (let i = 0; i < CIRCUIT_BREAKER_CONFIG.tripThreshold; i++) {
+      await expect(fetchJson(PROVIDER, URL, undefined, 1000, 0)).rejects.toThrow();
+    }
+    fetchMock.mockClear();
+
+    await expect(fetchJson(PROVIDER, URL, undefined, 1000, 0)).rejects.toThrow(/circuit breaker open/i);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    const snapshot = getProviderTelemetrySnapshot(PROVIDER);
+    expect(snapshot.outcomes.circuit_open).toBe(1);
+    const circuitOpenCall = snapshot.calls; // the trip-threshold http_errors + this one circuit_open call
+    expect(circuitOpenCall).toBe(CIRCUIT_BREAKER_CONFIG.tripThreshold + 1);
+  });
+
+  it("never records a real secret/header value anywhere in the recorded observation or snapshot", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { ok: true }));
+    await fetchJson<{ ok: boolean }>("github", "https://api.github.com/repos/example/example", {
+      headers: { authorization: "Bearer ghp_fakeTestTokenShouldNeverAppear" },
+    });
+
+    const snapshot = getProviderTelemetrySnapshot("github");
+    const serialized = JSON.stringify(snapshot);
+    expect(serialized).not.toContain("ghp_fakeTestTokenShouldNeverAppear");
+    expect(serialized).not.toMatch(/authorization/i);
+    expect(serialized).not.toMatch(/bearer/i);
   });
 });

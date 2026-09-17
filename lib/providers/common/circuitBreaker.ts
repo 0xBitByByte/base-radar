@@ -20,6 +20,7 @@
  * as breaker decision input).
  */
 
+import { recordCircuitOpen, recordCircuitRejection, type TelemetryProviderName } from "@/lib/providers/common/telemetry";
 import { PROVIDER_NAMES, type ProviderName } from "@/lib/providers/common/types";
 
 export type CircuitState = "closed" | "open" | "half-open";
@@ -99,7 +100,10 @@ export function shouldAllowRequest(provider: ProviderName): boolean {
   if (entry.state === "half-open") {
     const trialStartedAt = entry.openedAt;
     const trialAbandoned = trialStartedAt === null || Date.now() - trialStartedAt >= CIRCUIT_BREAKER_CONFIG.cooldownMs;
-    if (trialInFlight.get(provider) && !trialAbandoned) return false;
+    if (trialInFlight.get(provider) && !trialAbandoned) {
+      recordCircuitRejection(provider as TelemetryProviderName);
+      return false;
+    }
     trialInFlight.set(provider, true);
     entry.openedAt = Date.now();
     circuits.set(provider, entry);
@@ -109,7 +113,10 @@ export function shouldAllowRequest(provider: ProviderName): boolean {
   if (entry.state !== "open") return true;
 
   const elapsed = entry.openedAt !== null ? Date.now() - entry.openedAt : Infinity;
-  if (elapsed < CIRCUIT_BREAKER_CONFIG.cooldownMs) return false;
+  if (elapsed < CIRCUIT_BREAKER_CONFIG.cooldownMs) {
+    recordCircuitRejection(provider as TelemetryProviderName);
+    return false;
+  }
 
   entry.state = "half-open";
   entry.openedAt = Date.now();
@@ -151,6 +158,7 @@ export function recordRequestOutcome(provider: ProviderName, outcome: "success" 
     circuits.set(provider, entry);
     trialInFlight.delete(provider);
     logTransition(provider, "half-open->open", entry.consecutiveFailures);
+    recordCircuitOpen(provider as TelemetryProviderName);
     return;
   }
 
@@ -159,6 +167,7 @@ export function recordRequestOutcome(provider: ProviderName, outcome: "success" 
     entry.openedAt = Date.now();
     circuits.set(provider, entry);
     logTransition(provider, "closed->open", entry.consecutiveFailures);
+    recordCircuitOpen(provider as TelemetryProviderName);
     return;
   }
 

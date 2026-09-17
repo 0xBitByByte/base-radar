@@ -7,6 +7,7 @@ import {
   recordRequestOutcome,
   shouldAllowRequest,
 } from "@/lib/providers/common/circuitBreaker";
+import { __resetProviderTelemetryForTests, getProviderTelemetrySnapshot } from "@/lib/providers/common/telemetry";
 
 /**
  * V1-PHASE-2 (ADR V1-BLOCKER-001) — direct unit tests of the breaker's own
@@ -20,6 +21,7 @@ const PROVIDER = "blockscout";
 describe("circuitBreaker", () => {
   beforeEach(() => {
     __resetCircuitBreakerForTests();
+    __resetProviderTelemetryForTests();
     vi.useFakeTimers();
     delete process.env.CIRCUIT_BREAKER_DISABLED;
   });
@@ -171,5 +173,42 @@ describe("circuitBreaker", () => {
     expect(warnSpy.mock.calls[0]![0]).toContain("closed->open");
 
     warnSpy.mockRestore();
+  });
+
+  describe("PR-110 — circuit-breaker telemetry", () => {
+    it("records exactly one 'open' event on a real closed->open trip, not once per subsequent rejection", () => {
+      for (let i = 0; i < CIRCUIT_BREAKER_CONFIG.tripThreshold; i++) recordRequestOutcome(PROVIDER, "failure");
+      expect(getProviderTelemetrySnapshot(PROVIDER).circuitBreaker.opens).toBe(1);
+
+      shouldAllowRequest(PROVIDER); // rejected while open — a rejection, not a second "open"
+      shouldAllowRequest(PROVIDER);
+      expect(getProviderTelemetrySnapshot(PROVIDER).circuitBreaker.opens).toBe(1);
+      expect(getProviderTelemetrySnapshot(PROVIDER).circuitBreaker.rejectedWhileOpen).toBe(2);
+    });
+
+    it("records a rejection for a half-open trial already in flight", () => {
+      for (let i = 0; i < CIRCUIT_BREAKER_CONFIG.tripThreshold; i++) recordRequestOutcome(PROVIDER, "failure");
+      vi.advanceTimersByTime(CIRCUIT_BREAKER_CONFIG.cooldownMs + 1);
+
+      expect(shouldAllowRequest(PROVIDER)).toBe(true); // the one admitted trial — no rejection recorded
+      expect(shouldAllowRequest(PROVIDER)).toBe(false); // second caller — a real rejection
+
+      expect(getProviderTelemetrySnapshot(PROVIDER).circuitBreaker.rejectedWhileOpen).toBe(1);
+    });
+
+    it("a half-open trial that fails and reopens records a second 'open' event", () => {
+      for (let i = 0; i < CIRCUIT_BREAKER_CONFIG.tripThreshold; i++) recordRequestOutcome(PROVIDER, "failure");
+      vi.advanceTimersByTime(CIRCUIT_BREAKER_CONFIG.cooldownMs + 1);
+      shouldAllowRequest(PROVIDER); // trial admitted
+      recordRequestOutcome(PROVIDER, "failure"); // trial fails, reopens
+
+      expect(getProviderTelemetrySnapshot(PROVIDER).circuitBreaker.opens).toBe(2);
+    });
+
+    it("providers are tracked independently in telemetry too", () => {
+      for (let i = 0; i < CIRCUIT_BREAKER_CONFIG.tripThreshold; i++) recordRequestOutcome("blockscout", "failure");
+      expect(getProviderTelemetrySnapshot("blockscout").circuitBreaker.opens).toBe(1);
+      expect(getProviderTelemetrySnapshot("github").circuitBreaker.opens).toBe(0);
+    });
   });
 });

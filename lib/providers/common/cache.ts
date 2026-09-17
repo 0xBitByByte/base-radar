@@ -10,6 +10,8 @@
  * calls (and never double-counts against a rate limit).
  */
 
+import { providerFromCacheKey, recordCacheEvent } from "@/lib/providers/common/telemetry";
+
 type CacheEntry<T> = {
   value: T;
   expiresAt: number;
@@ -22,13 +24,24 @@ const inFlight = new Map<string, Promise<unknown>>();
 export async function getOrSet<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
   const cached = store.get(key);
   if (cached && cached.expiresAt > Date.now()) {
+    // PR-110 — a real cache hit: this call is answered without a new
+    // upstream fetch. `providerFromCacheKey` reads only the safe
+    // `provider:` prefix already documented on that function; recording
+    // never changes what's returned below.
+    recordCacheEvent(providerFromCacheKey(key), true);
     return cached.value as T;
   }
 
   const pending = inFlight.get(key);
   if (pending) {
+    // A concurrent caller for the same key — genuinely deduped (no new
+    // upstream fetch either), but distinct from a warm-cache hit, so it's
+    // not double-counted as one here; the eventual `fn()` below is what
+    // actually earns the one real "miss" this key produces.
     return pending as Promise<T>;
   }
+
+  recordCacheEvent(providerFromCacheKey(key), false);
 
   const promise = fn()
     .then((value) => {

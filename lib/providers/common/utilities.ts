@@ -11,6 +11,7 @@ import {
 import { getStale } from "@/lib/providers/common/cache";
 import { recordRequestOutcome, shouldAllowRequest } from "@/lib/providers/common/circuitBreaker";
 import { recordProviderFailure, recordProviderSuccess } from "@/lib/providers/common/health";
+import { recordProviderCall, type ProviderCallOutcome, type TelemetryProviderName } from "@/lib/providers/common/telemetry";
 import type { ProviderName, ProviderResult } from "@/lib/providers/common/types";
 
 const DEFAULT_TIMEOUT_MS = 8_000;
@@ -32,6 +33,26 @@ function isRetryable(err: unknown): boolean {
   if (err instanceof ProviderTimeoutError) return true;
   if (err instanceof ProviderError) return err.code === "network_error";
   return false;
+}
+
+/**
+ * PR-110 — maps a thrown error to this module's own telemetry outcome
+ * vocabulary. A real external HTTP 429 is classified `"rate_limited"`
+ * (the upstream provider's own signal) — distinct from this app's *own*
+ * self-imposed budget rejecting a call before any network attempt, which
+ * `common/rate-limit.ts`'s `assertRateLimit` records separately as
+ * `rateLimiter.rejected`, never as a `fetchJson` outcome (that rejection
+ * happens one layer up, in each provider's `service.ts`, before
+ * `fetchJson` is ever called).
+ */
+function classifyOutcome(err: unknown): { outcome: ProviderCallOutcome; httpStatus?: number } {
+  if (err instanceof ProviderCircuitOpenError) return { outcome: "circuit_open" };
+  if (err instanceof ProviderHttpError) {
+    return err.status === 429 ? { outcome: "rate_limited", httpStatus: err.status } : { outcome: "http_error", httpStatus: err.status };
+  }
+  if (err instanceof ProviderTimeoutError) return { outcome: "timeout" };
+  if (err instanceof ProviderParseError) return { outcome: "parse_error" };
+  return { outcome: "network_error" };
 }
 
 async function fetchJsonOnce<T>(
@@ -96,6 +117,14 @@ export async function fetchJson<T>(
   /** PR-074 REVIEW #11 — lets a provider's `client.ts` inspect real response headers (e.g. GitHub's `x-ratelimit-*`) without every provider needing its own fetch wrapper. */
   onHeaders?: (headers: Headers) => void
 ): Promise<T> {
+  // PR-110 — this logical call's own start time, independent of any
+  // individual retry attempt. `sawTimeout` tracks whether ANY attempt
+  // (not necessarily the final one) hit a timeout — Phase 4's own worked
+  // example: an attempt that times out, then succeeds on retry, must still
+  // report `timedOut: true` alongside `outcome: "success"`.
+  const startedAt = Date.now();
+  let sawTimeout = false;
+
   // V1-PHASE-2 (ADR V1-BLOCKER-001) — the circuit breaker gate. Checked once,
   // here, before this call's own retry loop even starts — never inside
   // `fetchJsonOnce` (that would gate each individual retry attempt
@@ -104,6 +133,17 @@ export async function fetchJson<T>(
   // touches `recordRequestOutcome` — a skipped call is not itself a new
   // failure to count.
   if (!shouldAllowRequest(provider)) {
+    // PR-110 — recorded as its own logical call (0 attempts, 0 retries):
+    // this is exactly the "we chose not to ask this time" case `errors.ts`
+    // already distinguishes from a real provider failure.
+    recordProviderCall({
+      provider: provider as TelemetryProviderName,
+      durationMs: Date.now() - startedAt,
+      attempts: 0,
+      retryCount: 0,
+      outcome: "circuit_open",
+      timedOut: false,
+    });
     throw new ProviderCircuitOpenError(provider);
   }
 
@@ -114,8 +154,18 @@ export async function fetchJson<T>(
       // never once per raw retry attempt, matching the ADR's own explicit
       // "retries occur first, breaker observes only the final outcome" rule.
       recordRequestOutcome(provider, "success");
+      recordProviderCall({
+        provider: provider as TelemetryProviderName,
+        durationMs: Date.now() - startedAt,
+        attempts: attempt + 1,
+        retryCount: attempt,
+        outcome: "success",
+        timedOut: sawTimeout,
+      });
       return result;
     } catch (err) {
+      if (err instanceof ProviderTimeoutError) sawTimeout = true;
+
       if (attempt >= retries || !isRetryable(err)) {
         // `isRetryable` is reused unmodified as the breaker's own failure
         // classifier too — the two questions ("is this worth retrying?" and
@@ -125,6 +175,16 @@ export async function fetchJson<T>(
         // table: a 404/429/parse_error is already excluded from retries by
         // this same predicate, and must also never trip the breaker.
         if (isRetryable(err)) recordRequestOutcome(provider, "failure");
+        const { outcome, httpStatus } = classifyOutcome(err);
+        recordProviderCall({
+          provider: provider as TelemetryProviderName,
+          durationMs: Date.now() - startedAt,
+          attempts: attempt + 1,
+          retryCount: attempt,
+          outcome,
+          httpStatus,
+          timedOut: sawTimeout,
+        });
         throw err;
       }
       await delay(RETRY_BASE_DELAY_MS * 2 ** attempt);

@@ -8,6 +8,7 @@
  */
 
 import { ProviderRateLimitError } from "@/lib/providers/common/errors";
+import { recordRateLimitEvent, type TelemetryProviderName } from "@/lib/providers/common/telemetry";
 import type { ProviderName } from "@/lib/providers/common/types";
 
 type Bucket = {
@@ -52,7 +53,17 @@ export function tryAcquire(key: string, config: RateLimitConfig): boolean {
  * repeated per provider.
  */
 export function assertRateLimit(provider: ProviderName, config: RateLimitConfig): void {
-  if (!tryAcquire(provider, config)) {
+  const allowed = tryAcquire(provider, config);
+  // PR-110 — this app's own self-imposed budget only, keyed by provider
+  // name exactly as `tryAcquire` already is here (unlike the generic
+  // `tryAcquire`, which `lib/security/requestRateLimit.ts` also reuses for
+  // unrelated per-IP route keys — recording lives here, not inside
+  // `tryAcquire` itself, so that per-IP usage is never mis-attributed to a
+  // "provider"). `provider` is real `ProviderName`, a strict subset of
+  // `TelemetryProviderName` — see `snapshot/client.ts`'s own identical
+  // widening precedent for why this cast is safe.
+  recordRateLimitEvent(provider as TelemetryProviderName, allowed);
+  if (!allowed) {
     throw new ProviderRateLimitError(provider);
   }
 }
