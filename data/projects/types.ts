@@ -60,6 +60,17 @@ export type ProjectProviderIds = {
   dexscreenerChainId?: string;
   /** DexScreener pair addresses to look up, if known. */
   dexscreenerPairAddresses?: string[];
+  /**
+   * Trading Discovery Strategy — the DexScreener `dexId` slug(s) this
+   * project's own exchange is listed under (e.g. `["aerodrome"]`,
+   * `["uniswap"]`), verified live against real DexScreener pair data, never
+   * guessed. Used only for `"dex"`-category projects, whose real Base
+   * footprint is the pools their exchange hosts, not a single governance
+   * token — see `lib/trading/discoveryStrategy.ts`. A project can list more
+   * than one slug when its AMM spans multiple DexScreener-tracked variants
+   * (e.g. a v2/v3 split).
+   */
+  dexscreenerDexIds?: string[];
   /** DefiLlama protocol slug, e.g. "aerodrome-finance". */
   defillamaSlug?: string;
   /** Primary address to resolve on the Base Blockscout explorer. */

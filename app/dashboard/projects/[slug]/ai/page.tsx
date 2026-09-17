@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { AlertTriangle, ArrowLeft, ChevronRight, FileSearch } from "lucide-react";
+import { AlertTriangle, FileSearch } from "lucide-react";
 import Link from "next/link";
 
 import { getProject } from "@/data/projects/helpers";
+import { ProjectSubpageBreadcrumb } from "@/components/explorer/ProjectSubpageBreadcrumb";
 import { getRawWhaleEvents } from "@/lib/data/aggregate";
 import { buildProjectIntelligence } from "@/lib/intelligence/engine";
 import { buildHealthScorecard, type ScorecardSeverity, type ScorecardTile } from "@/lib/intelligence/scorecard";
@@ -81,46 +82,7 @@ export default async function AIIntelligenceReportPage({ params }: AIIntelligenc
 
   const projectHref = `/dashboard/projects/${slug}`;
   const breadcrumb = (
-    <div className="flex flex-col gap-2">
-      <nav aria-label="Breadcrumb">
-        <ol className="flex flex-wrap items-center gap-1.5 text-xs text-radar-light-muted dark:text-radar-muted">
-          <li>
-            <Link href="/dashboard" className="rounded-md font-medium outline-none transition-colors hover:text-radar-light-text focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:hover:text-radar-white">
-              Dashboard
-            </Link>
-          </li>
-          <li aria-hidden="true">
-            <ChevronRight className="size-3.5" />
-          </li>
-          <li>
-            <Link href="/dashboard/projects" className="rounded-md font-medium outline-none transition-colors hover:text-radar-light-text focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:hover:text-radar-white">
-              Projects
-            </Link>
-          </li>
-          <li aria-hidden="true">
-            <ChevronRight className="size-3.5" />
-          </li>
-          <li>
-            <Link href={projectHref} className="rounded-md font-medium outline-none transition-colors hover:text-radar-light-text focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:hover:text-radar-white">
-              {registryProject?.name ?? "Project"}
-            </Link>
-          </li>
-          <li aria-hidden="true">
-            <ChevronRight className="size-3.5" />
-          </li>
-          <li aria-current="page" className="truncate font-semibold text-radar-light-text dark:text-radar-white">
-            AI Intelligence Report
-          </li>
-        </ol>
-      </nav>
-      <Link
-        href={projectHref}
-        className="group inline-flex w-fit items-center gap-1.5 rounded-lg text-xs font-medium text-radar-light-muted outline-none transition-colors hover:text-radar-light-text focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:text-radar-muted dark:hover:text-radar-white"
-      >
-        <ArrowLeft className="size-3.5 shrink-0 transition-transform duration-200 group-hover:-translate-x-0.5" aria-hidden="true" />
-        Back to {registryProject?.name ?? "Project"}
-      </Link>
-    </div>
+    <ProjectSubpageBreadcrumb projectName={registryProject?.name ?? null} projectHref={projectHref} currentPageLabel="AI Intelligence Report" />
   );
 
   if (!registryProject) {
@@ -201,6 +163,9 @@ export default async function AIIntelligenceReportPage({ params }: AIIntelligenc
     narrativeLabel,
     communityLinkCount,
     communityLinkTotal,
+    contracts: profile.contracts,
+    verificationStatus: profile.community.verificationStatus,
+    docsUrl: profile.community.socials.docs ?? null,
   });
 
   const report = buildIntelligenceReport({
@@ -300,12 +265,12 @@ export default async function AIIntelligenceReportPage({ params }: AIIntelligenc
         </div>
       </section>
 
-      {/* Complete Scorecard — all 8 tiles, including 4 never shown on the Profile page */}
+      {/* Complete Scorecard — all 11 tiles, including 7 never shown on the Profile page */}
       <section className="flex flex-col gap-4">
         <SectionHeading id="scorecard">Complete Scorecard</SectionHeading>
         <p className="text-xs leading-relaxed text-radar-light-muted dark:text-radar-muted">
-          All eight Base Radar Scorecard tiles, in full — four of these (Security, Market Momentum, Whale Activity, AI Rating) are
-          computed on every report but not shown anywhere else on this site today.
+          All eleven Base Radar Scorecard tiles, in full — seven of these (Security, Market Momentum, Whale Activity, AI Rating,
+          Activity, Transparency, Documentation) are computed on every report but not shown anywhere else on this site today.
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {allTiles.map((tile: ScorecardTile) => (

@@ -8,6 +8,9 @@ explained — not a line-by-line tour of the code.
 
 For product framing, see [PRODUCT_VISION.md](PRODUCT_VISION.md). For the
 Project Registry's schema in detail, see [PROJECT_REGISTRY.md](PROJECT_REGISTRY.md).
+For a ranked, evidence-based audit of this architecture's actual runtime
+performance — rendering strategy, caching layers, client/server bundle
+composition — see [PERFORMANCE_AUDIT.md](PERFORMANCE_AUDIT.md).
 
 ## Overall Architecture
 
@@ -896,6 +899,167 @@ flowchart TD
 **Dashboard integration**: `AutomationWidget` renders only the top-level summary (triggered/high-priority counts, the single latest result) — never the full grouped feed, which lives at `/dashboard/automation` only. Reached via the Sidebar's "Automation" nav item (under Portfolio, alongside Watchlist/Alerts) and via each notification's own deep link, per the PR brief's own "Dashboard widget, Sidebar, Notification deep links" access pattern — no Topbar icon was added.
 
 **Relationship with the Notification Engine**: Automation is the topmost layer in the reuse chain — AI Intelligence Engine (PR15.3) → Daily Brief (PR16) → Portfolio Intelligence (PR17) → Intelligence Timeline (PR18) → Notification System (PR19) → Automation System (PR20). It reads only from Notifications (never from Timeline, Portfolio Intelligence, Daily Brief, the AI Intelligence Engine, the Alert Engine, or the Provider Layer directly) and adds no new scoring, narrative, or notification-generation logic of its own — its only real contribution is evaluating already-built notifications against user-configurable rules.
+
+## Wallet Portfolio Pipeline
+
+A second, entirely separate five-layer pipeline scoped to the user's own
+**connected wallet holdings** — not to be confused with the watchlist/
+project-scoped "Portfolio Intelligence" (`lib/portfolio/`, PR17) or
+"Automation System" (`lib/automation/`, PR20) sections above, which share
+similar names but are different modules with no dependency between them.
+Built across the V3-WALLET-\*, V4-INTELLIGENCE-\*, V4-AI-\*,
+V4-AUTOMATION-\*, and V4-ANALYTICS-\* phases; this section is its first
+consolidated write-up (added as part of V4-ANALYTICS-001C's "freeze the
+model" pass — the code predates this doc).
+
+```mermaid
+flowchart TD
+    Discovery["Portfolio Discovery<br/>usePortfolio() / lib/holdings"] --> Intel["Portfolio Intelligence<br/>lib/portfolio-intelligence/"]
+    Intel --> AI["Portfolio AI<br/>lib/portfolio-ai/"]
+    Intel --> Auto["Wallet Automation<br/>lib/wallet-automation/"]
+    AI -.->|"walletEvents, for AI Timeline only"| Auto
+    Auto -->|"AutomationSnapshot per evaluation"| Analytics["Wallet Analytics<br/>lib/wallet-analytics/"]
+    Auto -->|"snapshot + real AutomationDiff"| History["History<br/>lib/wallet-history/"]
+    History -.->|"persisted AutomationSnapshot[], when available"| Analytics
+```
+
+**1. Portfolio Discovery** (`usePortfolio()`, backed by `lib/holdings/`) —
+resolves the connected wallet's real on-chain balances (native ETH + ERC-20
+tokens on Base) into `HoldingAsset[]` plus USD pricing. The only layer that
+talks to a blockchain/price provider; every layer below it is pure,
+synchronous, offline computation over its output.
+
+**2. Portfolio Intelligence** (`lib/portfolio-intelligence/`) — the single
+source of truth for every wallet score: `buildPortfolioIntelligence(assets,
+totalUsdValue, lastUpdated)` computes health/risk/confidence/diversification
+scores, allocation breakdown, concentration risk, warnings, recommendations,
+opportunities, and the portfolio fingerprint — all from `HoldingAsset[]`
+alone, no network calls. `lib/portfolio-intelligence/index.ts` is its public
+barrel. **Owns**: Health, Risk, Confidence, Diversification, Fingerprint,
+Warnings, Recommendations, Opportunities — nothing below this layer ever
+recomputes any of these; they only read them off an already-built
+`PortfolioIntelligence`.
+
+**3. Portfolio AI** (`lib/portfolio-ai/`) — a presentation-only
+interpretation layer over Portfolio Intelligence: `buildPortfolioAI(
+intelligence, walletEvents)` produces prioritized insights, suggested
+actions, an executive overview, and (given Wallet Automation's real
+`WalletEvent[]` log) an AI-narrated timeline — `advisor.ts` / `insights.ts`
+/ `actions.ts` / `timeline.ts` / `summary.ts` / `conversation.ts`. Never
+calls an LLM, never recalculates a score; every number it shows is read
+straight off `PortfolioIntelligence`. This is the one place a real future
+LLM integration would plug in, and the one deliberate exception to the
+"never depends on a downstream layer" rule below — it optionally reads
+Wallet Automation's event log for narrative context only, never for scoring.
+
+**4. Wallet Automation** (`lib/wallet-automation/`) — the action/event
+layer: `buildWalletAutomationResults()` / `buildSmartWalletAutomationResults()`
+(`engine.ts`) evaluate a fixed rule set against `PortfolioIntelligence`
+snapshots and emit `WalletEvent`s (`events.ts`) when something real changed
+(edge-triggered — a refresh with no real change produces nothing). `snapshot.ts`'s
+`buildAutomationSnapshot(intelligence)` is the one function that captures a
+point-in-time `AutomationSnapshot` — a plain, JSON-safe record of the
+already-computed scores/allocation fields Intelligence produced, with no
+new calculation of its own. **Owns**: Wallet Events, Automation Rules/Results,
+the `AutomationSnapshot` shape itself (see Snapshot Versioning below).
+
+**5. Wallet Analytics** (`lib/wallet-analytics/`) — the historical/trend
+layer, and the newest: `buildWalletAnalytics(history, events, window, now)`
+(`engine.ts`) consumes an accumulated `AutomationSnapshot[]` (never raw
+holdings, never Intelligence/AI/Automation directly) to compute Trends,
+Portfolio Evolution, Biggest Change, Allocation Analytics, Trend Correlation,
+Portfolio Stability, Milestones, Personal Bests, Recovery Analysis, Change
+Frequency, an Executive Summary, Analytics Highlights, and an Export
+snapshot — 20 files, one per concern, composed once in `engine.ts` and
+never duplicated. **Owns**: every one of those — Health/Confidence/Risk
+themselves stay owned by Portfolio Intelligence; Analytics only ever reads
+their already-computed values off a snapshot. `lib/wallet-analytics/index.ts`
+is its public barrel (see Public API Review below).
+
+**6. Wallet History** (`lib/wallet-history/`, V4-HISTORY-001) — the
+persistence layer, and the newest: `localStorage`-backed (key
+`base-radar:wallet-history`, version-guarded exactly like every other
+overlay in this codebase), storing `AnalyticsSnapshot[]` — a named alias of
+`AutomationSnapshot`, never a second snapshot shape. `storage.ts` owns
+hydration/append/persist/clear (mirroring `lib/wallet-automation/rules.ts`'s
+exact `localStorage` + module-scope cache + `listeners`/`notify()` pattern);
+`engine.ts` is retrieval-only — `getSnapshots()` / `getLatestSnapshot()` /
+`getSnapshotAt(date)` / `getSnapshotsBetween()` / `clearHistory()` /
+`getHistoryStatus()` — none of which compute a trend, score, recovery,
+highlight, or recommendation. Appending reuses the real
+`AutomationDiff` `lib/wallet-automation/snapshot.ts` already produces (never
+a second diff engine): a snapshot only persists when it's the first real
+entry, or a real field actually changed. Each entry is individually
+(de)serialized via `lib/wallet-analytics/serialization.ts`'s
+`serializeAnalyticsSnapshot()`/`deserializeAnalyticsSnapshot()`, so one
+corrupted entry never invalidates the rest of real history. `useWalletHistory()`
+(`lib/hooks/`) is the one hook that both drives the live append (via
+`useWalletAutomation()`'s `snapshot`/`diff`) and reads it back
+(`useSyncExternalStore`). `useWalletAnalytics()` now sources its `history`
+from persisted History WHEN available, falling back to the original
+session-only accumulation only if `localStorage` is genuinely unavailable —
+`buildWalletAnalytics()` itself is completely unchanged; only the source of
+the array it's called with changed. **Owns**: persistence, replay,
+cross-session storage — nothing else. UI: `WalletHistorySections.tsx`'s
+`HistoricalPortfolioSection` (status/actions, `/dashboard/wallet`) and
+`HistoryTimelineSection` (pure historical facts, no trend framing — that
+stays Analytics' job).
+
+**Ownership table** (V4-ANALYTICS-001C Phase 5, extended by V4-HISTORY-001 —
+every metric has exactly one real owner; every other layer only reads it):
+
+| Metric / concept | Owner |
+| --- | --- |
+| Health, Risk, Confidence, Diversification, Fingerprint, Warnings, Recommendations, Opportunities | Portfolio Intelligence |
+| AI Overview, Insights, Actions, AI Timeline, AI Summary | Portfolio AI |
+| Wallet Events, Automation Rules/Results, `AutomationSnapshot` shape | Wallet Automation |
+| Trends, Trend Confidence, Portfolio Evolution, Biggest Change, Allocation Analytics, Trend Correlation, Portfolio Stability, Milestones, Personal Bests, Recovery Analysis, Change Frequency, Analytics Highlights, Executive/Export summaries | Wallet Analytics |
+| Persistence, replay, cross-session storage | Wallet History (`lib/wallet-history/`) — **owns no metric of its own**, only persists/replays `AutomationSnapshot`s other layers already produced |
+
+**Snapshot Versioning & Serialization** (V4-ANALYTICS-001C Phases 3-4) —
+`AutomationSnapshot` (`lib/wallet-automation/types.ts`) carries an additive
+`analyticsVersion: number` field (`CURRENT_ANALYTICS_SNAPSHOT_VERSION = 1`
+today), stamped by `buildAutomationSnapshot()`. `lib/wallet-analytics/
+serialization.ts`'s `serializeAnalyticsSnapshot()`/`deserializeAnalyticsSnapshot()`
+are the version-aware read/write pair a future History module should use
+instead of raw `JSON.stringify`/`JSON.parse` — deserialize validates every
+required field is present, upgrades pre-versioning data (no `analyticsVersion`
+field at all) losslessly to the current version, and refuses (`null`, never
+throws) a version newer than the running code understands.
+
+**Hooks chain** (`lib/hooks/`): `useWallet` → `usePortfolio` →
+`useWalletPortfolioIntelligence` → `useWalletPortfolioAI` →
+`useWalletAutomation` → `useWalletHistory` → `useWalletAnalytics` — each hook
+wraps exactly the next layer's pure builder function, no layer skipped, no
+logic duplicated in a hook that belongs in its `lib/` module.
+
+**UI**: `/dashboard/wallet` (`WalletPortfolioPage.tsx`) is the full page —
+`WalletIntelligenceSections.tsx` (Intelligence + AI cards),
+`WalletAutomationSections.tsx` (Automation status + event log),
+`WalletAnalyticsSections.tsx` (Trends, Biggest Change, Evolution, Allocation
+Changes, Trend Correlation, Stability, Milestones, Personal Bests, Recovery
+Analysis, Analytics Highlights — the last placed above every other Analytics
+section as its executive summary), `WalletHistorySections.tsx`
+(`HistoricalPortfolioSection`/`HistoryTimelineSection`, placed last — the
+foundation the sections above increasingly build on). The Dashboard's
+`PortfolioWidget.tsx` mirrors the same hook chain for a compact preview
+only (including History's own one-line "N snapshots" row), never
+re-deriving anything the full page's sections already compute.
+
+**Relationship / circularity check**: strictly one-directional — Discovery
+→ Intelligence → AI → Automation → Analytics/History (siblings — Automation
+feeds both, Analytics optionally reads History's persisted output),
+confirmed via direct source read of every layer's imports (not inferred):
+Intelligence never imports AI/Automation/Analytics/History; AI imports only
+Intelligence types plus Automation's `WalletEvent` type (for timeline
+narration, never for scoring); Automation imports only Intelligence;
+Analytics imports only Automation's `AutomationSnapshot`/`WalletEvent`
+types; History imports only Automation's types plus Analytics'
+`serializeAnalyticsSnapshot`/`deserializeAnalyticsSnapshot`/
+`historyBounds`/`DEFAULT_MAX_HISTORY_LENGTH` utilities (explicitly
+sanctioned reuse, never a second serialization/bounds implementation) and
+never calls `buildWalletAnalytics()` itself. No circular dependency exists
+anywhere in this pipeline.
 
 ## Global Search & Command Palette
 

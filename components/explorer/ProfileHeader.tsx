@@ -5,7 +5,7 @@ import { ProjectLogo } from "@/components/branding/ProjectLogo";
 import { TokenLogo } from "@/components/branding/TokenLogo";
 import { ChangeValue } from "@/components/explorer/ChangeValue";
 import { ProfileChainDisplay } from "@/components/explorer/ProfileChainDisplay";
-import { ProfileChart } from "@/components/explorer/ProfileChart";
+import { ProfileChart } from "@/components/explorer/LazyProfileChart";
 import { ProfileHeaderExplorerTooltipAsync } from "@/components/explorer/ProfileHeaderExplorerTooltipAsync";
 import { ProjectCategoryChips } from "@/components/explorer/ProjectCategoryChips";
 import { VerificationBadge } from "@/components/explorer/VerificationBadge";
@@ -16,6 +16,7 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import { getExplorerLink } from "@/lib/branding/explorerLink";
 import { SOCIAL_BRANDING } from "@/lib/branding/socials";
 import type { SocialPlatform } from "@/lib/branding/types";
+import { resolveLogoUrl } from "@/lib/projects/build";
 import { formatCompactCurrency, formatCompactNumber, formatDate, formatPercent, formatPrice } from "@/lib/data/format";
 import type { SparklinePoint } from "@/lib/data/types";
 import type { ContractDetailEntry } from "@/lib/providers/blockscout/service";
@@ -452,14 +453,18 @@ export function ProfileHeader({
   // (a 404, not just an absent one) now retries the next real candidate
   // instead of jumping straight to initials — see `logoUrlFallbacks` below
   // and `ProjectLogo`'s own doc comment.
-  const logoCandidates = [
+  //
+  // Token Logo System — this is the exact same priority chain
+  // `lib/projects/build.ts`'s `resolveLogoUrl()` already implements for
+  // every `LiveProject` consumer; calling it here instead of reimplementing
+  // it inline (as this file did before) means there's exactly one place
+  // this priority order is defined, not two that could drift apart.
+  const { logoUrl, logoUrlFallbacks } = resolveLogoUrl([
     identity.logoUrl,
     market.available ? market.imageUrl : null,
     tvl.available ? tvl.imageUrl : null,
     github.available ? github.avatarUrl : null,
-  ].filter((url): url is string => Boolean(url));
-  const logoUrl = logoCandidates[0] ?? null;
-  const logoUrlFallbacks = logoCandidates.slice(1);
+  ]);
 
   // Goal 3 — only a real on-chain address view counts as "Explorer" here;
   // `getExplorerLink` falling back to the project's website (no registered
@@ -869,7 +874,12 @@ export function ProfileHeader({
               <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                 {market.imageUrl && market.symbol && (
                   <TokenInfoCell label="Token">
-                    <TokenLogo logoUrl={market.imageUrl} symbol={market.symbol} size={16} />
+                    {/* Token Logo System — reuses this header's own already-
+                        computed `logoUrl`/`logoUrlFallbacks` (the same
+                        `resolveLogoUrl()` call above, not a second read of
+                        `market.imageUrl`), so this icon can never diverge
+                        from the big logo just above it on the same page. */}
+                    <TokenLogo logoUrl={logoUrl} fallbackUrls={logoUrlFallbacks} symbol={market.symbol} size={16} />
                     {market.symbol}
                   </TokenInfoCell>
                 )}

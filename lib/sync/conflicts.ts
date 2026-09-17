@@ -27,7 +27,11 @@ function isValidConflict(value: unknown): value is ConflictRecord {
   if (typeof value !== "object" || value === null) return false;
   const conflict = value as Record<string, unknown>;
   return (
-    (conflict.entity === "watchlist" || conflict.entity === "preferences" || conflict.entity === "account") &&
+    (conflict.entity === "watchlist" ||
+      conflict.entity === "preferences" ||
+      conflict.entity === "account" ||
+      conflict.entity === "search" ||
+      conflict.entity === "savedSearch") &&
     typeof conflict.entityId === "string" &&
     typeof conflict.resolved === "boolean"
   );

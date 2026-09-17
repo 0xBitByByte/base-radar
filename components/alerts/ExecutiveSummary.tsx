@@ -1,6 +1,8 @@
 import { NARRATIVE_SUMMARY_LABEL } from "@/components/alerts/meta";
 import { useExecutiveSummary } from "@/lib/hooks/useExecutiveSummary";
 import { NARRATIVE_TYPES } from "@/lib/alerts/intelligence/types";
+import { GLASS_TILE_SURFACE } from "@/components/ui/glassStyles";
+import { cn } from "@/lib/utils";
 
 /**
  * The Alerts page's top-level "Today's Intelligence" roll-up — every number
@@ -27,7 +29,7 @@ export function ExecutiveSummary() {
   return (
     <section
       aria-label="Today's Intelligence summary"
-      className="flex flex-col gap-3 rounded-xl border border-radar-light-border bg-radar-light-card p-4 dark:border-white/10 dark:bg-white/[0.02] sm:flex-row sm:items-center sm:justify-between"
+      className={cn("flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between", GLASS_TILE_SURFACE)}
     >
       <div className="flex flex-col gap-1.5">
         <h3 className="text-sm font-semibold text-radar-light-text dark:text-radar-white">Today&apos;s Intelligence</h3>

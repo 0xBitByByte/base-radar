@@ -8,21 +8,21 @@ import { Cloud, LogOut, Settings, Sparkles, User } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useAccount } from "@/lib/hooks/useAccount";
+import { useAuthSession } from "@/lib/hooks/useAuthSession";
 import { AccountAvatar } from "@/components/account/AccountAvatar";
 
 /**
- * Both dialogs are closed by default and opened only by an explicit menu
- * click — never part of the initial paint — so their code (and, for
- * `SyncStatusCard`, the three further dialogs it itself imports) is
- * deferred out of every dashboard route's initial JS via `next/dynamic`,
- * rather than bundled unconditionally through `Topbar` → `AccountMenu`
- * (PR-006). `ssr: false` is correct here since neither dialog has
- * anything to render on the server — both start closed.
+ * Closed by default and opened only by an explicit menu click — never part
+ * of the initial paint — so its code (and the three further dialogs it
+ * itself imports) is deferred out of every dashboard route's initial JS via
+ * `next/dynamic`, rather than bundled unconditionally through `Topbar` →
+ * `AccountMenu` (PR-006). `ssr: false` is correct here since it has
+ * nothing to render on the server — it starts closed.
+ *
+ * V3-PROFILE-002 — `AccountProfileDialog` is gone; "Profile" below now
+ * navigates to the dedicated `/dashboard/profile` page instead of opening a
+ * modal, so there is nothing left here to dynamically import for it.
  */
-const AccountProfileDialog = dynamic(
-  () => import("@/components/account/AccountProfileDialog").then((mod) => mod.AccountProfileDialog),
-  { ssr: false }
-);
 const SyncStatusCard = dynamic(
   () => import("@/components/sync/SyncStatusCard").then((mod) => mod.SyncStatusCard),
   { ssr: false }
@@ -51,15 +51,14 @@ const MENU_ITEM_CLASS =
  * state (`useSyncStatus()`).
  */
 export function AccountMenu() {
-  const { account, signOut } = useAccount();
-  const [profileOpen, setProfileOpen] = useState(false);
+  const { account, signOut: signOutLocalAccount } = useAccount();
+  const { signOut: signOutSession } = useAuthSession();
   const [syncStatusOpen, setSyncStatusOpen] = useState(false);
-  // Once true, stays true — mounting each dialog only from its first
+  // Once true, stays true — mounting the dialog only from its first
   // requested open (rather than unconditionally like `open` alone would)
   // is what actually defers its dynamic-imported chunk past initial page
-  // load; never resetting to `false` afterward preserves each dialog's
-  // own closing transition on every subsequent close.
-  const [profileEverOpened, setProfileEverOpened] = useState(false);
+  // load; never resetting to `false` afterward preserves its own closing
+  // transition on every subsequent close.
   const [syncStatusEverOpened, setSyncStatusEverOpened] = useState(false);
 
   return (
@@ -95,16 +94,10 @@ export function AccountMenu() {
 
               <div className="my-1 h-px bg-radar-light-border dark:bg-white/10" />
 
-              <Menu.Item
-                onClick={() => {
-                  setProfileEverOpened(true);
-                  setProfileOpen(true);
-                }}
-                className={MENU_ITEM_CLASS}
-              >
+              <Menu.LinkItem render={<Link href="/dashboard/profile" />} closeOnClick className={MENU_ITEM_CLASS}>
                 <User className="size-4" aria-hidden="true" />
                 Profile
-              </Menu.Item>
+              </Menu.LinkItem>
 
               <Menu.LinkItem
                 render={<Link href="/dashboard/settings/notifications" />}
@@ -137,21 +130,56 @@ export function AccountMenu() {
                 Cloud Sync
               </Menu.Item>
 
-              <Menu.Item
-                onClick={() => {
-                  void signOut();
-                }}
-                className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm text-radar-danger outline-none transition-colors data-[highlighted]:bg-radar-danger/10"
-              >
-                <LogOut className="size-4" aria-hidden="true" />
-                Sign Out
-              </Menu.Item>
+              {/*
+                Bug fix (Guest + Sign Out) — a Guest has no real session
+                (`account.isGuest`, the same real signal the "Guest
+                account"/"@username" label above already switches on), so
+                Sign Out had nothing to actually revoke: clicking it called
+                `/api/auth/signout` with no session cookie (a real,
+                documented no-op) and reset the local Account Layer profile
+                to a fresh Guest record — a real action, but with no
+                visible effect for someone already Guest, which read as
+                "Sign Out doesn't work." `WalletAuthRow` (`ProfilePage.tsx`)
+                already gates its own Sign Out the same way
+                (`auth.status === "authenticated"`); this brings
+                `AccountMenu` in line with that same, already-established
+                pattern rather than inventing a new one.
+              */}
+              {!account.isGuest && (
+                <>
+                  <div className="my-1 h-px bg-radar-light-border dark:bg-white/10" />
+
+                  <Menu.Item
+                    onClick={() => {
+                      // Bug 3 (Authentication Flow) — this previously called only
+                      // `useAccount().signOut()`, which resets the local,
+                      // no-network Account Layer profile back to a fresh Guest
+                      // record but never touches the real, server-side session
+                      // (`useAuthSession()`, backed by `/api/auth/signout`'s real
+                      // `revokeSession()`). Confirmed live: clicking this left
+                      // `/api/auth/session` reporting `authenticated` with the
+                      // same account, unchanged — a real session that was never
+                      // revoked, not merely a UI that failed to update. Both
+                      // calls now run: the real session is revoked first, then
+                      // the local profile resets, matching `WalletAuthRow`'s
+                      // now-identical fix in `ProfilePage.tsx`.
+                      void (async () => {
+                        await signOutSession();
+                        await signOutLocalAccount();
+                      })();
+                    }}
+                    className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm text-radar-danger outline-none transition-colors data-[highlighted]:bg-radar-danger/10"
+                  >
+                    <LogOut className="size-4" aria-hidden="true" />
+                    Sign Out
+                  </Menu.Item>
+                </>
+              )}
             </Menu.Popup>
           </Menu.Positioner>
         </Menu.Portal>
       </Menu.Root>
 
-      {profileEverOpened && <AccountProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />}
       {syncStatusEverOpened && <SyncStatusCard open={syncStatusOpen} onOpenChange={setSyncStatusOpen} />}
     </>
   );

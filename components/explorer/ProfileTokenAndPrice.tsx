@@ -14,6 +14,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { WidgetSkeleton } from "@/components/dashboard/WidgetSkeleton";
 import { formatCompactCurrency, formatCompactNumber, formatDate, formatPercent, formatPrice } from "@/lib/data/format";
 import { PROVIDER_DISPLAY_NAME } from "@/lib/intelligence/scorecard";
+import { resolveLogoUrl } from "@/lib/projects/build";
 import { cn } from "@/lib/utils";
 import type { Identity, Market, Trading, Tvl } from "@/lib/intelligence/types";
 import type { SparklinePoint } from "@/lib/data/types";
@@ -98,6 +99,14 @@ export function ProfileTokenAndPrice({
   const volumeAvailable = trading.available && trading.volume24hUsd !== null;
   const liquidityAvailable = trading.available && trading.liquidityUsd !== null;
   const tvlAvailable = tvl.available && tvl.tvlUsd !== null;
+
+  // Token Logo System — the same centralized priority chain every other
+  // logo render site uses (`resolveLogoUrl`, `lib/projects/build.ts`),
+  // not `market.imageUrl` read directly. Guarantees this icon is byte-
+  // identical to the project's logo everywhere else it renders, and falls
+  // back to TVL's own image when CoinGecko's is missing/broken instead of
+  // jumping straight to initials.
+  const { logoUrl: tokenLogoUrl, logoUrlFallbacks: tokenLogoFallbacks } = resolveLogoUrl([identity.logoUrl, market.imageUrl, tvl.available ? tvl.imageUrl : null]);
 
   // Moved here from `ProfileMetrics.tsx` (PR-079 Section 3) — same
   // computation, now feeding the Liquidity/Volume cards' expanded states
@@ -196,6 +205,7 @@ export function ProfileTokenAndPrice({
       id: "overview-tvl",
       icon: <Wallet className="size-3 shrink-0" aria-hidden="true" />,
       label: "TVL",
+      infoTooltip: "Total value currently locked in this protocol.",
       value: tvlAvailable ? formatCompactCurrency(tvl.tvlUsd as number) : "Not Tracked",
       helper: tvl.changePct24h !== null ? <ChangeValue value={tvl.changePct24h} className="text-xs font-semibold" /> : undefined,
       unavailable: !tvlAvailable,
@@ -307,7 +317,7 @@ export function ProfileTokenAndPrice({
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-center gap-3">
-            <TokenLogo logoUrl={market.imageUrl} symbol={market.symbol} size={44} />
+            <TokenLogo logoUrl={tokenLogoUrl} fallbackUrls={tokenLogoFallbacks} symbol={market.symbol} size={44} />
             <div className="flex min-w-0 flex-col">
               <span className="truncate text-base font-semibold text-radar-light-text dark:text-radar-white">
                 {market.symbol ?? identity.name}

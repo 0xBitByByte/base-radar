@@ -7,10 +7,14 @@ import { SignalPills } from "@/components/alerts/SignalPills";
 import { ProjectLogo } from "@/components/branding/ProjectLogo";
 import { RelativeTime } from "@/components/shared/RelativeTime";
 import { getProject } from "@/data/projects/helpers";
+import { GLASS_TILE_SURFACE } from "@/components/ui/glassStyles";
+import { cn } from "@/lib/utils";
 import type { IntelligenceAlert } from "@/lib/alerts/intelligence/types";
+import type { ProjectLogoEntry } from "@/lib/branding/resolveProjectLogos";
 
 type IntelligenceCardProps = {
   alert: IntelligenceAlert;
+  logoMap: Record<string, ProjectLogoEntry>;
 };
 
 /**
@@ -22,12 +26,18 @@ type IntelligenceCardProps = {
  * page (the one real place to go deeper) using the same stretched-link
  * pattern `AlertCard` already establishes.
  */
-export function IntelligenceCard({ alert }: IntelligenceCardProps) {
+export function IntelligenceCard({ alert, logoMap }: IntelligenceCardProps) {
   const project = getProject(alert.projectId);
+  const logo = logoMap[alert.projectId];
   const signalCategories = Array.from(new Set(alert.signals.map((signal) => signal.category)));
 
   return (
-    <li className="group relative flex flex-col gap-3 rounded-xl border border-radar-light-border bg-radar-light-card p-4 transition-colors hover:bg-radar-light-surface dark:border-white/10 dark:bg-white/[0.02] dark:hover:bg-white/[0.05]">
+    <li
+      className={cn(
+        "group relative flex flex-col gap-3 p-4 transition-[border-color,box-shadow] duration-200 hover:border-radar-primary/40 dark:hover:border-white/25",
+        GLASS_TILE_SURFACE
+      )}
+    >
       {project && (
         <Link
           href={`/dashboard/projects/${project.slug}`}
@@ -39,7 +49,7 @@ export function IntelligenceCard({ alert }: IntelligenceCardProps) {
       <div className="relative z-[1] flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           <span className="flex max-w-[160px] items-center gap-1.5 rounded-full border border-radar-light-border bg-radar-light-surface px-2 py-0.5 text-[10.5px] font-medium text-radar-light-text dark:border-white/10 dark:bg-white/[0.03] dark:text-radar-white">
-            <ProjectLogo logoUrl={project?.logoUrl} name={alert.projectName} size={14} />
+            <ProjectLogo logoUrl={logo?.logoUrl} fallbackUrls={logo?.logoUrlFallbacks} name={alert.projectName} size={14} />
             <span className="truncate">{alert.projectName}</span>
           </span>
           <NarrativeBadge narrative={alert.narrative} />
@@ -63,7 +73,7 @@ export function IntelligenceCard({ alert }: IntelligenceCardProps) {
         </p>
       </div>
 
-      <div className="relative z-[1] flex flex-wrap items-end justify-between gap-3">
+      <div className="relative z-[1] flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-2">
           <SignalPills signals={alert.signals} />
           <span className="text-[10.5px] text-radar-light-muted dark:text-radar-muted">

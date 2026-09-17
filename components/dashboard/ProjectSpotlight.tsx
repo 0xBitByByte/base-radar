@@ -1,46 +1,60 @@
-"use client";
+import { Sparkles } from "lucide-react";
 
-import { useState } from "react";
-import { Dialog } from "@base-ui/react/dialog";
-import { Eye, Sparkles, X } from "lucide-react";
-
-import { cn } from "@/lib/utils";
-import { formatCompactCurrency, formatNumber, formatPercent } from "@/lib/data/format";
-import type { ProjectSpotlight as ProjectSpotlightData, WithSource } from "@/lib/data/types";
-import { ProjectLogo } from "@/components/branding/ProjectLogo";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
-import { MetricItem } from "@/components/explorer/MetricItem";
-import { GlowBadge } from "@/components/ui/GlowBadge";
-import { ProgressBar } from "@/components/ui/ProgressBar";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { LiveProjectCard } from "@/components/projects/LiveProjectCard";
+import type { LiveProject } from "@/lib/projects/types";
 
 type ProjectSpotlightProps = {
-  data: WithSource<ProjectSpotlightData>;
+  liveProjects: LiveProject[];
   lastUpdated: string;
 };
 
-export function ProjectSpotlight({ data, lastUpdated }: ProjectSpotlightProps) {
-  const [open, setOpen] = useState(false);
-  const isUp = data.change24hPct >= 0;
+/**
+ * Universal Project Card, PR-7 — retired the legacy `ProjectSpotlightData`
+ * shape (a raw `defillama.getTopBaseProtocol()` read, independent of the
+ * Project Registry, matching the same category of issue found and resolved
+ * in PR-5) for the canonical `LiveProject` model. Selection is the single
+ * `LiveProject` with the highest `market.tvlUsd` — "highest TVL on Base" is
+ * explicitly about raw TVL across every category, not each project's own
+ * category-routed primary metric, so `categoryAwarePrimaryMetricValue`
+ * (Category Rank's own value function) isn't the right fit here.
+ *
+ * `LiveProjectCard variant="detailed"` already renders its own complete
+ * card chrome (border/gradient/shadow) — the same chrome `WidgetCard`
+ * itself applies. The `className` override below neutralizes the inner
+ * card's chrome (`cn()` is `twMerge`-backed, so later classes reliably win
+ * over most earlier conflicting ones) so this reads as one widget, not a
+ * card nested inside a card. Verified live: border/shadow/padding merged
+ * correctly via `twMerge`, but `bg-gradient-to-b`/`bg-none` were NOT
+ * detected as conflicting by this project's `tailwind-merge` config (both
+ * ended up in the final class list) — `!bg-none` (Tailwind's `!important`
+ * prefix, the same working pattern already used for `WatchButton`'s
+ * `!size-11` elsewhere in this file) forces the override at the CSS level
+ * instead, independent of `twMerge`'s conflict detection.
+ *
+ * The previous "Quick View" modal duplicated a subset of what `detailed`
+ * already shows inline (metrics, scores) — not rebuilt; `detailed` already
+ * surfaces at a glance what Quick View existed to reveal via a click.
+ */
+// UX Polish, Part 8 Issue C — the `hover:border-transparent`/`hover:shadow-none`
+// pair is now dead weight: `cardBody` (what these would have overridden)
+// no longer carries any plain `hover:` classes of its own since the Part 1
+// card-hover fix moved all hover reaction to elevation on a wrapper
+// `peer-hover:` can actually reach — nothing left here to override.
+// Removed rather than left as silent no-op dead code.
+// V1-FIX-001 — `gap-2.5` (was the inherited `gap-3.5`) tightens the
+// spacing between `cardBody`'s internal rows for this dashboard instance
+// only; `twMerge` resolves it against the base class the same way it
+// already resolves `p-0` above (see this file's own doc comment).
+const SPOTLIGHT_CARD_CLASS = "border-0 border-transparent !bg-none shadow-none backdrop-blur-none p-0 gap-2.5";
 
-  const metrics = [
-    { label: "TVL", value: data.tvlUsd !== null ? formatCompactCurrency(data.tvlUsd) : "—" },
-    { label: "FDV", value: data.fdvUsd !== null ? formatCompactCurrency(data.fdvUsd) : "—" },
-    {
-      label: "Liquidity",
-      value: data.liquidityUsd !== null ? formatCompactCurrency(data.liquidityUsd) : "—",
-    },
-    {
-      label: "GitHub Stars",
-      value: data.githubStars !== null ? formatNumber(data.githubStars) : "—",
-    },
-  ];
-
-  const scores = [
-    { label: "Community", value: data.communityScore, color: "bg-radar-primary" },
-    { label: "Developer Activity", value: data.developerActivityScore, color: "bg-radar-success" },
-    { label: "AI Score", value: data.aiScore, color: "bg-radar-purple" },
-    { label: "Health", value: data.healthScore, color: "bg-radar-orange" },
-  ];
+export function ProjectSpotlight({ liveProjects, lastUpdated }: ProjectSpotlightProps) {
+  const spotlight = liveProjects.reduce<LiveProject | null>((best, project) => {
+    if (project.market.tvlUsd === null) return best;
+    if (best === null || (project.market.tvlUsd ?? 0) > (best.market.tvlUsd ?? 0)) return project;
+    return best;
+  }, null);
 
   return (
     <WidgetCard
@@ -48,107 +62,18 @@ export function ProjectSpotlight({ data, lastUpdated }: ProjectSpotlightProps) {
       title="Project Spotlight"
       subtitle="Auto-selected — highest TVL on Base (not from your Watchlist)"
       accent="primary"
-      source={data.source}
       lastUpdated={lastUpdated}
+      className="gap-3 p-4 sm:p-5"
     >
-      <div className="flex items-center gap-3">
-        {/* No `logoUrl` field exists on this legacy dashboard data type yet
-            (unlike `lib/intelligence/types.ts`'s `Identity`) — `ProjectLogo`
-            still gives this widget the same shared fallback-initials
-            treatment Explorer uses, instead of a locally reimplemented one,
-            and will start rendering a real image for free whenever this
-            widget's data source gains a logo field. */}
-        <ProjectLogo logoUrl={null} name={data.name} size={44} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <p className="truncate text-sm font-semibold text-radar-light-text dark:text-radar-white">
-              {data.name}
-            </p>
-            <GlowBadge color="muted" className="px-1.5 py-0 text-[10px]">
-              {data.category}
-            </GlowBadge>
-          </div>
-          <p className="text-xs text-radar-light-muted dark:text-radar-muted">{data.symbol}</p>
-        </div>
-        <div className="shrink-0 text-right">
-          <p className="text-sm font-semibold tabular-nums text-radar-light-text dark:text-radar-white">
-            {data.priceUsd > 0 ? `$${data.priceUsd.toFixed(4)}` : "—"}
-          </p>
-          <p className={cn("text-xs font-medium", isUp ? "text-radar-success" : "text-radar-danger")}>
-            {formatPercent(data.change24hPct)}
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        {metrics.map((m) => (
-          <MetricItem key={m.label} label={m.label} value={m.value} />
-        ))}
-      </div>
-
-      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-        {scores.map((s) => (
-          <ProgressBar key={s.label} value={s.value} label={s.label} colorClassName={s.color} />
-        ))}
-      </div>
-
-      <Dialog.Root open={open} onOpenChange={setOpen}>
-        <Dialog.Trigger
-          render={
-            <button
-              type="button"
-              className="flex items-center justify-center gap-1.5 rounded-xl border border-radar-light-border py-2 text-sm font-medium text-radar-light-text outline-none transition-colors hover:bg-radar-light-surface focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:border-white/10 dark:text-radar-white dark:hover:bg-white/5"
-            />
-          }
-        >
-          <Eye className="size-4" aria-hidden="true" />
-          Quick View
-        </Dialog.Trigger>
-
-        <Dialog.Portal>
-          <Dialog.Backdrop
-            className={cn(
-              "fixed inset-0 z-40 bg-radar-bg/40 backdrop-blur-sm dark:bg-black/60",
-              "transition-opacity duration-200 motion-reduce:transition-none",
-              "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0"
-            )}
-          />
-          <Dialog.Popup
-            className={cn(
-              "fixed top-1/2 left-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-radar-light-border bg-radar-light-card p-5 shadow-2xl outline-none dark:border-white/10 dark:bg-radar-card",
-              "transition-[opacity,transform] duration-200 motion-reduce:transition-none",
-              "data-[starting-style]:scale-95 data-[starting-style]:opacity-0 data-[ending-style]:scale-95 data-[ending-style]:opacity-0"
-            )}
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <Dialog.Title className="text-sm font-semibold text-radar-light-text dark:text-radar-white">
-                {data.name} ({data.symbol})
-              </Dialog.Title>
-              <Dialog.Close
-                aria-label="Close quick view"
-                className="flex size-7 items-center justify-center rounded-lg text-radar-light-muted outline-none transition-colors hover:bg-radar-light-surface dark:text-radar-muted dark:hover:bg-white/5"
-              >
-                <X className="size-4" aria-hidden="true" />
-              </Dialog.Close>
-            </div>
-            <Dialog.Description className="mb-4 text-xs text-radar-light-muted dark:text-radar-muted">
-              Snapshot from the current dashboard session.
-            </Dialog.Description>
-            <div className="grid grid-cols-2 gap-2">
-              {metrics.map((m) => (
-                <MetricItem key={m.label} label={m.label} value={m.value} />
-              ))}
-              <MetricItem label="Price" value={data.priceUsd > 0 ? `$${data.priceUsd.toFixed(4)}` : "—"} />
-              <MetricItem label="24h Change" value={formatPercent(data.change24hPct)} />
-            </div>
-            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-3">
-              {scores.map((s) => (
-                <ProgressBar key={s.label} value={s.value} label={s.label} colorClassName={s.color} />
-              ))}
-            </div>
-          </Dialog.Popup>
-        </Dialog.Portal>
-      </Dialog.Root>
+      {spotlight ? (
+        <LiveProjectCard project={spotlight} variant="detailed" className={SPOTLIGHT_CARD_CLASS} soloCard />
+      ) : (
+        <EmptyState
+          icon={Sparkles}
+          title="No TVL data available"
+          description="A featured project will appear here once TVL data is available for at least one tracked project."
+        />
+      )}
     </WidgetCard>
   );
 }

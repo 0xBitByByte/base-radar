@@ -27,8 +27,15 @@ export function ProfileSourcesBlockscoutAsync({ detailsPromise }: ProfileSources
     <SourceCard
       label={PROVIDER_BRANDING.blockscout.label}
       status={outcome.status}
-      badgeLabel={outcome.badgeLabel}
+      // V1-FOLLOWUP-004 — same badge-swap pattern the generic provider cards
+      // already use for a real, cached-after-failure result (see
+      // `ProfileSources.tsx`'s own `attribution.stale ? "Stale" : undefined`
+      // branch above) — the underlying `outcome.description` stays the real,
+      // computed verification finding (still true, just possibly served
+      // from cache), only the badge itself swaps to name that honestly.
+      badgeLabel={outcome.stale ? "Stale" : outcome.badgeLabel}
       description={outcome.description}
+      Icon={PROVIDER_BRANDING.blockscout.Icon}
     />
   );
 }

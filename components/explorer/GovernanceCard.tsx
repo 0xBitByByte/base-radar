@@ -1,20 +1,13 @@
 import { ExternalLink, MessageSquare } from "lucide-react";
 
-import { cleanProposalDescription, isOutcomeUncertain } from "@/components/explorer/governanceIntelligenceHelpers";
+import { GOVERNANCE_STATUS_COLOR, cleanProposalDescription, isOutcomeUncertain } from "@/components/explorer/governanceIntelligenceHelpers";
 import { CopyButton } from "@/components/ui/CopyButton";
-import { GlowBadge, type GlowBadgeColor } from "@/components/ui/GlowBadge";
+import { GlowBadge } from "@/components/ui/GlowBadge";
 import { formatDate, shortenAddress } from "@/lib/data/format";
-import type { GovernanceEvent, GovernanceStatus } from "@/lib/governance";
+import type { GovernanceEvent } from "@/lib/governance";
 
 type GovernanceCardProps = {
   event: GovernanceEvent;
-};
-
-const GOVERNANCE_STATUS_COLOR: Record<GovernanceStatus, GlowBadgeColor> = {
-  active: "accent",
-  passed: "success",
-  failed: "danger",
-  pending: "muted",
 };
 
 /**
@@ -30,7 +23,9 @@ export function GovernanceCard({ event }: GovernanceCardProps) {
   const uncertain = isOutcomeUncertain(event);
 
   return (
-    <li className="flex flex-col gap-2 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 dark:border-white/10 dark:bg-white/[0.02]">
+    // PR-084.07 integration pass — the same shared hover formula every
+    // other Market Intelligence card already uses.
+    <li className="group flex flex-col gap-2 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 transition-[transform,box-shadow,border-color,background-color] duration-300 ease-out hover:-translate-y-0.5 hover:border-radar-primary/30 hover:bg-radar-light-card hover:shadow-[0_8px_24px_-12px_rgba(var(--color-radar-primary-rgb),0.18)] motion-reduce:hover:translate-y-0 dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-radar-border-hover dark:hover:bg-white/[0.04]">
       <div className="flex items-start justify-between gap-3">
         <a
           href={event.url}

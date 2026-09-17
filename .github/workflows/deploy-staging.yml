@@ -1,0 +1,27 @@
+name: Deploy Staging
+
+# Manual only — a staging deploy is a deliberate action at this stage, not
+# something that should fire on every push to main alongside the existing
+# quality-gate workflow (.github/workflows/ci.yml, left untouched).
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to Fly.io (staging)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy
+        run: flyctl deploy --remote-only
+        env:
+          # Required secret — set in GitHub: Settings → Secrets and
+          # variables → Actions → New repository secret, name
+          # `FLY_API_TOKEN`, value from `flyctl tokens create deploy`.
+          # Never committed to this repository.
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

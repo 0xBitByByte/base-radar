@@ -6,8 +6,7 @@ import { ArrowRight, Newspaper } from "lucide-react";
 import { NarrativeBadge } from "@/components/alerts/NarrativeBadge";
 import { BriefMetric } from "@/components/brief/BriefMetric";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
-import { ManageWatchlistAction } from "@/components/dashboard/ManageWatchlistAction";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { WatchlistEmptyNotice } from "@/components/dashboard/WatchlistEmptyNotice";
 import { getProject } from "@/data/projects/helpers";
 import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
 
@@ -37,20 +36,18 @@ export function BriefWidget() {
       lastUpdated={brief?.generatedAt}
     >
       {!brief || brief.projectCount === 0 ? (
-        <EmptyState
-          icon={Newspaper}
-          title="No brief to show yet."
-          description="Today's Brief summarizes your Watchlist into one daily read — headline, confidence, and a top opportunity. It builds itself once you're watching at least one project."
-          action={<ManageWatchlistAction />}
-        />
+        <WatchlistEmptyNotice icon={Newspaper} label="A daily brief — headline, confidence, and a top opportunity — appears here" />
       ) : (
         <div className="flex flex-col gap-3.5">
-          <div className="flex flex-col gap-1">
-            <p className="text-sm font-semibold text-radar-light-text dark:text-radar-white">{brief.headline}</p>
-            <p className="line-clamp-2 text-xs leading-relaxed text-radar-light-muted dark:text-radar-muted">
-              {brief.summary}
-            </p>
-          </div>
+          {/* V2-UX-003 — `brief.headline` is always the literal string
+              "Today's Brief" (`buildBriefHeadline()`, static by design,
+              never parameterized) — identical to this widget's own title
+              directly above, every time. Confirmed live: the two lines
+              read as the same text repeated. Dropped the redundant line;
+              the summary sentence (the actual content) now leads. */}
+          <p className="line-clamp-2 text-xs leading-relaxed text-radar-light-muted dark:text-radar-muted">
+            {brief.summary}
+          </p>
 
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
             <BriefMetric label="Average Confidence" value={`${brief.averageConfidence}%`} />

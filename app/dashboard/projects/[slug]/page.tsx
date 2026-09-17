@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 
 import { getProject } from "@/data/projects/helpers";
 import { CATEGORY_BRANDING } from "@/lib/branding/categories";
+import { poolTokenIdentities, resolveTokenLogosForPools } from "@/lib/branding/resolveTokenLogo";
 import { SITE, SITE_TWITTER_HANDLE } from "@/constants/site";
 import { getProjectAIIntelligence, getRawWhaleEvents, getSignals } from "@/lib/data/aggregate";
 import { buildProjectIntelligence } from "@/lib/intelligence/engine";
@@ -14,7 +15,12 @@ import { normalizeName } from "@/lib/intelligence/helpers";
 import { toLatestProjectHighlight, toRelatedProjectHighlights } from "@/lib/ai-intelligence/project-adapter";
 import { filterLiveProjects } from "@/lib/projects/filter";
 import { getLiveProjects } from "@/lib/projects/service";
+import { evaluateServerCollections } from "@/lib/smart-collections/aggregate";
 import { sortLiveProjects } from "@/lib/projects/sort";
+import { resolveTradingDiscoveryStrategies } from "@/lib/trading/discoveryStrategy";
+import { logProjectProfileTiming, markDuration, markStart, timed } from "@/lib/observability/serverTiming";
+import type { TimingEntry } from "@/lib/observability/serverTiming";
+import { withBoundedWait } from "@/lib/providers/common/utilities";
 import * as base from "@/lib/providers/base/service";
 import * as blockscout from "@/lib/providers/blockscout/service";
 import * as coingecko from "@/lib/providers/coingecko/service";
@@ -27,11 +33,11 @@ import { ProfileCommunityMetrics } from "@/components/explorer/ProfileCommunityM
 import { ProfileHeader } from "@/components/explorer/ProfileHeader";
 import { ProfileKeySignals } from "@/components/explorer/ProfileKeySignals";
 import { ProfileQuickActions } from "@/components/explorer/ProfileQuickActions";
+import { RecordProjectView } from "@/components/explorer/RecordProjectView";
 import { ProfileTokenAndPriceLive } from "@/components/explorer/ProfileTokenAndPriceLive";
 import { ProfileMetrics } from "@/components/explorer/ProfileMetrics";
 import { ProfilePairIntelligence } from "@/components/explorer/ProfilePairIntelligence";
 import { ProfileExecutiveIntelligence } from "@/components/explorer/ProfileExecutiveIntelligence";
-import { ProfileIntelligence } from "@/components/explorer/ProfileIntelligence";
 import { ProfileIntelligencePanel } from "@/components/explorer/ProfileIntelligencePanel";
 import { ProfileContracts } from "@/components/explorer/ProfileContracts";
 import { ProfileGovernance } from "@/components/explorer/ProfileGovernance";
@@ -41,9 +47,9 @@ import { ProfileRelatedProjects } from "@/components/explorer/ProfileRelatedProj
 import { ProfileSectionNav } from "@/components/explorer/ProfileSectionNav";
 import { ProfileSources } from "@/components/explorer/ProfileSources";
 import { ProfileSummary } from "@/components/explorer/ProfileSummary";
-import { ProfileTrustCenter } from "@/components/explorer/ProfileTrustCenter";
 import { ProfileWhyItMatters } from "@/components/explorer/ProfileWhyItMatters";
 import { ProjectHealthScorecard } from "@/components/explorer/ProjectHealthScorecard";
+import { ProfileAIIntelligenceLinks } from "@/components/explorer/ProfileAIIntelligenceLinks";
 import type { SparklinePoint } from "@/lib/data/types";
 
 type ProjectProfilePageProps = {
@@ -71,6 +77,23 @@ function ZoneHeading({ children }: { children: ReactNode }) {
 function isWithinLast30Days(iso: string): boolean {
   return Date.now() - new Date(iso).getTime() <= 30 * 24 * 60 * 60 * 1000;
 }
+
+/**
+ * PR-105 — the bound applied (via `withBoundedWait`) to this page's
+ * deferred/streamed provider calls (TVL history, token transfers, contract
+ * detail, chain stats) — never the awaited critical-path batch above,
+ * which keeps its own, separate, already-proven 5s whale race untouched.
+ * Set to the exact same 5s figure as that existing precedent — deliberate
+ * consistency, not a new arbitrary number: this PR's own measurements
+ * found real, healthy-call latency up to ~2.5s (DefiLlama TVL history) and
+ * ~1.7s (Blockscout token transfers) for these specific calls, so 5s
+ * leaves comfortable headroom above anything actually observed while still
+ * capping the previously-unbounded ~24.75s worst case (8s timeout × up to
+ * 3 attempts) a genuinely stalled provider could otherwise impose on one
+ * streamed section's Suspense boundary.
+ */
+const DEFERRED_PROVIDER_TIMEOUT_MS = 5_000;
+
 
 /**
  * Per-project title/description/OG/canonical — `getProject` is a cheap,
@@ -195,18 +218,46 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
   const registryProject = getProject(slug);
   if (!registryProject) notFound();
 
+  // PR-103 — lightweight, opt-in (`PERF_TRACE_PROJECT_PROFILE=1`) timing
+  // instrumentation around this page's critical-path data loading. See
+  // `lib/observability/serverTiming.ts`'s own doc comment: `timed()` never
+  // changes what a wrapped promise resolves/rejects with, only records how
+  // long it took, so this cannot alter the page's actual behavior.
+  const renderStart = markStart();
+  const timingEntries: TimingEntry[] = [];
+
+  // PERFORMANCE (C2) — started here, immediately, rather than where it's
+  // first awaited (the category-rank block below). `getLiveProjects()` is
+  // `cache()`-wrapped and unconditionally needed later anyway by the Smart
+  // Collections block (see that block's own comment: its own call already
+  // reuses this exact request-scoped result today) — so starting it this
+  // early costs nothing extra even when category rank ends up not needing
+  // it (no TVL), and lets its real, measured cost run CONCURRENTLY with the
+  // rest of this page's own already-concurrent fetch batch below, instead
+  // of adding sequentially on top of it once that batch resolves. This is
+  // a scheduling change only — the exact same cached computation, the
+  // exact same fast-path/slow-path split, nothing recomputed twice and
+  // nothing new added to what Smart Collections already needed regardless.
+  // `.catch()` here only prevents a Node "unhandled rejection" warning if
+  // this page 404s (`notFound()`, a few lines below) before either
+  // consumer below ever awaits this promise — the real rejection (if any)
+  // is still observed and handled wherever `liveProjectsPromise` is
+  // actually awaited.
+  const liveProjectsPromise = timed("getLiveProjects (kickoff)", getLiveProjects(), timingEntries);
+  liveProjectsPromise.catch(() => {});
+
   // Genesis date is fast (67-378ms observed) — unlike commit activity/TVL
   // history it isn't worth deferring behind its own Suspense boundary, so
   // it's fetched here, in parallel with the fast intelligence build, rather
   // than bundled into `extended`.
   const genesisPromise = registryProject.providerIds.coingeckoId
-    ? coingecko.getCoinDetail(registryProject.providerIds.coingeckoId)
+    ? timed("genesis (CoinGecko)", coingecko.getCoinDetail(registryProject.providerIds.coingeckoId), timingEntries)
     : Promise.resolve(null);
 
   // PR13.7 Goal 14 — real finality lag (Base RPC's cheapest, shortest-TTL
   // provider), same "fast enough to not defer behind Suspense" treatment as
   // `genesisPromise` above rather than a new streamed component.
-  const finalityPromise = base.getFinality();
+  const finalityPromise = timed("finality (Base RPC)", base.getFinality(), timingEntries);
 
   // PERFORMANCE (measured, not a blind tuning pass) — `getRawWhaleEvents()`
   // scans every registry-eligible token's real Blockscout transfer history
@@ -226,19 +277,31 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
   // rejects (see `whaleRes.status !== "fulfilled"` below). The dedicated
   // Whale Explorer (`[slug]/whale/page.tsx`) does NOT do this — whale data
   // is that route's actual purpose, so it correctly waits the full window.
-  const whalePromise = Promise.race([
-    getRawWhaleEvents(),
-    new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Whale detection timed out for this page render")), 5_000)),
-  ]);
+  // PR-103 — `getRawWhaleEvents()` itself is timed separately from the
+  // race as a whole (`whale scan (raw)` vs `whale (raced, 5s ceiling)`) so
+  // the report can tell apart "the scan was actually slow" from "the scan
+  // was fine but something else in this same race lagged" — impossible to
+  // tell from the race's own outcome alone.
+  const rawWhaleEventsPromise = timed("whale scan (raw, getRawWhaleEvents)", getRawWhaleEvents(), timingEntries);
+  const whalePromise = timed(
+    "whale (raced, 5s ceiling)",
+    Promise.race([
+      rawWhaleEventsPromise,
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Whale detection timed out for this page render")), 5_000)),
+    ]),
+    timingEntries
+  );
 
+  const criticalBatchStart = markStart();
   const [profileRes, genesisRes, whaleRes, signalsRes, finalityRes, aiIntelligenceRes] = await Promise.allSettled([
-    buildProjectIntelligence(registryProject, undefined, { extended: false }),
+    timed("buildProjectIntelligence", buildProjectIntelligence(registryProject, undefined, { extended: false }), timingEntries),
     genesisPromise,
     whalePromise,
-    getSignals(),
+    timed("getSignals", getSignals(), timingEntries),
     finalityPromise,
-    getProjectAIIntelligence(registryProject.id),
+    timed("getProjectAIIntelligence", getProjectAIIntelligence(registryProject.id), timingEntries),
   ]);
+  const criticalBatchMs = markDuration(criticalBatchStart);
 
   const profile = profileRes.status === "fulfilled" ? profileRes.value : null;
   if (!profile) notFound();
@@ -289,9 +352,19 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
       ? github.getCommitActivity(profile.github.fullName)
       : Promise.resolve(null);
 
+  // PR-105 — `withBoundedWait` (`lib/providers/common/utilities.ts`) caps
+  // how long this deferred Suspense boundary waits, without changing what
+  // it resolves to on either path: real data on success (including a real
+  // stale value, if `getProtocolTvlHistory`'s own `withStaleFallback`
+  // already found one), or the same `ok:false` "unavailable" shape a
+  // genuine failure already produces — just possibly sooner. Justified by
+  // this PR's own measurement: DefiLlama's per-protocol TVL history showed
+  // real spikes up to ~2.5s even on a healthy call; unbounded, the
+  // provider layer's own retry/timeout stack could extend that to ~24.75s
+  // worst case with nothing capping it before now.
   const tvlHistoryPromise =
     profile.tvl.available && registryProject.providerIds.defillamaSlug
-      ? defillama.getProtocolTvlHistory(registryProject.providerIds.defillamaSlug)
+      ? withBoundedWait("defillama", defillama.getProtocolTvlHistory(registryProject.providerIds.defillamaSlug), DEFERRED_PROVIDER_TIMEOUT_MS)
       : Promise.resolve(null);
 
   // PR13.7 Goal 2 — GitHub contributor count, extended/Profile-page-only,
@@ -307,10 +380,23 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
   const releasesPromise =
     profile.github.available && profile.github.fullName ? github.getReleases(profile.github.fullName) : Promise.resolve(null);
 
+  // Kept as its own lookup — Whale Activity's Blockscout token-transfer
+  // feed (below) is genuinely token-only regardless of Trading Discovery
+  // Strategy (a DEX project with no Base token has no token transfers to
+  // track either), unrelated to how pools are discovered.
   const tokenContract = profile.contracts.items.find(
     (item) => item.chain === profile.chain.primaryChain && item.type === "token"
   );
 
+  // Trading Discovery Strategy — routed through the one centralized
+  // resolver (`lib/trading/discoveryStrategy.ts`), the same one
+  // `matchTrading` (feeding `profile.trading.pools`, this call's own
+  // fallback below) and the dedicated Pools page use. Previously this was
+  // its own third, independent "does this project have a Base token
+  // contract" check — correct for an asset-type project, wrong for a DEX
+  // like Uniswap, whose real Base footprint is the pools it hosts, not a
+  // governance token it doesn't have on Base at all.
+  //
   // PR-084.01 — real multi-pool Trading Intelligence data for this one
   // project, on demand (see `dexscreener.getPairsForToken`'s doc comment
   // for why this is a justified second DexScreener request rather than a
@@ -321,13 +407,101 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
   // same way. Falls back to the original single-pool `profile.trading.pools`
   // on any failure or empty result — Trading Intelligence is never broken,
   // never empty because of this call.
-  const richerPairsResult = tokenContract ? await dexscreener.getPairsForToken(tokenContract.address) : null;
+  // PR-103 — this whole loop is on the page's critical (awaited, not
+  // deferred) path; timed as one span (`getPairsForToken (DexScreener,
+  // post-batch)`) since it can run 1-2 real requests depending on how many
+  // trading strategies this project has and whether the first one comes
+  // back empty. `try/finally` (never `catch`) — a real throw here must
+  // still propagate exactly as it did before this instrumentation existed;
+  // this only records the duration on the way out, success or failure.
+  const postBatchStart = markStart();
+
+  // PR-104 — the confirmed DexScreener → token-logo waterfall (PR-103:
+  // Morpho cold, DexScreener 303ms + logos 576ms = 884ms, strictly
+  // additive). The real data dependency: `tradingPools` below is EITHER
+  // `richerPairsResult.data` (only knowable once DexScreener responds) OR,
+  // on any failure/empty result, `profile.trading.pools` — a value that's
+  // already fully available right now, before DexScreener is even called
+  // (it comes from `buildProjectIntelligence`, already resolved by the main
+  // batch above). That fallback case is this page's single most common
+  // outcome for a project whose trading data doesn't change between the
+  // bulk-matched `profile.trading` and a fresh per-token DexScreener query.
+  //
+  // So: start resolving logos for `profile.trading.pools` CONCURRENTLY with
+  // the DexScreener call below, instead of waiting for DexScreener first.
+  // This is safe, not a race: `resolveTokenLogosForPools` reads no state
+  // DexScreener produces, and `resolveTokenLogo`'s own cache
+  // (`lib/branding/resolveTokenLogo.ts`) has genuine in-flight
+  // deduplication and cross-call caching keyed by symbol/address — so if
+  // the richer DexScreener path ends up needing to resolve overlapping
+  // tokens moments later, that second call either shares the exact same
+  // in-flight request (zero extra network calls) or reads an
+  // already-cached hit, never issuing a true duplicate. When the fallback
+  // branch is taken (no richer data), the two are exactly the same
+  // question asked once — the prewarm result is reused directly rather
+  // than resolved a second time.
+  const fallbackLogosPromise = timed(
+    "resolveTokenLogosForPools (prewarm, concurrent with DexScreener)",
+    resolveTokenLogosForPools(poolTokenIdentities(profile.trading.pools)),
+    timingEntries
+  );
+  fallbackLogosPromise.catch(() => {});
+
+  const dexscreenerStart = markStart();
+  const tradingStrategies = resolveTradingDiscoveryStrategies(registryProject);
+  let richerPairsResult: Awaited<ReturnType<typeof dexscreener.getPairsForToken>> | null = null;
+  try {
+    for (const tradingStrategy of tradingStrategies) {
+      if (tradingStrategy.kind === "token") {
+        richerPairsResult = await dexscreener.getPairsForToken(tradingStrategy.tokenAddress);
+      } else if (tradingStrategy.kind === "dex") {
+        richerPairsResult = await dexscreener.getPairsByDexId(tradingStrategy.dexIds);
+      } else {
+        continue;
+      }
+      if (richerPairsResult.ok && richerPairsResult.data.length > 0) break;
+    }
+    timingEntries.push({ label: "getPairsForToken (DexScreener, post-batch)", durationMs: markDuration(dexscreenerStart), ok: true });
+  } catch (err) {
+    timingEntries.push({
+      label: "getPairsForToken (DexScreener, post-batch)",
+      durationMs: markDuration(dexscreenerStart),
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
   const tradingPools =
     richerPairsResult?.ok && richerPairsResult.data.length > 0 ? richerPairsResult.data.map(pairToTradingPool) : profile.trading.pools;
 
+  // Token Logo System — Featured Pools (below) renders through the exact
+  // same `PoolCardGrid`/`PairCard`/`TokenPairCluster` chain the dedicated
+  // Pools page does, so it has the identical secondary/quote-token logo gap
+  // — fixed the same way, via the one shared resolver, not a second copy of
+  // this logic.
+  //
+  // PR-104 — `tradingPools === profile.trading.pools` (reference equality,
+  // not a value comparison — the ternary above literally returns that same
+  // array when the fallback branch is taken) means this is the identical
+  // query the concurrent prewarm above already started: reuse it instead of
+  // resolving the exact same thing twice. Only the richer-data branch
+  // (a different, DexScreener-derived pool set, unknowable before this
+  // point) needs a fresh resolution — same function, same inputs it always
+  // had, just cache-assisted by the prewarm for any token the two sets
+  // share.
+  const tokenLogos =
+    tradingPools === profile.trading.pools
+      ? await fallbackLogosPromise
+      : await timed("resolveTokenLogosForPools (post-batch, richer set)", resolveTokenLogosForPools(poolTokenIdentities(tradingPools)), timingEntries);
+
+  // PR-105 — bounded, same justification as `tvlHistoryPromise` above:
+  // measured up to ~1.7s on a healthy call this PR's own investigation,
+  // previously unbounded against the shared ~24.75s retry/timeout worst
+  // case. `withBoundedWait` never changes what this resolves to, only how
+  // long this render waits for it.
   const transfersPromise =
     tokenContract && profile.chain.primaryChain === "base"
-      ? blockscout.getTokenTransfers(tokenContract.address)
+      ? withBoundedWait("blockscout", blockscout.getTokenTransfers(tokenContract.address), DEFERRED_PROVIDER_TIMEOUT_MS)
       : Promise.resolve(null);
 
   // PR13.7 Goal 10 — real per-address Blockscout verification detail for
@@ -352,14 +526,22 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
     ...profile.contracts.items.filter((item) => item.chain === "base").map((item) => item.address),
   ].filter((address, index, all) => all.findIndex((other) => normalizeName(other) === normalizeName(address)) === index);
 
+  // PR-105 — each address bounded individually (not the `Promise.all` as a
+  // whole), same justification/bound as `transfersPromise` above — one
+  // slow address degrades to "unavailable" on its own schedule rather than
+  // extending every other address's own already-resolved result.
   const contractDetailsPromise = Promise.all(
-    blockscoutCandidateAddresses.map((address) => blockscout.getContractDetail(address).then((result) => ({ address, result })))
+    blockscoutCandidateAddresses.map((address) =>
+      withBoundedWait("blockscout", blockscout.getContractDetail(address), DEFERRED_PROVIDER_TIMEOUT_MS).then((result) => ({ address, result }))
+    )
   );
 
   // PR-078 §5 — real Base-chain-wide gas trend + network utilization,
   // extended/Profile-page-only (never part of the batch Explorer/Dashboard
   // path) — see `ProfileNetworkChainStatsAsync`.
-  const chainStatsPromise = blockscout.getChainStats();
+  // PR-105 — bounded, same justification as the other deferred Blockscout
+  // calls above.
+  const chainStatsPromise = withBoundedWait("blockscout", blockscout.getChainStats(), DEFERRED_PROVIDER_TIMEOUT_MS);
 
   const priceHistory: SparklinePoint[] | null =
     profile.market.sparkline7d.length > 0
@@ -415,20 +597,30 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
   const primaryCategory = profile.identity.categories[0];
   if (primaryCategory && profile.tvl.available && profile.tvl.tvlUsd !== null) {
     try {
-      // PERFORMANCE (measured, not a blind tuning pass) — `getLiveProjects()`
+      // PERFORMANCE (C2, measured, not a blind tuning pass) — `getLiveProjects()`
       // rebuilds full `ProjectIntelligence` (its own GitHub/governance/market
       // calls) for every registry project, not just this one, purely to rank
-      // this project among its peers. Measured at 1-2s on its own, sequential
-      // (awaited after the main batch above, not concurrent with it) — real
-      // cost for a comparison this page's core content doesn't depend on.
-      // Same race-with-honest-fallback treatment as the whale fetch above:
-      // on timeout this throws into the catch below, which already leaves
-      // every rank `null` (the UI already renders that as "unavailable") —
-      // reusing the existing failure path, not a new one.
-      const liveProjects = await Promise.race([
-        getLiveProjects(),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Category rank comparison timed out for this page render")), 4_000)),
-      ]);
+      // this project among its peers — previously measured at 1-2s on its
+      // own, added sequentially because this block awaited a *fresh*
+      // `getLiveProjects()` call only once execution reached here, after the
+      // main batch above had already fully resolved. Awaiting the shared
+      // `liveProjectsPromise` (started at the very top of this function,
+      // before that main batch even began) instead means this same
+      // computation now overlaps with the rest of the page's already-
+      // concurrent work rather than stacking on top of it — same cached
+      // result, same data, no new fetch. Same race-with-honest-fallback
+      // treatment as the whale fetch above: on timeout this throws into the
+      // catch below, which already leaves every rank `null` (the UI already
+      // renders that as "unavailable") — reusing the existing failure path,
+      // not a new one.
+      const liveProjects = await timed(
+        "getLiveProjects (await, category-rank block)",
+        Promise.race([
+          liveProjectsPromise,
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Category rank comparison timed out for this page render")), 4_000)),
+        ]),
+        timingEntries
+      );
       const categoryPeers = sortLiveProjects(
         filterLiveProjects(liveProjects, { category: primaryCategory, hasTvl: true }),
         "tvl",
@@ -462,6 +654,36 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
     }
   }
 
+  // PR-090.06 — Project Integration. Real Smart Collection membership for
+  // THIS project, reusing `evaluateServerCollections()` (the exact same
+  // evaluator `/dashboard/collections` uses) over the same `liveProjectsPromise`
+  // started at the top of this function (C2 — was a second, later
+  // `getLiveProjects()` call; still `cache()`-deduped either way, so this
+  // was already free, but awaiting the shared, early-started promise here
+  // too keeps both consumers reading from one obviously-single source
+  // rather than two call sites that happen to resolve to the same thing) —
+  // and `allWhaleEvents`, already fetched above. Only the 7 server-
+  // evaluated collections can be known here (the other 3 need client-only
+  // Alert Engine/Daily Brief data); silence on those 3 is honest, not a
+  // false negative.
+  let projectSmartCollections: { id: string; name: string }[] = [];
+  try {
+    const liveProjectsForCollections = await timed(
+      "getLiveProjects (await, smart-collections block)",
+      Promise.race([
+        liveProjectsPromise,
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Smart Collections lookup timed out for this page render")), 4_000)),
+      ]),
+      timingEntries
+    );
+    const collectionResults = evaluateServerCollections(liveProjectsForCollections, allWhaleEvents, new Date().toISOString());
+    projectSmartCollections = collectionResults
+      .filter((result) => result.matches.some((match) => match.projectId === registryProject.id))
+      .map((result) => ({ id: result.id, name: result.name }));
+  } catch {
+    projectSmartCollections = [];
+  }
+
   // PR-062 Task 5 — real registry lifecycle timestamps, already on the
   // static registry entry (`data/projects/types.ts`'s `ProjectLifecycle`),
   // for the Timeline's "Registry updates"/"Discovery updates" events.
@@ -483,6 +705,9 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
     narrativeLabel,
     communityLinkCount,
     communityLinkTotal,
+    contracts: profile.contracts,
+    verificationStatus: profile.community.verificationStatus,
+    docsUrl: profile.community.socials.docs ?? null,
   });
 
   const intelligenceReport = buildIntelligenceReport({
@@ -513,12 +738,32 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
 
   const categoryLabel = primaryCategory ? CATEGORY_BRANDING[primaryCategory].label : null;
 
+  // PR-103 — one structured summary line per render, logged last so it
+  // covers every timed span above. `postBatchMs` intentionally spans from
+  // right after the critical `Promise.allSettled` batch to here (the last
+  // point before JSX construction) — everything in between is real,
+  // awaited, on-the-critical-path work; the streamed/deferred promises
+  // (`commitActivityPromise`, `tvlHistoryPromise`, `contractDetailsPromise`,
+  // `contributorCountPromise`, `releasesPromise`, `transfersPromise`,
+  // `chainStatsPromise`) are deliberately NOT included here — they are
+  // passed down unawaited and resolve after this function has already
+  // returned, exactly as designed; instrumenting them would require
+  // awaiting them, which would defeat the point of deferring them.
+  logProjectProfileTiming({
+    slug,
+    totalMs: markDuration(renderStart),
+    criticalBatchMs,
+    postBatchMs: markDuration(postBatchStart),
+    entries: timingEntries,
+  });
+
   return (
     <div className="flex flex-col gap-6">
       {/* UX polish pass, Section 7 — "Back to Projects" (inside `ProfileBreadcrumb`) stays left-aligned; Watchlist/Alert/Share/Compare move to the same row's right edge, directly above the header card — a single left/right toolbar row instead of two stacked full-width blocks. */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <ProfileBreadcrumb projectName={profile.identity.name} />
         <ProfileQuickActions projectId={registryProject.id} projectName={profile.identity.name} />
+        <RecordProjectView projectId={registryProject.id} projectName={profile.identity.name} projectSlug={slug} />
       </div>
 
       <ProfileHeader
@@ -541,6 +786,8 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
       />
 
       <ProfileRelatedIntelligence projectId={registryProject.id} />
+
+      <ProfileAIIntelligenceLinks smartCollections={projectSmartCollections} />
 
       {/* UX polish pass, Sections 15/18 — the old standalone `ProfileQuickStats` section (Price/Market Cap/TVL as large "emphasized" cards, Liquidity/Volume/FDV below) duplicated the same six numbers as full-size cards, once more here and again in the Overview zone's `ExpandableMetricCard`s below. Replaced by the header's compact stat-chip row (Section 15) — the Overview zone remains the one place with the full-detail cards. */}
 
@@ -582,6 +829,7 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
         sources={profile.sources}
         verificationStatus={profile.community.verificationStatus}
         aiHref={`/dashboard/projects/${slug}/ai`}
+        websiteUrl={profile.identity.websiteUrl}
       />
 
       <ProfileWhyItMatters highlights={intelligenceReport.highlights} />
@@ -610,7 +858,15 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
         lastUpdated={profile.freshness.newestSourceAt}
       />
 
-      <ProfileIntelligence narrative={profile.narrative} risk={profile.risk} health={profile.health} confidence={profile.confidence} />
+      {/* PR-085.01 — the old inline "AI Intelligence" section (`ProfileIntelligence`)
+          was retired here: its full Risk Analysis and itemized Health/
+          Confidence factor detail duplicated the `/ai` report page verbatim
+          (already one click away via Executive Intelligence's own "View
+          Full AI Intelligence Report" link above), and its one non-
+          duplicated fact — the Narrative Signal sentence — is redundant
+          with `buildThesis()`'s own "Near-term momentum reads
+          {narrativeLabel}" clause already in the Project Summary paragraph
+          above. See `ProfileExecutiveIntelligence.tsx`'s own doc comment. */}
 
       {aiIntelligence && (
         <ProfileIntelligencePanel
@@ -646,7 +902,19 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
           reads `profile.trading` directly and is unaffected by this. */}
       <ZoneHeading>Market</ZoneHeading>
 
-      <ProfilePairIntelligence pools={tradingPools} tokenSymbol={profile.market.symbol} poolsHref={`/dashboard/projects/${slug}/pools`} />
+      {/* Token Logo System — `profile.identity.logoUrl` is this page's own
+          already-resolved centralized value (the same one the page header
+          renders), not `market.imageUrl` read directly. Guarantees this
+          section's primary token icon can never diverge from the header
+          logo above it, and still resolves correctly when CoinGecko alone
+          has nothing but the registry/DefiLlama/GitHub tiers do. */}
+      <ProfilePairIntelligence
+        pools={tradingPools}
+        tokenSymbol={profile.market.symbol}
+        tokenLogoUrl={profile.identity.logoUrl}
+        tokenLogos={tokenLogos}
+        poolsHref={`/dashboard/projects/${slug}/pools`}
+      />
 
       <ProfileContracts
         contracts={profile.contracts}
@@ -666,21 +934,15 @@ export default async function ProjectProfilePage({ params }: ProjectProfilePageP
         chainStatsPromise={chainStatsPromise}
       />
 
-      <ZoneHeading>Trust</ZoneHeading>
-
-      <ProfileTrustCenter
-        verificationStatus={profile.community.verificationStatus}
-        confidence={profile.confidence}
-        contracts={profile.contracts}
-        sources={profile.sources}
-        github={profile.github}
-        githubConfigured={githubConfigured}
-        websiteUrl={profile.identity.websiteUrl}
-        docsUrl={profile.community.socials.docs ?? null}
-        communityLinkCount={communityLinkCount}
-        communityLinkTotal={communityLinkTotal}
-        contractDetailsPromise={contractDetailsPromise}
-      />
+      {/* PR-085.01 — the "Trust" zone (`ProfileTrustCenter`) was retired
+          here: an audit found 6 of its 8 tiles already had a fuller,
+          more-detailed home elsewhere on this page (Verification/Confidence
+          → the Scorecard above, GitHub/Docs/Registry-Completeness → the
+          Community section above, Verified Contracts → the Network section
+          directly above this comment). Its two genuinely unique facts
+          (Official Website configured, live-provider coverage) were
+          relocated into `ProfileExecutiveIntelligence`'s info row — see
+          that component's own doc comment. */}
 
       <ZoneHeading>Governance</ZoneHeading>
 

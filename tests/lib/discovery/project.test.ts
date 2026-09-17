@@ -58,6 +58,47 @@ describe("buildDiscoveryProject", () => {
     expect(first.category).toBe(second.category);
     expect(first.confidence.score).toBe(second.confidence.score);
   });
+
+  // PR-085.13B — chain attribution: `chains` is the union of real on-chain
+  // evidence (`contracts[].chain`) and provider-owned source-query evidence
+  // (`knownChains`), never a guessed/defaulted value.
+  describe("chains", () => {
+    it("unions contract-derived chains with provider-owned knownChains for a single candidate", async () => {
+      const [group] = dedupeCandidates([candidate({ contracts: [{ chain: "base", address: "0x1" }], knownChains: ["base"] })]);
+      const result = await buildDiscoveryProject(group, []);
+      expect(result.chains).toEqual(["base"]);
+    });
+
+    it("returns [] when neither contracts nor knownChains carry any evidence — never a guessed default", async () => {
+      const [group] = dedupeCandidates([candidate({ contracts: [], knownChains: undefined })]);
+      const result = await buildDiscoveryProject(group, []);
+      expect(result.chains).toEqual([]);
+    });
+
+    it("dedupes overlapping chain evidence from contracts and knownChains", async () => {
+      const [group] = dedupeCandidates([candidate({ contracts: [{ chain: "base", address: "0x1" }, { chain: "ethereum", address: "0x2" }], knownChains: ["base"] })]);
+      const result = await buildDiscoveryProject(group, []);
+      expect(result.chains.sort()).toEqual(["base", "ethereum"].sort());
+    });
+
+    it("merges chain evidence across the primary candidate AND merged duplicates — the latent gap the PR-085.13A audit found", async () => {
+      // coingecko (confidence 60) wins as primary over blockscout (confidence
+      // 35, via SOURCE_CONFIDENCE) — mirrors pickPrimary's real ranking.
+      // Primary only carries knownChains (no on-chain evidence of its own);
+      // the merged duplicate carries a real, different-chain contract.
+      // Pre-PR-085.13B, `contracts: candidate.contracts` (primary-only)
+      // would have silently dropped the duplicate's chain evidence.
+      const [group] = dedupeCandidates([
+        candidate({ source: "coingecko", coingeckoId: "shared", contracts: [], knownChains: ["base"], confidence: 60 }),
+        candidate({ source: "blockscout", coingeckoId: "shared", contracts: [{ chain: "ethereum", address: "0xabc" }], confidence: 35 }),
+      ]);
+      expect(group.primary.source).toBe("coingecko");
+      expect(group.duplicates).toHaveLength(1);
+
+      const result = await buildDiscoveryProject(group, []);
+      expect(result.chains.sort()).toEqual(["base", "ethereum"].sort());
+    });
+  });
 });
 
 describe("runDiscoveryPipeline", () => {

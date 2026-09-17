@@ -41,6 +41,16 @@ export type CandidateProject = {
   /** Known contracts, if the source surfaced any. Usually empty — most sources don't carry on-chain addresses. */
   contracts: CandidateContract[];
   /**
+   * PR-085.13B — chains guaranteed by this candidate's own source query,
+   * independent of contract-level evidence. Set only by a provider whose
+   * query is itself chain-scoped by construction (e.g. CoinGecko's
+   * Base-ecosystem category listing, DefiLlama's Base-protocols list) —
+   * never inferred centrally, never a fallback/default applied downstream.
+   * A provider that can't make this guarantee about its own query leaves
+   * it unset; `undefined` here means "unknown," never "assume Base."
+   */
+  knownChains?: Chain[];
+  /**
    * PR-053 — CoinGecko's real API `id` (`/coins/markets`'s own `id` field),
    * set only by the `coingecko` discovery source, which already fetches it
    * as `externalId`. Kept as its own named, structured field (rather than

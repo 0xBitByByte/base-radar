@@ -39,7 +39,21 @@ export function WatchlistSelector({ watchlists, activeWatchlist, onSelect, class
             <ActiveIcon className={cn("size-3", activeColorClasses.text)} aria-hidden="true" />
           </span>
         ) : null}
-        <span className="truncate font-medium">{activeWatchlist ? activeWatchlist.name : "No active watchlist"}</span>
+        {/* V1-FIX-026 — a visible "Watchlist:" qualifier so this reads as an
+            active-watchlist switcher, not a static "Favorites" filter/menu
+            (the bare watchlist name alone gave no visual cue this was even
+            a switcher, confirmed in V1-REVIEW-001). Sized down from the
+            name's own text-sm, plain case (not this app's usual uppercase
+            tracking-wide micro-label treatment — measured live: that
+            costs ~59px here purely from letter-spacing, for a single
+            inline qualifier with nothing else competing for attention;
+            plain case reads equally clearly at a fraction of the width,
+            leaving more of this trigger's constrained Topbar budget for
+            the part that actually varies — the name itself). */}
+        <span className="flex min-w-0 flex-1 items-baseline gap-1">
+          <span className="shrink-0 text-[10px] font-medium text-radar-light-muted dark:text-radar-muted">Watchlist:</span>
+          <span className="truncate font-medium">{activeWatchlist ? activeWatchlist.name : "No active watchlist"}</span>
+        </span>
         <ChevronDown className="size-3.5 shrink-0 opacity-60" aria-hidden="true" />
       </Menu.Trigger>
       <Menu.Portal>

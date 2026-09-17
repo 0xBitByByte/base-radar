@@ -49,6 +49,12 @@ export const coingeckoDiscoveryProvider: DiscoveryProvider = {
       logoUrl: market.imageUrl || undefined,
       socials: {},
       contracts: [],
+      // PR-085.13B — `getBaseEcosystemMarkets()` (see this file's own header
+      // comment) queries CoinGecko's `category=base-ecosystem` listing —
+      // every candidate it returns is Base-scoped by construction of the
+      // query itself, independent of the (always-empty, see above)
+      // contract-level evidence.
+      knownChains: ["base"],
       discoveredAt: fetchedAt,
       confidence: SOURCE_CONFIDENCE[SOURCE],
       providerMetadata: { ...market },

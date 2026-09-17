@@ -14,6 +14,7 @@
 
 import { getProjects } from "@/data/projects";
 import type { Project } from "@/data/projects/types";
+import { dayBucket, startOfTodayIso } from "@/lib/alerts/providers/shared";
 import type { AlertProvider } from "@/lib/alerts/providers/types";
 import type { Alert, AlertSeverity } from "@/lib/alerts/types";
 import { changePctOverDays } from "@/lib/intelligence/merge";
@@ -31,14 +32,18 @@ function buildTvlAlert(project: Project, changePct7d: number): Alert | null {
   const severity: AlertSeverity = magnitude >= LARGE_CHANGE_THRESHOLD_PCT ? (up ? "success" : "warning") : "info";
 
   return {
-    id: `defillama:tvl:${project.id}:${Math.round(changePct7d)}`,
+    // V3-NOTIFICATION-001 — day-bucketed + direction, not the raw live
+    // `changePct7d` value — see `dayBucket()`'s own doc comment; same
+    // reasoning and fix as the CoinGecko price-move alert right below it
+    // in the same read-state bug.
+    id: `defillama:tvl:${project.id}:${dayBucket()}:${up ? "up" : "down"}`,
     projectId: project.id,
     projectName: project.name,
     title: `TVL ${up ? "Increased" : "Decreased"} ${rounded}%`,
     summary: `${project.name}'s total value locked ${up ? "grew" : "declined"} ${rounded}% over the past 7 days.`,
     category: "tvl",
     severity,
-    timestamp: new Date().toISOString(),
+    timestamp: startOfTodayIso(),
     read: false,
     pinned: false,
     source: "DefiLlama",

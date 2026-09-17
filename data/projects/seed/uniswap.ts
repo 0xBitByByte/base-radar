@@ -12,6 +12,12 @@ export const uniswap: Project = {
   tags: ["cross-chain"],
   status: "live",
   chains: ["base", "ethereum", "arbitrum", "optimism", "polygon"],
+  // Trading Discovery Strategy audit — genuinely empty, not an oversight:
+  // UNI has no Base deployment at all (confirmed live against CoinGecko's
+  // own `platforms` listing for the `uniswap` coin id — Ethereum, Polygon,
+  // Arbitrum, Optimism, Avalanche, BSC, and others, but not Base). Uniswap
+  // still has real, active Base pools — see `providerIds.dexscreenerDexIds`
+  // below, which is what actually drives this project's pool discovery now.
   contracts: [],
   github: {
     owner: "Uniswap",
@@ -29,6 +35,14 @@ export const uniswap: Project = {
     coingeckoId: "uniswap",
     dexscreenerChainId: "base",
     defillamaSlug: "uniswap",
+    // Trading Discovery Strategy — verified live against real DexScreener
+    // Base pair data (`dexId: "uniswap"` on real, currently-trending
+    // pairs). This is the fix for the reported "Uniswap shows no pools"
+    // issue: the old pipeline could only discover pools by looking up a
+    // project's own Base token contract, which Uniswap doesn't have — its
+    // real Base footprint is the exchange it hosts, not a token. See
+    // `lib/trading/discoveryStrategy.ts`.
+    dexscreenerDexIds: ["uniswap"],
   },
   governance: {
     snapshotSpace: "uniswapgovernance.eth",

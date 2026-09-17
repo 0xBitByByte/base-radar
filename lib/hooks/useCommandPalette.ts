@@ -20,13 +20,22 @@
  * keypress — when disabled, the shortcut is a no-op, but the Topbar's
  * mouse trigger (`openPalette`/`togglePalette` called from a click) is
  * completely unaffected.
+ *
+ * PR-094.02: also surfaces `savedSearches`/`showSavedSearches`/
+ * `isCurrentQuerySaved`/`toggleSaveCurrentQuery`/`selectSavedSearch`/
+ * `removeSavedSearch` — a real, explicit, user-curated list, never
+ * auto-recorded the way Recent Searches is (see
+ * `lib/search/savedSearches.ts`'s own doc comment for why this is a
+ * genuinely separate module/store, not a variant of Recent Searches).
  */
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 
 import { useGlobalSearch } from "@/lib/hooks/useGlobalSearch";
+import { useRecentSearches } from "@/lib/hooks/useRecentSearches";
+import { useSavedSearches } from "@/lib/hooks/useSavedSearches";
 import { DEFAULT_SEARCH_PREFERENCES, getSearchPreferences, subscribeToSearchPreferences } from "@/lib/search/preferences";
-import { getRecentSearches, recordSearch, subscribeToRecentSearches } from "@/lib/search/storage";
+import type { SavedSearch } from "@/lib/search/savedSearches";
 import type { SearchableItem } from "@/lib/search/types";
 
 export type UseCommandPaletteResult = {
@@ -45,16 +54,16 @@ export type UseCommandPaletteResult = {
   showRecentSearches: boolean;
   recordSearch: (query: string) => void;
   selectRecentSearch: (query: string) => void;
+  savedSearches: SavedSearch[];
+  showSavedSearches: boolean;
+  isCurrentQuerySaved: boolean;
+  toggleSaveCurrentQuery: () => void;
+  selectSavedSearch: (query: string) => void;
+  removeSavedSearch: (id: string) => void;
 };
 
 function getSearchPreferencesServerSnapshot() {
   return DEFAULT_SEARCH_PREFERENCES;
-}
-
-const EMPTY_RECENT_SEARCHES: string[] = [];
-
-function getRecentSearchesServerSnapshot(): string[] {
-  return EMPTY_RECENT_SEARCHES;
 }
 
 export function useCommandPalette(): UseCommandPaletteResult {
@@ -68,13 +77,12 @@ export function useCommandPalette(): UseCommandPaletteResult {
     getSearchPreferences,
     getSearchPreferencesServerSnapshot
   );
-  const recentSearches = useSyncExternalStore(
-    subscribeToRecentSearches,
-    getRecentSearches,
-    getRecentSearchesServerSnapshot
-  );
+  const { recentSearches, recordSearch } = useRecentSearches();
+  const { savedSearches, saveSearch, deleteSavedSearch, deleteSavedSearchByQuery, isQuerySaved } = useSavedSearches();
 
   const showRecentSearches = searchPreferences.enableRecentSearches && recentSearches.length > 0 && query.trim() === "";
+  const showSavedSearches = savedSearches.length > 0 && query.trim() === "";
+  const isCurrentQuerySaved = isQuerySaved(query);
 
   // Changing the query always re-homes the highlighted row to the top
   // result. Done here, at the one call site that changes `query`, rather
@@ -122,6 +130,30 @@ export function useCommandPalette(): UseCommandPaletteResult {
     [setQuery]
   );
 
+  const toggleSaveCurrentQuery = useCallback(() => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    if (isQuerySaved(trimmed)) {
+      deleteSavedSearchByQuery(trimmed);
+    } else {
+      saveSearch(trimmed);
+    }
+  }, [query, isQuerySaved, deleteSavedSearchByQuery, saveSearch]);
+
+  const selectSavedSearch = useCallback(
+    (savedQuery: string) => {
+      setQuery(savedQuery);
+    },
+    [setQuery]
+  );
+
+  const removeSavedSearch = useCallback(
+    (id: string) => {
+      deleteSavedSearch(id);
+    },
+    [deleteSavedSearch]
+  );
+
   // Global ⌘K / Ctrl+K — reads the Keyboard Shortcut preference fresh on
   // every keypress (not as a reactive dependency), so disabling it takes
   // effect immediately without re-registering this listener. Must work
@@ -156,5 +188,11 @@ export function useCommandPalette(): UseCommandPaletteResult {
     showRecentSearches,
     recordSearch,
     selectRecentSearch,
+    savedSearches,
+    showSavedSearches,
+    isCurrentQuerySaved,
+    toggleSaveCurrentQuery,
+    selectSavedSearch,
+    removeSavedSearch,
   };
 }

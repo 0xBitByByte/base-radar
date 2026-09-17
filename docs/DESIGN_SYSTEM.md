@@ -6,6 +6,14 @@ across the landing page and dashboard. It is a record of current behavior,
 not a spec for how things should look — nothing here should be read as a
 proposal to change anything.
 
+For *where and in what order* those tokens/components should be used on a
+given screen — not their visual style, which stays defined here — see
+[INFORMATION_HIERARCHY_STANDARD.md](INFORMATION_HIERARCHY_STANDARD.md). For
+the governance rules on when a new pattern should reuse an existing
+component versus earn a new one — plus a full component-standardization
+audit against this document's own described primitives — see
+[DESIGN_SYSTEM_LOCK.md](DESIGN_SYSTEM_LOCK.md).
+
 For layer/module architecture, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Typography

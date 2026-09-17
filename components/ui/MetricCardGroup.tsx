@@ -20,6 +20,8 @@ export type MetricTile = {
   sourceLabel?: string;
   className?: string;
   valueClassName?: string;
+  /** PR-089 — one concise sentence explaining this metric, shown as a native browser tooltip on the label. A plain `title` attribute, not a `Tooltip`+`Info`-icon button: this tile's whole header is already one `<button>` (the select/expand toggle), and a nested `<button>` inside it would be invalid HTML. Omit for a tile that doesn't need one — every existing caller keeps its current (tooltip-less) header. */
+  infoTooltip?: string;
 };
 
 type MetricCardGroupProps = {
@@ -76,7 +78,10 @@ export function MetricCardGroup({ tiles, gridClassName }: MetricCardGroupProps) 
               )}
             >
               <span className="flex w-full items-center justify-between gap-2">
-                <span className="flex items-center gap-1 text-[10.5px] font-semibold tracking-wide text-radar-light-muted uppercase dark:text-radar-muted">
+                <span
+                  title={tile.infoTooltip}
+                  className="flex items-center gap-1 text-[10.5px] font-semibold tracking-wide text-radar-light-muted uppercase dark:text-radar-muted"
+                >
                   {tile.icon}
                   {tile.label}
                 </span>

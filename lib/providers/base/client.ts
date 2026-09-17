@@ -59,3 +59,14 @@ export type RawRpcBlockNumber = { number: string };
 export async function fetchSafeBlock(): Promise<RawRpcBlockNumber> {
   return rpcCall<RawRpcBlockNumber>("eth_getBlockByNumber", ["safe", false]);
 }
+
+/**
+ * V3-WALLET-002 — native ETH balance for a connected wallet, via the same
+ * free public RPC and `rpcCall()`/`fetchJson` (circuit-breaker, retry,
+ * timeout) path every other Base RPC read in this file already uses. Raw
+ * hex wei string, same shape `fetchGasPriceHex` already returns — decimal
+ * conversion happens in the mapper, never here.
+ */
+export async function fetchEthBalanceHex(address: string): Promise<string> {
+  return rpcCall<string>("eth_getBalance", [address, "latest"]);
+}

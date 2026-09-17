@@ -1,0 +1,41 @@
+# Base Radar — staging deployment (Release 1 Phase C).
+#
+# One Machine, one Volume, no horizontal scaling — a deliberate,
+# documented tradeoff for this stage (see docs/DATABASE.md and the Phase C
+# deployment report): a Fly Volume attaches to exactly one Machine at a
+# time, which is what makes a single SQLite file on disk safe here (no
+# concurrent writers across instances is possible, not just unlikely).
+# Scaling beyond one Machine is a real future decision (LiteFS or a
+# network-accessible database), not attempted in this phase.
+
+app = "base-radar-staging"
+primary_region = "iad"
+
+[build]
+
+[env]
+  NODE_ENV = "production"
+  SQLITE_DB_PATH = "/data/backend.db"
+  PORT = "3000"
+
+[[mounts]]
+  source = "base_radar_staging_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "15s"
+    method = "GET"
+    path = "/api/health"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

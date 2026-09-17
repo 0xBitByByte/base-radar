@@ -28,8 +28,9 @@ export function Footer() {
     <footer id="site-footer" className="border-t border-radar-light-border bg-radar-light-bg dark:border-white/5 dark:bg-radar-bg">
       <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
         <div className="grid gap-12 sm:grid-cols-2 lg:grid-cols-6">
-          <div className="group flex flex-col gap-3 sm:col-span-2">
-            <FooterLogo height={68} className="w-fit transition-transform duration-200 ease-out group-hover:scale-105" />
+          {/* Visual review: this column reads noticeably emptier than its 5-link siblings (the grid row stretches every cell to the tallest column's height). Sized the logo back up a bit and centered the block vertically within that stretched height, instead of sitting pinned to the top with dead space below. */}
+          <div className="group flex h-full flex-col justify-center gap-4 sm:col-span-2">
+            <FooterLogo height={56} className="w-fit transition-transform duration-200 ease-out group-hover:scale-105" />
             <p className="max-w-xs text-sm text-radar-light-muted dark:text-radar-muted">{SITE.tagline}</p>
           </div>
 

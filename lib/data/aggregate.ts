@@ -28,7 +28,10 @@ import * as github from "@/lib/providers/github/service";
 import type { ProviderResult } from "@/lib/providers/common/types";
 import { attributionFromProviderResult, resolveMetric, type MetricResolution } from "@/lib/providers/common/resolution";
 import { getWhaleProvider, type WatchedToken, type WhaleEvent as WhaleDetectionEvent } from "@/lib/whale";
-import { getGovernanceProvider, type GovernanceProjectRef } from "@/lib/governance";
+import { getGovernanceProvider, type GovernanceEvent, type GovernanceProjectRef } from "@/lib/governance";
+import type { VerifiedContract } from "@/lib/providers/blockscout/service";
+import type { RepoStats } from "@/lib/providers/github/service";
+import { findTopTvlMover } from "@/lib/intelligence/sources";
 import { getIntelligenceProvider, type NarrativeCategorySample } from "@/lib/intelligence-engine";
 import {
   getProject,
@@ -38,6 +41,8 @@ import {
   type RegistryLifecycleState,
   type VerificationLevel,
 } from "@/data/projects";
+import { computeRegistryMetrics, type RegistryMetrics } from "@/data/projects/metrics";
+import { countActiveProposals } from "@/lib/governance/helpers";
 import { getAlerts, getIntelligenceAlerts } from "@/lib/alerts/service";
 import { generateDailyIntelligenceBriefing } from "@/lib/ai-intelligence/generator";
 import type { RegistryUpdateInput } from "@/lib/ai-intelligence/generator/types";
@@ -50,7 +55,7 @@ import {
   type DashboardEvidenceSummaryItem,
   type DashboardSourceAttribution,
 } from "@/lib/ai-intelligence/dashboard-adapter";
-import { formatCompactCurrency, formatNumber, formatPercent, formatPrice, formatRelativeTime } from "@/lib/data/format";
+import { formatNumber, formatPrice } from "@/lib/data/format";
 import {
   MOCK_ACTIVITY_FEED,
   MOCK_AI_PROJECTS,
@@ -72,7 +77,6 @@ import type {
   DataSource,
   HeatmapCategory,
   IntelligenceBrief,
-  IntelligenceWallData,
   Kpi,
   KpiId,
   LiveTicker,
@@ -391,12 +395,11 @@ function mockWhaleEvents(): WithSource<WhaleEvent[]> {
 
 /**
  * Real whale-detection events (`lib/whale`'s own shape — not the
- * dashboard-facing `WhaleEvent` shape below). `cache()`-wrapped so both
- * `getWhaleEventsImpl` (dashboard widget) and `getIntelligenceWallDataImpl`
- * (landing page) share one detection pass per request instead of each
- * re-running the confidence-scoring loop independently — the underlying
- * Blockscout calls are already cached at the provider level regardless,
- * but this avoids redundant CPU work too.
+ * dashboard-facing `WhaleEvent` shape below). `cache()`-wrapped so every
+ * caller of `getWhaleEventsImpl` (dashboard widget) shares one detection
+ * pass per request instead of each re-running the confidence-scoring loop
+ * independently — the underlying Blockscout calls are already cached at
+ * the provider level regardless, but this avoids redundant CPU work too.
  */
 async function getRawWhaleEventsImpl(): Promise<WhaleDetectionEvent[]> {
   const [marketsRes, pairsRes] = await Promise.all([
@@ -561,11 +564,22 @@ async function getProjectSpotlightImpl(): Promise<WithSource<ProjectSpotlight>> 
     const repoSlug = KNOWN_PROTOCOL_REPOS[top.name.toLowerCase()];
     const repo = repoSlug ? unwrap(await github.getRepoStats(repoSlug)) : null;
 
+    // PR-102 — this widget's own literal "TVL" field, and every TVL-scale
+    // heuristic derived from it, must be this protocol's real BASE-chain
+    // TVL, never its (potentially much larger) global total — the exact
+    // Priority 6 finding from the V2 audit (Aave V3: ~$16.9B global vs.
+    // ~$506M on Base). `baseTvl` stays `null`, never silently substituted
+    // with `top.globalTvlUsd`, when DefiLlama has no Base-specific
+    // breakdown for this protocol — the heuristics below then honestly
+    // read as if there's no TVL evidence (the log10 floor), not as if a
+    // different, larger number were this protocol's real Base TVL.
+    const baseTvl = top.baseTvlUsd;
+
     // Real GitHub stars drive this when we have a known repo mapping;
     // otherwise fall back to a TVL-derived estimate of engineering activity.
     const developerActivityScore = repo
       ? Math.min(99, Math.round(Math.log10(Math.max(repo.stars, 10)) * 22))
-      : Math.min(80, Math.round(Math.log10(Math.max(top.tvlUsd, 10)) * 8));
+      : Math.min(80, Math.round(Math.log10(Math.max(baseTvl ?? 0, 10)) * 8));
 
     const aiScore =
       looksLikeAIProject(top.name) || category.toLowerCase().includes("ai") ? 82 : 24;
@@ -574,7 +588,7 @@ async function getProjectSpotlightImpl(): Promise<WithSource<ProjectSpotlight>> 
     // metric — blending live TVL scale and 24h price action.
     const healthScore = Math.max(
       10,
-      Math.min(99, Math.round(70 + change24hPct * 1.5 + (top.tvlUsd > 50_000_000 ? 10 : 0)))
+      Math.min(99, Math.round(70 + change24hPct * 1.5 + ((baseTvl ?? 0) > 50_000_000 ? 10 : 0)))
     );
 
     return {
@@ -583,14 +597,14 @@ async function getProjectSpotlightImpl(): Promise<WithSource<ProjectSpotlight>> 
       category,
       priceUsd: match?.priceUsd ?? 0,
       change24hPct,
-      tvlUsd: top.tvlUsd,
+      tvlUsd: baseTvl,
       fdvUsd: match?.fullyDilutedValuationUsd ?? top.marketCapUsd ?? null,
       liquidityUsd: null,
       githubStars: repo?.stars ?? null,
       developerActivityScore,
       aiScore,
       healthScore,
-      communityScore: Math.min(99, Math.round(Math.log10(Math.max(top.tvlUsd, 10)) * 10)),
+      communityScore: Math.min(99, Math.round(Math.log10(Math.max(baseTvl ?? 0, 10)) * 10)),
       changeResolution,
       source: "live",
     };
@@ -694,13 +708,113 @@ function getGovernanceTrackedProjects(): GovernanceProjectRef[] {
     .map((p) => ({ projectId: p.id, projectName: p.name, snapshotSpace: p.governance.snapshotSpace }));
 }
 
-/** Request-deduped so the Brief and the Intelligence Wall never issue this fetch twice in the same render pass. */
+/**
+ * Request-deduped so the Brief and the Intelligence Wall never issue this
+ * fetch twice in the same render pass. Exported (PR-091.04, Governance
+ * Compare) for `app/dashboard/compare/page.tsx` to reuse directly, the same
+ * way it already reuses `getRawWhaleEvents()` — real, ecosystem-wide
+ * governance events, never a second fetch path.
+ */
 async function getRegistryGovernanceEventsImpl() {
   const projects = getGovernanceTrackedProjects();
   if (projects.length === 0) return [];
   return getGovernanceProvider().fetchEvents({ projects });
 }
-const getRegistryGovernanceEvents = cache(getRegistryGovernanceEventsImpl);
+export const getRegistryGovernanceEvents = cache(getRegistryGovernanceEventsImpl);
+
+export type ExecutiveSnapshot = {
+  /** `computeRegistryMetrics()` (`data/projects/metrics.ts`) — a real, pure, already-existing function with no prior caller anywhere in the app; this is its first real use, not a new computation. Its own `verified`/`intelligenceReady` fields read `project.verificationLevel` — a *pipeline-staging* concept confirmed unset on every current project (see that file's own comment) — so this snapshot's `verifiedCount` below deliberately reads a different, populated field instead; `registryMetrics` is kept for `discovered`/`indexed`/`newThisMonth`/`updatedToday`, which don't have that gap. */
+  registryMetrics: RegistryMetrics;
+  /**
+   * PR-085.02 (live-verified fix) — `registryMetrics.verified` reads the
+   * empty `verificationLevel` pipeline field (confirmed live: read 0 of 756
+   * real projects). `project.verification.status` is the actual editorial
+   * trust field this app already surfaces everywhere else (the "Verified"
+   * badge on every Project Profile header, `LiveProject.verification` in
+   * `lib/projects/build.ts`) — real, populated, not a new concept, just the
+   * correct existing field for "how many tracked projects are verified."
+   */
+  verifiedCount: number;
+  /** Same `countActiveProposals()` helper `lib/intelligence/scorecard.ts`/`ProfileKeySignals.tsx` already share (PR-085.01) — reused again here, not re-derived, over the same real ecosystem-wide governance events `getRegistryGovernanceEvents()` already fetches for the landing page. */
+  governanceActiveCount: number;
+  /** The real, unmocked, untruncated count from `getRawWhaleEvents()` — not `getWhaleEvents()`'s display-oriented top-8/mock-fallback list, since a snapshot count needs to be honest even when the display list would mock-fill. */
+  whaleEventCount: number;
+  /**
+   * V1-FIX-006 — the raw events behind `governanceActiveCount`/
+   * `whaleEventCount` above, exposed rather than discarded after counting,
+   * so `lib/dashboard/executiveSummary.ts`'s `buildExecutiveHighlights()`
+   * can name the real project/proposal/amount instead of a bare number.
+   * Same already-`cache()`-wrapped calls this function already made for the
+   * counts — not a second fetch.
+   */
+  governanceEvents: GovernanceEvent[];
+  whaleEvents: WhaleDetectionEvent[];
+  /** Real, already fetched by `getActivityFeedImpl()` for its own Contract Verification slot — reused here via the same `getOrSet`-cached provider call, not a duplicate network request. `null` when Blockscout has nothing recently verified to report. */
+  verifiedContract: VerifiedContract | null;
+  /** Real, already fetched by `getActivityFeedImpl()` for its own Developer Activity slot (`PRIMARY_REPO`) — same reasoning as `verifiedContract` above. `null` on a genuine provider miss. */
+  repoStats: RepoStats | null;
+  /**
+   * V1-FIX-006A — the tracked project with the largest real 24h DefiLlama
+   * TVL move, resolved via `lib/intelligence/sources.ts`'s `findTopTvlMover`
+   * (the same real name/parent-tag protocol matching Project Profile pages
+   * use, so a split protocol like Aerodrome or Uniswap still resolves
+   * correctly) against `getBaseProtocols()` — the exact same `getOrSet`-cached
+   * bulk DefiLlama call `getKpisImpl()` already makes for the "Projects" KPI
+   * count, here read for its per-protocol `changePct24h` instead of just its
+   * length. Not a second network request. `null` when no tracked project has
+   * a real 24h change to compare.
+   */
+  topTvlMover: { projectId: string; projectName: string; changePct24h: number } | null;
+};
+
+/**
+ * PR-085.02 — the Executive Dashboard's ecosystem-wide "Market Snapshot"
+ * numbers beyond what `getKpis()` already covers (Projects/TVL/Volume/Gas/
+ * Stablecoins). Every field here is either a first real caller of an
+ * existing pure function (`computeRegistryMetrics`), a plain filter over
+ * data `getProjects()` (a pure, synchronous, already-loaded registry read)
+ * already provides, or a count over data another already-`cache()`-wrapped
+ * function in this file fetches — zero new provider calls:
+ * `getRegistryGovernanceEvents()`/`getRawWhaleEvents()` are both deduped
+ * against their other call sites in this same file within one render pass.
+ */
+async function getExecutiveSnapshotImpl(): Promise<ExecutiveSnapshot> {
+  // V1-FIX-006 — `verifiedContractResult`/`repoStatsResult` reuse the exact
+  // same `getOrSet`-cached provider calls `getActivityFeedImpl()` already
+  // makes (`blockscout.getRecentlyVerifiedContract()`, `github.getRepoStats(PRIMARY_REPO)`)
+  // — not a second network round-trip, just a second logical caller within
+  // this same request. Like every other provider call in this file, a miss
+  // resolves to `null` (via `unwrap`) rather than throwing.
+  const [governanceEvents, whaleEvents, verifiedContractResult, repoStatsResult, protocolsResult] = await Promise.all([
+    getRegistryGovernanceEvents(),
+    getRawWhaleEvents(),
+    blockscout.getRecentlyVerifiedContract(),
+    github.getRepoStats(PRIMARY_REPO),
+    defillama.getBaseProtocols(),
+  ]);
+  const projects = getProjects();
+  const topTvlMoverMatch = findTopTvlMover(projects, unwrap(protocolsResult) ?? []);
+  const topTvlMover =
+    topTvlMoverMatch && topTvlMoverMatch.protocol.changePct24h !== null
+      ? {
+          projectId: topTvlMoverMatch.project.id,
+          projectName: topTvlMoverMatch.project.name,
+          changePct24h: topTvlMoverMatch.protocol.changePct24h,
+        }
+      : null;
+  return {
+    registryMetrics: computeRegistryMetrics(projects),
+    verifiedCount: projects.filter((project) => project.verification.status === "verified").length,
+    governanceActiveCount: countActiveProposals(governanceEvents) ?? 0,
+    whaleEventCount: whaleEvents.length,
+    governanceEvents,
+    whaleEvents,
+    verifiedContract: unwrap(verifiedContractResult),
+    repoStats: unwrap(repoStatsResult),
+    topTvlMover,
+  };
+}
+export const getExecutiveSnapshot = cache(getExecutiveSnapshotImpl);
 
 /**
  * PR-042 — real, unfabricated registry-change evidence for the Daily
@@ -873,170 +987,6 @@ async function getProjectAIIntelligenceImpl(projectId: string): Promise<ProjectA
 }
 export const getProjectAIIntelligence = cache(getProjectAIIntelligenceImpl);
 
-/** 0-100, biased by how large a real percentage move is — deterministic, not fabricated. */
-function confidenceFromMagnitude(pct: number, base = 50): number {
-  return Math.max(30, Math.min(99, Math.round(base + Math.abs(pct))));
-}
-
-/**
- * Live-update content for the landing page's AI Intelligence Wall (PR10
- * Part 2). Keyed by the tile ids `AIIntelligencePreview.tsx` defines in its
- * own `TILE_DEFS`. A tile with no entry here (e.g. "New Protocol", "Funding
- * Round", "Bridge Activity" — none of which have a real backing provider in
- * this codebase) has no live signal and renders its neutral default state
- * instead of a fabricated value; this is the same "omit rather than
- * fabricate" principle `lib/whale` and `lib/governance` already apply,
- * extended to every tile on the Wall. Every input here is a call this file
- * already makes elsewhere for the dashboard/Brief — `cache()` on each of
- * those underlying functions means mounting this on the landing page adds
- * zero duplicate provider requests.
- */
-async function getIntelligenceWallDataImpl(): Promise<IntelligenceWallData> {
-  const [
-    signalsRes,
-    narrativeSamplesRes,
-    whaleRes,
-    governanceRes,
-    commitActivityRes,
-    verifiedContractRes,
-    tvlRes,
-    trendingPairsRes,
-  ] = await Promise.allSettled([
-    getSignals(),
-    getNarrativeSamples(),
-    getRawWhaleEvents(),
-    getRegistryGovernanceEvents(),
-    github.getCommitActivity(PRIMARY_REPO),
-    blockscout.getRecentlyVerifiedContract(),
-    defillama.getBaseChainTvl(),
-    dexscreener.getBaseTrendingPairs(),
-  ]);
-
-  const data: IntelligenceWallData = {};
-
-  const signals = signalsRes.status === "fulfilled" ? signalsRes.value : null;
-  if (signals && signals.source === "live" && signals[0]) {
-    const top = signals[0];
-    data["ai-signal"] = {
-      headline: `${top.project} ${top.note}`,
-      detail: `Signal type: ${top.kind}`,
-      time: "just now",
-      confidence: top.strength,
-      source: "DexScreener",
-    };
-  }
-
-  const narrativeSamples = narrativeSamplesRes.status === "fulfilled" ? narrativeSamplesRes.value : [];
-  if (narrativeSamples.length > 0) {
-    try {
-      const topNarrative = (await getIntelligenceProvider().generateNarrative({ samples: narrativeSamples })).signals[0];
-      if (topNarrative) {
-        data["narrative-shift"] = {
-          headline: `${topNarrative.category} narrative ${topNarrative.label}`,
-          detail: `${formatPercent(topNarrative.changePct24h)} 24h`,
-          time: "just now",
-          confidence: topNarrative.strength,
-          source: "CoinGecko",
-        };
-      }
-    } catch {
-      // A misconfigured INTELLIGENCE_PROVIDER throws synchronously (see
-      // lib/intelligence-engine/index.ts) — this tile simply stays absent
-      // (neutral fallback) rather than taking down the whole landing page.
-    }
-  }
-
-  const rawWhaleEvents = whaleRes.status === "fulfilled" ? whaleRes.value : [];
-  const topWhale = [...rawWhaleEvents].sort((a, b) => b.usdValue - a.usdValue)[0];
-  if (topWhale) {
-    data["whale-alert"] = {
-      headline: `${formatCompactCurrency(topWhale.usdValue)} transferred`,
-      detail: `${topWhale.tokenSymbol} · ${topWhale.classification === "whale-alert" ? "Whale Alert" : "Large on-chain transfer"}`,
-      time: formatRelativeTime(topWhale.timestamp),
-      confidence: topWhale.confidence,
-      source: "Blockscout",
-    };
-  }
-
-  const governanceEvents = governanceRes.status === "fulfilled" ? governanceRes.value : [];
-  const topGovernance = governanceEvents[0];
-  if (topGovernance) {
-    const projectName =
-      getGovernanceTrackedProjects().find((p) => p.projectId === topGovernance.projectId)?.projectName ??
-      topGovernance.projectId;
-    const statusHeadline: Record<typeof topGovernance.status, string> = {
-      passed: "Proposal passed",
-      active: "Vote active",
-      failed: "Proposal failed",
-      pending: "Vote pending",
-    };
-    data["governance-vote"] = {
-      headline: statusHeadline[topGovernance.status],
-      detail: `${projectName} · ${topGovernance.title}`,
-      time: formatRelativeTime(topGovernance.end),
-      confidence: topGovernance.confidence,
-      source: "Snapshot",
-    };
-  }
-
-  const commitActivity = commitActivityRes.status === "fulfilled" ? unwrap(commitActivityRes.value) : null;
-  if (commitActivity) {
-    data["developer-activity"] = {
-      headline: `${commitActivity.commitsLast7d} commits this week`,
-      detail: commitActivity.fullName,
-      time: "past 7 days",
-      confidence: commitActivity.trendPct !== null ? confidenceFromMagnitude(commitActivity.trendPct, 60) : null,
-      source: "GitHub",
-    };
-  }
-
-  const verified = verifiedContractRes.status === "fulfilled" ? unwrap(verifiedContractRes.value) : null;
-  if (verified) {
-    const hoursAgo = (Date.now() - new Date(verified.verifiedAt).getTime()) / 3_600_000;
-    const recencyConfidence = Math.max(50, Math.min(99, Math.round(99 - hoursAgo)));
-    const truncatedAddress = `${verified.address.slice(0, 6)}…${verified.address.slice(-4)}`;
-    data["builder-verified"] = {
-      headline: verified.name ? `${verified.name} verified` : "Contract verified",
-      detail: `${truncatedAddress} on Base`,
-      time: formatRelativeTime(verified.verifiedAt),
-      confidence: recencyConfidence,
-      source: "Blockscout",
-    };
-    data["security-update"] = {
-      headline: "Contract security check passed",
-      detail: `Latest verification: ${verified.name ?? truncatedAddress}`,
-      time: formatRelativeTime(verified.verifiedAt),
-      confidence: recencyConfidence,
-      source: "Blockscout",
-    };
-  }
-
-  const tvl = tvlRes.status === "fulfilled" ? unwrap(tvlRes.value) : null;
-  if (tvl) {
-    data["tvl-spike"] = {
-      headline: `TVL ${tvl.changePct24h >= 0 ? "+" : ""}${tvl.changePct24h.toFixed(1)}% in 24h`,
-      detail: "Base ecosystem-wide",
-      time: "just now",
-      confidence: confidenceFromMagnitude(tvl.changePct24h, 50),
-      source: "DefiLlama",
-    };
-  }
-
-  const trendingPairs = trendingPairsRes.status === "fulfilled" ? unwrap(trendingPairsRes.value) : null;
-  const topPair = trendingPairs?.[0];
-  if (topPair && topPair.volume24hUsd !== null) {
-    data["liquidity-movement"] = {
-      headline: `${formatCompactCurrency(topPair.volume24hUsd)} 24h volume`,
-      detail: `${topPair.baseToken.symbol} · ${topPair.dexId}`,
-      time: "last 24h",
-      confidence: topPair.priceChangePct24h !== null ? confidenceFromMagnitude(topPair.priceChangePct24h, 50) : null,
-      source: "DexScreener",
-    };
-  }
-
-  return data;
-}
-export const getIntelligenceWallData = cache(getIntelligenceWallDataImpl);
 
 async function getNarrativeHeatmapImpl(): Promise<WithSource<NarrativeHeatRow[]>> {
   try {

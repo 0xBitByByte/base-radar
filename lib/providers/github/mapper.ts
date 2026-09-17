@@ -47,11 +47,65 @@ export type CommitActivity = {
   commitsLast90d: number;
   /** Positive = accelerating, negative = slowing, relative to the prior week. */
   trendPct: number | null;
+  /** PR-102 — sustained development cadence over the last 26 complete weeks, from this same already-fetched response. `null` when there's no usable evidence at all (see `mapDeveloperCadence`'s own doc comment). */
+  cadence: DeveloperCadence | null;
 };
 
 const WEEKS_IN_90_DAYS = 13;
 
-export function mapCommitActivity(fullName: string, weeks: RawCommitActivityWeek[]): CommitActivity | null {
+/**
+ * PR-102 — 26-week sustained development cadence: `activeWeeks / windowWeeks
+ * × 100`, where a week counts as active when it has ANY real commits
+ * (`total > 0`). Distinct from `trendPct`/`commitsLast90d` above (both
+ * about RECENT VOLUME) — this measures CONSISTENCY over roughly six
+ * months, deliberately never rewarding raw commit count (a week with 1
+ * commit and a week with 200 commits both count as exactly one active
+ * week — see `lib/intelligence/dimensionNormalization.ts`'s own audit note
+ * for why raw volume was rejected as a Developer Activity signal).
+ *
+ * Two honesty requirements, both handled here rather than left to the
+ * caller:
+ * 1. The current, still-in-progress week is excluded — its bucket hasn't
+ *    finished accumulating commits yet, so a 0 there is not real evidence
+ *    of inactivity (`week.week` is the UTC start of that week; it only
+ *    counts once a full 7 days have elapsed since then).
+ * 2. `windowWeeks` reflects how many COMPLETE weeks of real history are
+ *    actually available, up to 26 — never hardcoded to 26 regardless of
+ *    history. A repo with only, say, 10 weeks of real history is judged
+ *    against those 10 weeks, not artificially diluted by 16 phantom
+ *    "missing" weeks that would silently treat "didn't exist yet" as
+ *    "inactive" — exactly the "absence of evidence as negative evidence"
+ *    anti-pattern this whole PR is required to avoid.
+ *
+ * Returns `null` (never a fabricated 0%) when there are zero weeks of
+ * data at all, or the only week(s) present are still in progress.
+ */
+export type DeveloperCadence = {
+  activeWeeks: number;
+  /** How many complete weeks of real history this was computed over — 26 normally, fewer only when the repo genuinely has less history than that. */
+  windowWeeks: number;
+  cadencePct: number;
+};
+
+const CADENCE_WINDOW_WEEKS = 26;
+const WEEK_SECONDS = 7 * 24 * 60 * 60;
+
+export function mapDeveloperCadence(weeks: RawCommitActivityWeek[], nowMs: number = Date.now()): DeveloperCadence | null {
+  if (weeks.length === 0) return null;
+
+  const nowSeconds = nowMs / 1000;
+  const completeWeeks = weeks.filter((w) => w.week + WEEK_SECONDS <= nowSeconds);
+  if (completeWeeks.length === 0) return null;
+
+  const window = completeWeeks.slice(-CADENCE_WINDOW_WEEKS);
+  const activeWeeks = window.filter((w) => w.total > 0).length;
+  const windowWeeks = window.length;
+  const cadencePct = Math.round((activeWeeks / windowWeeks) * 1000) / 10;
+
+  return { activeWeeks, windowWeeks, cadencePct };
+}
+
+export function mapCommitActivity(fullName: string, weeks: RawCommitActivityWeek[], nowMs: number = Date.now()): CommitActivity | null {
   if (weeks.length === 0) return null;
 
   const lastWeek = weeks[weeks.length - 1];
@@ -66,6 +120,7 @@ export function mapCommitActivity(fullName: string, weeks: RawCommitActivityWeek
     commitsPrev7d,
     commitsLast90d,
     trendPct: commitsPrev7d > 0 ? ((commitsLast7d - commitsPrev7d) / commitsPrev7d) * 100 : null,
+    cadence: mapDeveloperCadence(weeks, nowMs),
   };
 }
 

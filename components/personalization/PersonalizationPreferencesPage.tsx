@@ -5,7 +5,9 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Download, RotateCcw, Upload } from "lucide-react";
 import { Switch } from "@base-ui/react/switch";
 
-import { cn } from "@/lib/utils";
+import { cn, downloadTextFile } from "@/lib/utils";
+import { GLASS_TILE_SURFACE } from "@/components/ui/glassStyles";
+import { PAGE_HEADER_GROUP_CLASS, PAGE_HEADER_TITLE_CLASS, PAGE_HEADER_SUBTITLE_CLASS } from "@/components/dashboard/pageHeaderStyles";
 import { usePersonalizationPreferences } from "@/lib/hooks/usePersonalizationPreferences";
 import { useWatchlists } from "@/lib/hooks/useWatchlists";
 import { exportWatchlistsToJson, validateWatchlistImport } from "@/lib/personalization/importExport";
@@ -16,17 +18,9 @@ const SWITCH_ROOT_CLASS =
 const SWITCH_THUMB_CLASS =
   "block size-4 translate-x-1 rounded-full bg-radar-light-card shadow transition-transform data-[checked]:translate-x-6 dark:bg-radar-bg";
 
-/** Triggers a browser file download for a JSON string — no external request, no data leaves the tab. */
+/** Triggers a browser file download for a JSON string — no external request, no data leaves the tab. V4-FUTURE-001 — now a thin wrapper over `lib/utils.ts`'s shared `downloadTextFile`, the one real download implementation this app uses. */
 function downloadJson(filename: string, content: string): void {
-  const blob = new Blob([content], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  document.body.removeChild(anchor);
-  URL.revokeObjectURL(url);
+  downloadTextFile(filename, content, "application/json");
 }
 
 /**
@@ -83,9 +77,9 @@ export function PersonalizationPreferencesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold text-radar-light-text dark:text-radar-white">Personalization Preferences</h1>
-        <p className="text-sm leading-relaxed text-radar-light-muted dark:text-radar-muted">
+      <div className={PAGE_HEADER_GROUP_CLASS}>
+        <h1 className={PAGE_HEADER_TITLE_CLASS}>Personalization Preferences</h1>
+        <p className={PAGE_HEADER_SUBTITLE_CLASS}>
           Control how the Dashboard, Global Search, and the Topbar respond to your active watchlist, and manage your
           watchlists as a file.
         </p>
@@ -99,7 +93,7 @@ export function PersonalizationPreferencesPage() {
         <h2 id="personalization-dashboard-heading" className="text-sm font-semibold text-radar-light-text dark:text-radar-white">
           Dashboard
         </h2>
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-radar-light-border bg-radar-light-card p-4 dark:border-white/10 dark:bg-white/[0.02]">
+        <div className={cn("flex items-center justify-between gap-3 p-4", GLASS_TILE_SURFACE)}>
           <span className="flex flex-col">
             <span className="text-sm font-medium text-radar-light-text dark:text-radar-white">
               Enable Dashboard Personalization
@@ -133,7 +127,7 @@ export function PersonalizationPreferencesPage() {
         <h2 id="personalization-search-heading" className="text-sm font-semibold text-radar-light-text dark:text-radar-white">
           Search
         </h2>
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-radar-light-border bg-radar-light-card p-4 dark:border-white/10 dark:bg-white/[0.02]">
+        <div className={cn("flex items-center justify-between gap-3 p-4", GLASS_TILE_SURFACE)}>
           <span className="flex flex-col">
             <span className="text-sm font-medium text-radar-light-text dark:text-radar-white">
               Enable Search Prioritization
@@ -167,7 +161,7 @@ export function PersonalizationPreferencesPage() {
         >
           Watchlist Behavior
         </h2>
-        <div className="flex flex-col divide-y divide-radar-light-border rounded-xl border border-radar-light-border bg-radar-light-card dark:divide-white/10 dark:border-white/10 dark:bg-white/[0.02]">
+        <div className={cn("flex flex-col divide-y divide-radar-light-border dark:divide-white/10", GLASS_TILE_SURFACE)}>
           <div className="flex items-center justify-between gap-3 p-4">
             <span className="flex flex-col">
               <span className="text-sm font-medium text-radar-light-text dark:text-radar-white">
@@ -224,7 +218,7 @@ export function PersonalizationPreferencesPage() {
         >
           Import / Export
         </h2>
-        <div className="flex flex-col gap-3 rounded-xl border border-radar-light-border bg-radar-light-card p-4 dark:border-white/10 dark:bg-white/[0.02]">
+        <div className={cn("flex flex-col gap-3 p-4", GLASS_TILE_SURFACE)}>
           <p className="text-xs text-radar-light-muted dark:text-radar-muted">
             Export your {watchlists.length} {watchlists.length === 1 ? "watchlist" : "watchlists"} as a JSON file, or
             import one from another device. Importing never overwrites an existing watchlist — it only adds new ones,

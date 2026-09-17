@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
+import { ArrowRight, Eye } from "lucide-react";
 
 import { AlertFeed } from "@/components/alerts/AlertFeed";
 import { AlertFilters } from "@/components/alerts/AlertFilters";
@@ -18,6 +20,7 @@ import {
   type IntelligenceSortOrder,
 } from "@/lib/alerts/service";
 import { useIntelligenceAlerts } from "@/lib/hooks/useIntelligenceAlerts";
+import type { ProjectLogoEntry } from "@/lib/branding/resolveProjectLogos";
 import { useVisibleAlerts } from "@/lib/hooks/useVisibleAlerts";
 import { useWatchedProjectsWithAlerts } from "@/lib/hooks/useWatchedProjectsWithAlerts";
 import { useWatchlist } from "@/lib/hooks/useWatchlist";
@@ -52,7 +55,7 @@ const DEFAULT_INTELLIGENCE_SORT: IntelligenceSortOrder = "score";
  * spec's "Project filter should only list watched projects" — not from
  * whatever projects happen to appear in the current alert list.
  */
-export function AlertsPageClient() {
+export function AlertsPageClient({ logoMap }: { logoMap: Record<string, ProjectLogoEntry> }) {
   const { alerts, markRead, markAllRead, togglePin } = useVisibleAlerts();
   const { count: watchlistCount } = useWatchlist();
   const watchedProjects = useWatchedProjectsWithAlerts();
@@ -130,7 +133,10 @@ export function AlertsPageClient() {
       : undefined;
 
   return (
-    <div className="flex flex-col gap-5">
+    // PR-086.05 — gap-5 -> gap-6, matching the shared page-header rhythm
+    // every other flat top-level page (Watchlists/Automation/Notifications/
+    // Settings) already uses between its header and first section.
+    <div className="flex flex-col gap-6">
       <AlertHeader unreadCount={unreadCount} onMarkAllRead={markAllRead} />
 
       {watchlistCount > 0 && (
@@ -145,6 +151,19 @@ export function AlertsPageClient() {
             </h2>
           </div>
           <ExecutiveSummary />
+          {/* PR-090.06 — Alerts Integration. Zero changes to the Alert
+              Engine or this page's own alert data/filtering — a single,
+              honest cross-navigation link into AI Watch, which is a
+              separate, Watchlist-scoped feature (not a replacement for
+              these alerts). Exact required wording preserved verbatim. */}
+          <Link
+            href="/dashboard/ai-workspace"
+            className="group flex w-fit items-center gap-1.5 text-xs font-medium text-radar-light-muted outline-none transition-colors hover:text-radar-primary focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:text-radar-muted dark:hover:text-radar-accent"
+          >
+            <Eye className="size-3.5 shrink-0" aria-hidden="true" />
+            Want proactive risk notifications for your Watchlist? AI Watch checks your saved watch when you open AI Workspace — it doesn&apos;t run in the background.
+            <ArrowRight className="size-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />
+          </Link>
           {intelligenceAlerts.length > 0 && (
             <IntelligenceFilters
               search={intelligenceSearch}
@@ -164,35 +183,55 @@ export function AlertsPageClient() {
             alerts={displayedIntelligenceAlerts}
             emptyMessage={intelligenceEmptyMessage}
             preserveOrder
+            logoMap={logoMap}
           />
         </section>
       )}
 
-      {watchlistCount > 0 && alerts.length > 0 && (
-        <AlertFilters
-          status={status}
-          onStatusChange={setStatus}
-          severity={severity}
-          onSeverityChange={setSeverity}
-          category={category}
-          onCategoryChange={setCategory}
-          projectId={projectId}
-          onProjectIdChange={setProjectId}
-          projectOptions={projectOptions}
-          sort={sort}
-          onSortChange={setSort}
-          counts={{ all: alerts.length, unread: unreadCount, pinned: pinnedCount }}
-        />
-      )}
-
       {watchlistCount === 0 ? (
         <EmptyAlerts variant="no-watchlist" />
-      ) : alerts.length === 0 ? (
-        <EmptyAlerts variant="no-alerts" />
-      ) : displayedAlerts.length === 0 ? (
-        <EmptyAlerts variant="filtered" onClearFilters={filtersActive ? clearFilters : undefined} />
       ) : (
-        <AlertFeed alerts={displayedAlerts} onOpen={markRead} onTogglePin={togglePin} />
+        // PR-086.06 — mirrors the "AI Intelligence" section's own
+        // `aria-labelledby` heading above: without this, the page went
+        // from one clearly-labeled section straight into an unlabeled
+        // filter bar + card list, so scrolling past the Intelligence
+        // section gave no visual cue that a distinct "raw alerts" section
+        // had begun. Shown under the same condition the Intelligence
+        // section itself uses (`watchlistCount > 0`), not gated on
+        // `alerts.length` — same as `IntelligenceList` still rendering its
+        // own empty message rather than disappearing, this section keeps
+        // its heading through the "no alerts yet" and "filtered to zero"
+        // states too, not just when there's a feed to show.
+        <section aria-labelledby="all-alerts-heading" className="flex flex-col gap-3">
+          <h2 id="all-alerts-heading" className="text-sm font-semibold text-radar-light-text dark:text-radar-white">
+            All Alerts
+          </h2>
+
+          {alerts.length > 0 && (
+            <AlertFilters
+              status={status}
+              onStatusChange={setStatus}
+              severity={severity}
+              onSeverityChange={setSeverity}
+              category={category}
+              onCategoryChange={setCategory}
+              projectId={projectId}
+              onProjectIdChange={setProjectId}
+              projectOptions={projectOptions}
+              sort={sort}
+              onSortChange={setSort}
+              counts={{ all: alerts.length, unread: unreadCount, pinned: pinnedCount }}
+            />
+          )}
+
+          {alerts.length === 0 ? (
+            <EmptyAlerts variant="no-alerts" />
+          ) : displayedAlerts.length === 0 ? (
+            <EmptyAlerts variant="filtered" onClearFilters={filtersActive ? clearFilters : undefined} />
+          ) : (
+            <AlertFeed alerts={displayedAlerts} onOpen={markRead} onTogglePin={togglePin} logoMap={logoMap} />
+          )}
+        </section>
       )}
     </div>
   );

@@ -5,6 +5,12 @@ projects that powers Base Radar. It contains **metadata only** — no prices, TV
 volume, or other live market data. Live data is layered on top of this registry
 by provider modules that consume the identifiers stored here.
 
+This document defines the registry's *schema* — the fields available to
+record a trust/lifecycle decision. For *whether a project should be listed
+at all, and how much of it should be trusted* — the objective eligibility,
+verification, and maintenance criteria those fields exist to record — see
+[TRUSTED_PROJECT_FRAMEWORK.md](TRUSTED_PROJECT_FRAMEWORK.md).
+
 ## Registry philosophy
 
 The registry exists to answer one question honestly: *how much do we actually

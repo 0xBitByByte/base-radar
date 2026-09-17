@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.data
+coverage
+*.md
+.env
+.env.local
+.env*.local
+tests
+.github
+.vscode
+.claude

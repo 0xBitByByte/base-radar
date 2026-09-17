@@ -1,6 +1,6 @@
 /** Raw CoinGecko responses → domain models. Pure functions, no I/O. */
 
-import type { RawCoinDetail, RawCoinGeckoMarket, RawMarketChartRange, RawSimplePrice } from "@/lib/providers/coingecko/client";
+import type { RawCoinContractDetail, RawCoinContractMarket, RawCoinDetail, RawCoinGeckoMarket, RawMarketChartRange, RawSimplePrice } from "@/lib/providers/coingecko/client";
 import type { SparklinePoint } from "@/lib/data/types";
 
 export type CoinMarket = {
@@ -36,6 +36,20 @@ export type MajorPrices = {
   btc: AssetPrice;
 };
 
+/**
+ * PR-098.02 — CoinGecko's docs assert `price_change_percentage_24h` is
+ * always a finite number when present, but a raw provider response should
+ * never be trusted blindly (a malformed/truncated response, or a field
+ * CoinGecko itself is glitching on, could hand back `NaN`/`Infinity` after
+ * JSON parsing in edge cases). Guards `changePct24h` specifically — the
+ * one field PR-098.02 audited end-to-end — rather than every numeric field
+ * on this type, to keep this a targeted fix, not a silent behavior change
+ * across every other consumer of `CoinMarket`.
+ */
+function toFiniteOrNull(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
 export function mapCoinMarket(raw: RawCoinGeckoMarket): CoinMarket {
   return {
     id: raw.id,
@@ -47,7 +61,13 @@ export function mapCoinMarket(raw: RawCoinGeckoMarket): CoinMarket {
     marketCapRank: raw.market_cap_rank ?? null,
     fullyDilutedValuationUsd: raw.fully_diluted_valuation,
     volume24hUsd: raw.total_volume,
-    changePct24h: raw.price_change_percentage_24h,
+    // PR-098.02 — this is THE project's own token's real USD price change
+    // over the last 24 hours, straight from CoinGecko's own
+    // `price_change_percentage_24h`. Never substitute TVL change
+    // (DefiLlama's `Protocol.changePct24h`, a structurally different field
+    // on a different type — see `defillama/mapper.ts`), volume change, or
+    // any other metric here.
+    changePct24h: toFiniteOrNull(raw.price_change_percentage_24h),
     changePct7d: raw.price_change_percentage_7d_in_currency ?? null,
     changePct30d: raw.price_change_percentage_30d_in_currency ?? null,
     circulatingSupply: raw.circulating_supply ?? null,
@@ -75,15 +95,19 @@ export function mapMajorPrices(raw: RawSimplePrice): MajorPrices | null {
   };
 }
 
-export function mapAssetPrice(raw: RawSimplePrice, id: string): AssetPrice | null {
-  const entry = raw[id];
-  if (!entry) return null;
-  return { usd: entry.usd, changePct24h: entry.usd_24h_change };
-}
-
 /** `null` when CoinGecko has no genesis date on record for this coin (common for tokens without a fixed "launch" event) — never guessed. */
 export function mapGenesisDate(raw: RawCoinDetail): string | null {
   return raw.genesis_date ?? null;
+}
+
+/** Token Logo System — the largest real image CoinGecko has for this contract, falling back to `small` if `large` is missing; `null` when the response has no usable image at all (a malformed/unexpected shape, not just "field absent" — contained here rather than thrown, matching this file's existing error-containment style). */
+export function mapContractImageUrl(raw: RawCoinContractDetail): string | null {
+  return raw.image?.large || raw.image?.small || null;
+}
+
+/** V3-WALLET-002 — real USD price for a token resolved by contract address, `null` when CoinGecko has no market data for it (never fabricated). */
+export function mapContractPrice(raw: RawCoinContractMarket): number | null {
+  return raw.market_data?.current_price?.usd ?? null;
 }
 
 /** Real historical price series for a given period — `null` when the coin has no chart data at all (never a fabricated flat line). */

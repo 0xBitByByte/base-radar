@@ -21,6 +21,7 @@ function isValidAccount(data: unknown): data is Account {
     typeof account.username === "string" &&
     (typeof account.email === "string" || account.email === null) &&
     (typeof account.avatar === "string" || account.avatar === null) &&
+    (typeof account.bio === "string" || account.bio === null) &&
     typeof account.createdAt === "string" &&
     typeof account.updatedAt === "string" &&
     typeof account.lastActiveAt === "string" &&

@@ -44,7 +44,8 @@ export function PoolExplorerFilterBar({ state, availableDexes }: PoolExplorerFil
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="relative flex items-center gap-2 rounded-xl border border-radar-light-border bg-radar-light-surface px-3 py-2 transition-colors focus-within:border-radar-primary/50 focus-within:ring-2 focus-within:ring-radar-primary/30 dark:border-white/10 dark:bg-white/5">
+      {/* PR-086 — `duration-200` on the existing focus-glow transition, matching this pass's shared motion timing elsewhere on this page. */}
+      <div className="relative flex items-center gap-2 rounded-xl border border-radar-light-border bg-radar-light-surface px-3 py-2 transition-colors duration-200 focus-within:border-radar-primary/50 focus-within:ring-2 focus-within:ring-radar-primary/30 dark:border-white/10 dark:bg-white/5">
         <Search className="size-4 shrink-0 text-radar-light-muted dark:text-radar-muted" aria-hidden="true" />
         <input
           type="text"

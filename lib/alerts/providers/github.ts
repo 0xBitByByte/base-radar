@@ -25,7 +25,7 @@
 
 import { getProjects } from "@/data/projects";
 import type { Project } from "@/data/projects/types";
-import { isWithinDays, makeAlertId } from "@/lib/alerts/providers/shared";
+import { dayBucket, isWithinDays, makeAlertId, startOfTodayIso } from "@/lib/alerts/providers/shared";
 import type { AlertProvider } from "@/lib/alerts/providers/types";
 import type { Alert } from "@/lib/alerts/types";
 import * as github from "@/lib/providers/github/service";
@@ -127,14 +127,19 @@ function buildActivityAlert(project: Project, activity: CommitActivity): Alert |
   if (activity.trendPct === null || activity.trendPct < 50) return null;
 
   return {
-    id: makeAlertId("github", "activity", project.id, String(activity.commitsLast7d)),
+    // V3-NOTIFICATION-001 — day-bucketed, not the raw rolling
+    // `commitsLast7d` count — see `dayBucket()`'s own doc comment; same
+    // reasoning as the CoinGecko/DefiLlama fixes in this same read-state
+    // bug (a rolling 7-day count shifts on almost every fetch as commits
+    // land, which broke read-state persistence identically).
+    id: makeAlertId("github", "activity", project.id, dayBucket()),
     projectId: project.id,
     projectName: project.name,
     title: "Increased Development Activity",
     summary: `${activity.commitsLast7d} commit${activity.commitsLast7d === 1 ? "" : "s"} in the last 7 days, up from ${activity.commitsPrev7d} the week before.`,
     category: "release",
     severity: "info",
-    timestamp: new Date().toISOString(),
+    timestamp: startOfTodayIso(),
     read: false,
     pinned: false,
     source: "GitHub",

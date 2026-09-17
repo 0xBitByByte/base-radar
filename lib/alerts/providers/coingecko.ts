@@ -25,7 +25,7 @@
 
 import { getProjects } from "@/data/projects";
 import type { Project } from "@/data/projects/types";
-import { isWithinDays } from "@/lib/alerts/providers/shared";
+import { dayBucket, isWithinDays, startOfTodayIso } from "@/lib/alerts/providers/shared";
 import type { AlertProvider } from "@/lib/alerts/providers/types";
 import type { Alert, AlertSeverity } from "@/lib/alerts/types";
 import * as coingecko from "@/lib/providers/coingecko/service";
@@ -61,14 +61,21 @@ function buildPriceMoveAlert(project: Project, market: CoinMarket): Alert | null
   }
 
   return {
-    id: `coingecko:price-move:${project.id}:${Math.round(change)}`,
+    // V3-NOTIFICATION-001 — day-bucketed + direction, not the raw live
+    // `change` value: a 24h % change ticks continuously, so baking it into
+    // the id (as this used to) meant the id — and therefore read state —
+    // changed on every single re-fetch. Same day + same direction is
+    // treated as the same alert; a new day (or the move reversing
+    // direction) is a genuinely new one. See `dayBucket()`'s own doc
+    // comment for the full reasoning.
+    id: `coingecko:price-move:${project.id}:${dayBucket()}:${direction}`,
     projectId: project.id,
     projectName: project.name,
     title,
     summary: `${project.name} moved ${direction} ${rounded}% over the past 24 hours to $${market.priceUsd.toLocaleString()}.`,
     category: "price",
     severity,
-    timestamp: new Date().toISOString(),
+    timestamp: startOfTodayIso(),
     read: false,
     pinned: false,
     source: "CoinGecko",

@@ -1,17 +1,11 @@
-import { GlowBadge, type GlowBadgeColor } from "@/components/ui/GlowBadge";
+import { GOVERNANCE_STATUS_COLOR, cleanProposalDescription } from "@/components/explorer/governanceIntelligenceHelpers";
+import { GlowBadge } from "@/components/ui/GlowBadge";
 import { formatDate } from "@/lib/data/format";
-import type { GovernanceEvent, GovernanceStatus } from "@/lib/governance";
+import type { GovernanceEvent } from "@/lib/governance";
 
 type GovernanceListProps = {
   /** Already known to be configured by the caller — `null`-vs-"not configured" is the caller's concern (it decides whether to render this section at all), this component only ever renders the events it's given. */
   events: GovernanceEvent[];
-};
-
-const GOVERNANCE_STATUS_COLOR: Record<GovernanceStatus, GlowBadgeColor> = {
-  active: "accent",
-  passed: "success",
-  failed: "danger",
-  pending: "muted",
 };
 
 /** Real, forward-looking time-remaining text for an active proposal's `end` timestamp — the countdown counterpart to `formatRelativeTime`'s backward-looking "Xm/h/d ago", which doesn't apply here since `end` is still in the future. */
@@ -26,41 +20,12 @@ function formatTimeRemaining(endIso: string): string {
   return `Voting ends in ${days}d`;
 }
 
-/**
- * PR-079 follow-up — Snapshot's `body` field is raw markdown and sometimes
- * carries a leading YAML frontmatter block (`---\ntitle: ...\nauthor: ...\n
- * ---`) that Snapshot's own UI never renders directly, but this component's
- * plain-text preview previously did, verbatim (confirmed live on Aave, both
- * in the full Governance section and the Key Signals "Governance Activity"
- * card, which both render through this same component). Strips the
- * frontmatter block plus common inline markdown syntax so only prose is
- * left for the line-clamped preview — presentation-only, `event.description`
- * itself is never modified.
- */
-function cleanProposalDescription(description: string): string {
-  let text = description;
-  // Leading YAML frontmatter delimited by `---` on its own line.
-  text = text.replace(/^\s*---\r?\n[\s\S]*?\r?\n---\s*/, "");
-  // Heading markers (#, ##, ... up to ######).
-  text = text.replace(/^#{1,6}\s+/gm, "");
-  // Bold/italic emphasis markers.
-  text = text.replace(/(\*\*|__)(.*?)\1/g, "$2");
-  text = text.replace(/(\*|_)(.*?)\1/g, "$2");
-  // Markdown links -> link text only.
-  text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
-  // Inline code, blockquote, and list markers.
-  text = text.replace(/`([^`]+)`/g, "$1");
-  text = text.replace(/^>\s?/gm, "");
-  text = text.replace(/^[-*+]\s+/gm, "");
-  // The preview is a single line-clamped block, not a multi-line document —
-  // collapse all remaining whitespace/newlines into single spaces.
-  return text.replace(/\s+/g, " ").trim();
-}
-
 function ProposalRow({ event, timeLabel }: { event: GovernanceEvent; timeLabel: string }) {
   const description = event.description ? cleanProposalDescription(event.description) : null;
   return (
-    <li className="flex flex-col gap-1.5 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 dark:border-white/10 dark:bg-white/[0.02]">
+    // PR-084.07 integration pass — the same shared hover formula every
+    // other Market Intelligence card already uses.
+    <li className="group flex flex-col gap-1.5 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 transition-[transform,box-shadow,border-color,background-color] duration-300 ease-out hover:-translate-y-0.5 hover:border-radar-primary/30 hover:bg-radar-light-card hover:shadow-[0_8px_24px_-12px_rgba(var(--color-radar-primary-rgb),0.18)] motion-reduce:hover:translate-y-0 dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-radar-border-hover dark:hover:bg-white/[0.04]">
       <div className="flex items-start justify-between gap-3">
         <a
           href={event.url}

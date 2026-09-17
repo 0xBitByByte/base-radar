@@ -10,6 +10,8 @@ import {
   Rocket,
   ShieldAlert,
   ShieldCheck,
+  TrendingDown,
+  TrendingUp,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -20,16 +22,19 @@ import { RelativeTime } from "@/components/shared/RelativeTime";
 import type { IntelligenceReport } from "@/lib/intelligence/report";
 import type { Freshness, Sources } from "@/lib/intelligence/types";
 import type { VerificationStatus } from "@/data/projects/enums";
+import { PROVIDER_NAMES } from "@/lib/providers/common/types";
 import { cn } from "@/lib/utils";
 
 type ProfileExecutiveIntelligenceProps = {
   report: IntelligenceReport;
   freshness: Freshness;
-  /** Real per-provider status, already computed for the Evidence & Sources panel below — reused here (not recalculated) to explain, in plain checkmarks, why Confidence sits where it does. */
+  /** Real per-provider status, already computed for the Evidence & Sources panel below — reused here (not recalculated) to explain, in plain checkmarks, why Confidence sits where it does, and (PR-085.01) to compute the relocated provider-coverage count below. */
   sources: Sources;
   verificationStatus: VerificationStatus;
   /** PR-084.06 — the real AI Intelligence Report route for this project (`/dashboard/projects/{slug}/ai`), built once in `page.tsx` from `slug`. */
   aiHref: string;
+  /** PR-085.01 — relocated from the now-removed `ProfileTrustCenter`'s "Official Website" tile, the one fact from that section with no fuller home anywhere else on the page. Same real `profile.identity.websiteUrl` field, not recomputed. */
+  websiteUrl: string | null;
 };
 
 type ConfidenceFactor = { label: string; met: boolean };
@@ -113,8 +118,22 @@ function ReportBucket({ icon: Icon, label, tone, items }: { icon: LucideIcon; la
  * the old monolithic Executive Intelligence card down to just the trust/risk
  * assessment core: Overall Rating hero (pills only, no headline sentence —
  * Project Summary, now its own top-level section, is the only place the
- * report reads in prose) → Key Takeaways (Strengths/Weaknesses/Risks/
- * Opportunities) → Upcoming Catalysts → Watch Closely.
+ * report reads in prose) → Key Takeaways, grouped Bull Case (Strengths +
+ * Opportunities) / Bear Case (Weaknesses + Risks) since PR-085.03 → Upcoming
+ * Catalysts → Watch Closely.
+ *
+ * PR-085.03 ("AI Project Summary") audited this component against its own
+ * 8-section spec and found ~90% already shipped here and in `ProfileSummary`
+ * (Executive Summary = thesis, Bull/Bear = Key Takeaways, Key Opportunities/
+ * Risks = the same buckets, Watch Next = Catalysts + Watch Closely, and the
+ * footer link already fills "Link to Full AI Report"). The only two real
+ * gaps closed by that pass: labeling/regrouping Key Takeaways under Bull/Bear
+ * (previously four flat quadrants), and turning the provider-coverage line
+ * below into a link to `ProfileSources`'s "Evidence & Sources" section so
+ * "Supporting Evidence" has a compact presence here instead of none. No new
+ * section was added — `lib/intelligence/executiveIntelligence.ts`'s own doc
+ * comment already explains why a second visible summary would duplicate this
+ * one.
  *
  * Investment Thesis, "Why This Project Stands Out," Key Metrics Explained,
  * Recent Developments, and the Sources footer all used to render here too —
@@ -128,12 +147,31 @@ function ReportBucket({ icon: Icon, label, tone, items }: { icon: LucideIcon; la
  * confirmed real duplication; the Scorecard is now the one place that grid
  * lives. Every remaining field still comes from `buildIntelligenceReport()`
  * (`lib/intelligence/report.ts`) — nothing here is computed twice.
+ *
+ * PR-085.01 — this is now this page's sole "can I trust it?" owner.
+ * `ProfileTrustCenter` (a separate, redundant "Trust Center" section) and
+ * `ProfileIntelligence` (a separate "AI Intelligence" section duplicating
+ * the `/ai` report page's full Risk Analysis and Health/Confidence factor
+ * detail) are both retired — a full audit found 6 of Trust Center's 8 facts
+ * already had a fuller home elsewhere on the page (Verification/Confidence
+ * → the Scorecard, GitHub/Docs/Registry-Completeness → the Community
+ * section, Verified Contracts → the Network section), and `ProfileIntelligence`'s
+ * only non-duplicated content (a Narrative Signal sentence) is redundant
+ * with `buildThesis()`'s own "Near-term momentum reads {narrativeLabel}"
+ * clause already in the Project Summary paragraph. Trust Center's two
+ * genuinely unique facts (Official Website configured, live-provider
+ * coverage) are relocated into the info row below rather than lost.
  */
-export function ProfileExecutiveIntelligence({ report, freshness, sources, verificationStatus, aiHref }: ProfileExecutiveIntelligenceProps) {
+export function ProfileExecutiveIntelligence({ report, freshness, sources, verificationStatus, aiHref, websiteUrl }: ProfileExecutiveIntelligenceProps) {
   const sentimentColor = RISK_SENTIMENT_COLOR[report.riskLevel];
   const confidenceFactors = buildConfidenceFactors(sources, verificationStatus);
-  const hasKeyTakeaways =
-    report.strengths.length > 0 || report.weaknesses.length > 0 || report.threats.length > 0 || report.opportunities.length > 0;
+  const hasBullCase = report.strengths.length > 0 || report.opportunities.length > 0;
+  const hasBearCase = report.weaknesses.length > 0 || report.threats.length > 0;
+  const hasKeyTakeaways = hasBullCase || hasBearCase;
+  // PR-085.01 — relocated from `ProfileTrustCenter`'s "Provider Coverage"
+  // tile: the exact same `sources` prop this component already receives for
+  // the confidence checklist above, just counted rather than checklisted.
+  const liveSourceCount = Object.values(sources).filter((source) => source.status === "live").length;
 
   return (
     <ProfileSectionCard
@@ -211,18 +249,45 @@ export function ProfileExecutiveIntelligence({ report, freshness, sources, verif
                 </span>
               )}
             </span>
+            {/* PR-085.01 — the two facts relocated from `ProfileTrustCenter` (see this file's own doc comment). Same row style as Data Freshness above, not a new card. */}
+            <span>
+              Website: <span className="font-semibold text-radar-light-text dark:text-radar-white">{websiteUrl ? "Configured" : "Not configured"}</span>
+            </span>
+            {/* PR-085.03 — compact link to `ProfileSources`'s "Evidence & Sources" section (`#sources`), the one authoritative owner of the full source list and metric explanations. Counts only, reusing `liveSourceCount` (computed above) and `report.metricsExplained` (already computed by `buildIntelligenceReport()`) — nothing recalculated here. PR-085.05 — recolored to match this file's other real link ("View Full AI Intelligence Report" below): the original `text-radar-light-text` matched the plain facts around it exactly, so on touch devices (no `:hover`) it read as inert text, not a link. */}
+            <Link
+              href="#sources"
+              className="font-medium text-radar-light-muted underline-offset-2 outline-none transition-colors hover:text-radar-primary hover:underline focus-visible:text-radar-primary focus-visible:underline dark:text-radar-muted dark:hover:text-radar-accent dark:focus-visible:text-radar-accent"
+            >
+              {liveSourceCount} of {PROVIDER_NAMES.length} providers live · {report.metricsExplained.length} metrics explained
+            </Link>
           </div>
         </div>
 
-        {/* Key Takeaways (Strengths / Weaknesses / Risks / Opportunities) — hidden entirely, not just an empty grid, when every bucket is empty */}
+        {/* Key Takeaways, grouped as Bull Case / Bear Case (PR-085.03) — same four buckets as before (Strengths/Opportunities vs. Weaknesses/Risks), just regrouped under the two labels the AI Project Summary requirement asks for instead of four flat quadrants. No new bullets, no new computation: each `ReportBucket` still reads directly from `report.strengths`/`report.weaknesses`/`report.threats`/`report.opportunities`. Each panel — and the section as a whole — is hidden entirely, not just left empty, when its buckets have nothing real to show. */}
         {hasKeyTakeaways && (
           <div className="flex flex-col gap-3 border-t border-radar-light-border pt-6 dark:border-white/10">
             <span className="text-[10.5px] font-semibold tracking-wider text-radar-light-muted uppercase dark:text-radar-muted">Key Takeaways</span>
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-              <ReportBucket icon={CircleCheck} label="Strengths" tone="text-radar-success" items={report.strengths} />
-              <ReportBucket icon={CircleX} label="Weaknesses" tone="text-radar-danger" items={report.weaknesses} />
-              <ReportBucket icon={ShieldAlert} label="Risks" tone="text-radar-danger" items={report.threats} />
-              <ReportBucket icon={Rocket} label="Opportunities" tone="text-radar-primary dark:text-radar-accent" items={report.opportunities} />
+              {hasBullCase && (
+                <div className="flex flex-col gap-4 border-l-2 border-l-radar-success/40 pl-3">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold text-radar-success">
+                    <TrendingUp className="size-3.5 shrink-0" aria-hidden="true" />
+                    Bull Case
+                  </p>
+                  <ReportBucket icon={CircleCheck} label="Strengths" tone="text-radar-success" items={report.strengths} />
+                  <ReportBucket icon={Rocket} label="Opportunities" tone="text-radar-primary dark:text-radar-accent" items={report.opportunities} />
+                </div>
+              )}
+              {hasBearCase && (
+                <div className="flex flex-col gap-4 border-l-2 border-l-radar-danger/40 pl-3">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold text-radar-danger">
+                    <TrendingDown className="size-3.5 shrink-0" aria-hidden="true" />
+                    Bear Case
+                  </p>
+                  <ReportBucket icon={CircleX} label="Weaknesses" tone="text-radar-danger" items={report.weaknesses} />
+                  <ReportBucket icon={ShieldAlert} label="Risks" tone="text-radar-danger" items={report.threats} />
+                </div>
+              )}
             </div>
           </div>
         )}

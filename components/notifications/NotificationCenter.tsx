@@ -26,6 +26,9 @@ import { NotificationMetric } from "@/components/notifications/NotificationMetri
 import { buildNotificationSummary } from "@/components/notifications/summary";
 import { useNotificationMetrics } from "@/lib/hooks/useNotificationMetrics";
 import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
+import { GLASS_TILE_SURFACE } from "@/components/ui/glassStyles";
+import { PAGE_HEADER_GROUP_CLASS, PAGE_HEADER_TITLE_CLASS, PAGE_HEADER_SUBTITLE_CLASS } from "@/components/dashboard/pageHeaderStyles";
+import { cn } from "@/lib/utils";
 import type { NotificationType } from "@/lib/notifications/types";
 
 const DEFAULT_READ_FILTER: NotificationReadFilter = "all";
@@ -76,9 +79,9 @@ export function NotificationCenter() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
+      <div className={PAGE_HEADER_GROUP_CLASS}>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h1 className="text-xl font-semibold text-radar-light-text dark:text-radar-white">Notifications</h1>
+          <h1 className={PAGE_HEADER_TITLE_CLASS}>Notifications</h1>
           <div className="flex items-center gap-3">
             {unreadCount > 0 && (
               <button
@@ -100,7 +103,7 @@ export function NotificationCenter() {
             </Link>
           </div>
         </div>
-        <p className="text-sm leading-relaxed text-radar-light-muted dark:text-radar-muted">
+        <p className={PAGE_HEADER_SUBTITLE_CLASS}>
           {buildNotificationSummary(notifications.length, unreadCount)}
         </p>
       </div>
@@ -115,7 +118,7 @@ export function NotificationCenter() {
             Metrics
           </h2>
         </div>
-        <div className="grid grid-cols-2 gap-x-6 gap-y-3 rounded-xl border border-radar-light-border bg-radar-light-card p-4 sm:grid-cols-3 lg:grid-cols-5 dark:border-white/10 dark:bg-white/[0.02]">
+        <div className={cn("grid grid-cols-2 gap-x-6 gap-y-3 p-4 sm:grid-cols-3 lg:grid-cols-5", GLASS_TILE_SURFACE)}>
           {metrics.map((metric) => (
             <NotificationMetric key={metric.key} label={metric.label} value={metric.value} />
           ))}

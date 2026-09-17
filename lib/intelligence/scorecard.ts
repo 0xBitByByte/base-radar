@@ -12,14 +12,29 @@
  * re-derived overlapping facts into three separately-rendered cards, the
  * direct cause of a confirmed duplication bug. `lib/intelligence/report.ts`'s
  * `buildIntelligenceReport` replaces all three with one merged derivation.
+ *
+ * PR-084.06 (final completion) — three more tiles (`activity`,
+ * `transparency`, `documentation`), closing the AI Intelligence roadmap's
+ * signal-category gap. Same rule as every tile above: each is derived from
+ * data this function (or an already-computed sibling tile) already has —
+ * `activity` blends the already-computed `developer`/`momentum` tiles'
+ * scores (the same blend pattern `aiRating` below already uses for
+ * Health+Confidence, not a third independent model); `transparency` reuses
+ * the same registered-contracts verification ratio the now-removed
+ * `ProfileTrustCenter` (retired in PR-085.01) used to compute from the
+ * identical `Contracts` field; `documentation` reuses the same `docsUrl`
+ * presence check that component's Documentation trust tile used to make. No
+ * new provider call, no new scoring model, nothing computed twice.
  */
 
-import { clampScore } from "@/lib/intelligence/helpers";
-import type { Confidence, GithubIntel, Health, Market, Risk, Trading, Tvl } from "@/lib/intelligence/types";
+import { clampScore, VERIFICATION_STATUS_LABEL } from "@/lib/intelligence/helpers";
+import { countActiveProposals } from "@/lib/governance/helpers";
+import type { Confidence, Contracts, GithubIntel, Health, Market, Risk, Trading, Tvl } from "@/lib/intelligence/types";
 import type { RiskContributor } from "@/lib/intelligence-engine";
 import type { GovernanceEvent } from "@/lib/governance/types";
 import type { WhaleEvent } from "@/lib/whale/types";
 import type { ProviderName } from "@/lib/providers/common/types";
+import type { VerificationStatus } from "@/data/projects/enums";
 
 export type ScorecardSeverity = "excellent" | "strong" | "moderate" | "weak" | "unknown";
 
@@ -31,7 +46,10 @@ export type ScorecardTileId =
   | "governance"
   | "community"
   | "whale"
-  | "aiRating";
+  | "aiRating"
+  | "activity"
+  | "transparency"
+  | "documentation";
 
 export type ScorecardTrend = "up" | "down" | "stable";
 
@@ -134,7 +152,27 @@ export type ScorecardInput = {
   narrativeLabel: string | null;
   communityLinkCount: number;
   communityLinkTotal: number;
+  /** PR-084.06 — already computed by every caller (previously also read by the now-removed `ProfileTrustCenter`); reused here for the `transparency` tile's contract-verification ratio, never re-fetched. */
+  contracts: Contracts;
+  /** PR-084.06 — already computed by every caller for the report's own `verification` explanation; reused here for the `transparency` tile. */
+  verificationStatus: VerificationStatus;
+  /** PR-084.06 — already computed by every caller (`profile.community.socials.docs`); reused here for the `documentation` tile, the same real field the now-removed `ProfileTrustCenter`'s Documentation trust tile used to check. */
+  docsUrl: string | null;
 };
+
+export type AiRatingGrade = "A+" | "A" | "B+" | "B" | "C" | "D";
+
+/**
+ * PR-1 (Universal Project Card, Phase 1) — extracted from this file's own
+ * previously-inline AI Rating tile logic so `lib/projects/build.ts` can
+ * reuse the exact same blend for `LiveProject.aiRating` instead of
+ * recomputing a second, driftable copy of these thresholds. Pure, no
+ * behavior change to `buildHealthScorecard`'s existing output below.
+ */
+export function computeAiRatingGrade(healthScore: number, confidenceScore: number): AiRatingGrade {
+  const blended = (healthScore + confidenceScore) / 2;
+  return blended >= 90 ? "A+" : blended >= 80 ? "A" : blended >= 70 ? "B+" : blended >= 60 ? "B" : blended >= 50 ? "C" : "D";
+}
 
 export function buildHealthScorecard(input: ScorecardInput): ScorecardTile[] {
   const contributors = input.risk.contributors;
@@ -174,7 +212,7 @@ export function buildHealthScorecard(input: ScorecardInput): ScorecardTile[] {
   );
   const developer = developerFromRisk.severity === "unknown" ? buildFastPathDeveloperTile(input.github) : developerFromRisk;
 
-  const activeProposals = input.governance?.filter((event) => event.status === "active").length ?? null;
+  const activeProposals = countActiveProposals(input.governance);
   const confirmedGovernanceType =
     input.governance === null && (input.governanceType === "on-chain" || input.governanceType === "forum" || input.governanceType === "none")
       ? input.governanceType
@@ -282,7 +320,7 @@ export function buildHealthScorecard(input: ScorecardInput): ScorecardTile[] {
   // (Health, Confidence) into one letter grade — a display transform of
   // real numbers, not a new model.
   const blended = (input.health.score + input.confidence.score) / 2;
-  const grade = blended >= 90 ? "A+" : blended >= 80 ? "A" : blended >= 70 ? "B+" : blended >= 60 ? "B" : blended >= 50 ? "C" : "D";
+  const grade = computeAiRatingGrade(input.health.score, input.confidence.score);
   const outlook =
     input.narrativeLabel ??
     (input.risk.level === "low" ? "Stable" : input.risk.level === "moderate" ? "Neutral" : "Cautious");
@@ -297,7 +335,99 @@ export function buildHealthScorecard(input: ScorecardInput): ScorecardTile[] {
     source: "Base Radar Health + Confidence scores",
   };
 
-  return [security, liquidity, momentum, developer, governance, community, whale, aiRating];
+  // Activity — a roll-up of the two tiles above that carry a real recency
+  // signal (Engineering Health's commit/push cadence, Market Momentum's
+  // price-change window), the same blend pattern `aiRating` above already
+  // uses for Health+Confidence. Not a third independent activity model —
+  // averages whichever of `developer`/`momentum`'s own already-computed
+  // scores are real, and reports "not enough data" only when neither is.
+  const activityInputs = [developer.score, momentum.score].filter((score): score is number => score !== null);
+  const activity: ScorecardTile =
+    activityInputs.length === 0
+      ? {
+          id: "activity",
+          label: "Activity",
+          score: null,
+          scoreLabel: "Not enough verified data",
+          statusLabel: "Not Assessed",
+          severity: "unknown",
+          detail: "Neither Engineering Health nor Market Momentum has a live signal to blend into an activity read yet.",
+          source: "Base Radar Engineering Health + Market Momentum scores",
+        }
+      : (() => {
+          const score = clampScore(activityInputs.reduce((sum, value) => sum + value, 0) / activityInputs.length);
+          const severity: ScorecardSeverity = score >= 80 ? "excellent" : score >= 60 ? "strong" : score >= 40 ? "moderate" : "weak";
+          return {
+            id: "activity",
+            label: "Activity",
+            score,
+            scoreLabel: `${score}/100`,
+            statusLabel: SEVERITY_STATUS[severity],
+            severity,
+            detail: `Blends Engineering Health (${developer.score !== null ? `${developer.score}/100` : "not assessed"}) and Market Momentum (${momentum.score !== null ? `${momentum.score}/100` : "not assessed"}) into one overall activity read.`,
+            source: "Base Radar Engineering Health + Market Momentum scores",
+          } satisfies ScorecardTile;
+        })();
+
+  // Transparency — the same registered-contracts verification ratio the
+  // now-removed `ProfileTrustCenter` used to compute from this project's
+  // real `Contracts` field, exposed here as its own Scorecard tile instead
+  // of being recomputed. Mirrors the `community` tile's own "real ratio,
+  // honest gap when nothing to measure" shape.
+  const verifiedContractCount = input.contracts.items.filter((contract) => contract.verified === true).length;
+  const verifiedContractRatio = input.contracts.count > 0 ? verifiedContractCount / input.contracts.count : null;
+  const transparencyScore = verifiedContractRatio !== null ? clampScore(verifiedContractRatio * 100) : null;
+  const transparency: ScorecardTile =
+    transparencyScore === null
+      ? {
+          id: "transparency",
+          label: "Transparency",
+          score: null,
+          scoreLabel: "Not enough verified data",
+          statusLabel: "Not Assessed",
+          severity: "unknown",
+          detail: "No contracts are currently registered for this project, so contract-verification transparency can't be assessed.",
+          source: "Blockscout contract verification",
+        }
+      : {
+          id: "transparency",
+          label: "Transparency",
+          score: transparencyScore,
+          scoreLabel: `${transparencyScore}/100`,
+          statusLabel: transparencyScore >= 70 ? "Transparent" : transparencyScore >= 35 ? "Partial" : "Limited",
+          severity: transparencyScore >= 70 ? "excellent" : transparencyScore >= 35 ? "moderate" : "weak",
+          detail: `${verifiedContractCount} of ${input.contracts.count} registered contract${input.contracts.count === 1 ? "" : "s"} verified on-chain. Registry listing status: ${VERIFICATION_STATUS_LABEL[input.verificationStatus]}.`,
+          source: "Blockscout contract verification",
+        };
+
+  // Documentation — the same `docsUrl` presence check the now-removed
+  // `ProfileTrustCenter`'s Documentation trust tile used to make, exposed
+  // here as its own Scorecard tile. Binary by design: a link either exists
+  // or it doesn't, no fabricated completeness gradient for a single real
+  // field.
+  const documentation: ScorecardTile = input.docsUrl
+    ? {
+        id: "documentation",
+        label: "Documentation",
+        score: 100,
+        scoreLabel: "100/100",
+        statusLabel: "Available",
+        severity: "excellent",
+        detail: "Technical documentation is linked for this project in the Base Radar registry.",
+        source: "Base Radar registry",
+      }
+    : {
+        id: "documentation",
+        label: "Documentation",
+        score: null,
+        scoreLabel: "Not enough verified data",
+        statusLabel: "Not Assessed",
+        severity: "unknown",
+        detail: "No documentation link is currently configured for this project in the registry.",
+        source: "Base Radar registry",
+      };
+
+  return [security, liquidity, momentum, developer, governance, community, whale, aiRating, activity, transparency, documentation];
 }
 
 /**

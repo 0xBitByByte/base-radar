@@ -8,14 +8,15 @@ import { CATEGORY_ICON, CATEGORY_LABEL, SEVERITY_BORDER_CLASS } from "@/componen
 import { ProjectLogo } from "@/components/branding/ProjectLogo";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { RelativeTime } from "@/components/shared/RelativeTime";
-import { getProject } from "@/data/projects/helpers";
 import type { Alert } from "@/lib/alerts/types";
+import type { ProjectLogoEntry } from "@/lib/branding/resolveProjectLogos";
 import { cn } from "@/lib/utils";
 
 type AlertCardProps = {
   alert: Alert;
   onOpen: (id: string) => void;
   onTogglePin: (id: string) => void;
+  logoMap: Record<string, ProjectLogoEntry>;
 };
 
 /**
@@ -32,13 +33,14 @@ type AlertCardProps = {
  * Alerts without an `actionUrl` still mark read on click; there's just
  * nowhere to navigate.
  */
-export function AlertCard({ alert, onOpen, onTogglePin }: AlertCardProps) {
+export function AlertCard({ alert, onOpen, onTogglePin, logoMap }: AlertCardProps) {
   const CategoryIcon = CATEGORY_ICON[alert.category];
-  // A pure, synchronous lookup against the static Project Registry
-  // (`data/projects/seed`) — no fetch, no provider call. `logoUrl` is
-  // `undefined` for most seed entries; `ProjectLogo` already falls back to
-  // initials when that happens, matching every other logo render site.
-  const project = getProject(alert.projectId);
+  // Project Logo System — resolved server-side once via the centralized
+  // `getProjectLogoMap()` (registry -> CoinGecko), not `project.logoUrl`
+  // read directly — that raw registry field is empty for every seed
+  // project today, which previously meant this card always fell to
+  // initials, for every project, unconditionally.
+  const logo = logoMap[alert.projectId];
 
   return (
     <li
@@ -125,7 +127,7 @@ export function AlertCard({ alert, onOpen, onTogglePin }: AlertCardProps) {
 
         <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
           <span className="flex items-center gap-1.5 rounded-full border border-radar-light-border bg-radar-light-surface px-2 py-0.5 text-[10.5px] font-medium text-radar-light-text dark:border-white/10 dark:bg-white/[0.03] dark:text-radar-white">
-            <ProjectLogo logoUrl={project?.logoUrl} name={alert.projectName} size={14} />
+            <ProjectLogo logoUrl={logo?.logoUrl} fallbackUrls={logo?.logoUrlFallbacks} name={alert.projectName} size={14} />
             {alert.projectName}
           </span>
           <SeverityBadge severity={alert.severity} />

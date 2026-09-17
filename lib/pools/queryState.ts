@@ -41,6 +41,13 @@ export type PoolsQueryState = {
   sortOrder: SortOrder;
   /** `true` when the URL itself named a sort — lets the page fall back to the current category's natural order (already liquidity-sorted, or already the category's own meaningful order) rather than silently re-sorting when nobody asked for a specific sort. */
   sortExplicit: boolean;
+  /**
+   * PR-097.01 (Performance — C1) — 1-indexed, mirroring the Whale
+   * Explorer's own `WhaleQueryState.page` (`lib/whale/queryState.ts`),
+   * itself mirroring `ProjectsQueryState.page`. Bounds the per-render
+   * pool count the same way.
+   */
+  page: number;
 };
 
 export const DEFAULT_POOLS_QUERY_STATE: PoolsQueryState = {
@@ -50,7 +57,11 @@ export const DEFAULT_POOLS_QUERY_STATE: PoolsQueryState = {
   sortField: "liquidity",
   sortOrder: "desc",
   sortExplicit: false,
+  page: 1,
 };
+
+/** Query params whose change should reset `page` back to 1 — anything that changes what set of pools is being paginated through. Mirrors `lib/whale/queryState.ts`'s `PAGE_RESETTING_KEYS` exactly. */
+const PAGE_RESETTING_KEYS: (keyof PoolsQueryState)[] = ["category", "search", "dex", "sortField", "sortOrder"];
 
 function parseDexList(value: string | string[] | undefined): string[] {
   const raw = first(value);
@@ -72,6 +83,9 @@ export function parsePoolsQueryState(searchParams: RawSearchParams): PoolsQueryS
   const sortField = sortExplicit ? (rawSortField as PoolSortField) : DEFAULT_POOLS_QUERY_STATE.sortField;
   const sortOrder = rawSortOrder === "asc" || rawSortOrder === "desc" ? rawSortOrder : DEFAULT_POOLS_QUERY_STATE.sortOrder;
 
+  const rawPage = Number(first(searchParams.page));
+  const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : DEFAULT_POOLS_QUERY_STATE.page;
+
   return {
     category,
     search: (first(searchParams.search) ?? "").trim(),
@@ -79,16 +93,25 @@ export function parsePoolsQueryState(searchParams: RawSearchParams): PoolsQueryS
     sortField,
     sortOrder,
     sortExplicit,
+    page,
   };
 }
 
 /**
  * Builds the query string for `state` merged with `overrides` — the single
  * function every control on the Pool Explorer uses to navigate. Returns a
- * `?`-prefixed string, or `""` when every value is default.
+ * `?`-prefixed string, or `""` when every value is default. Any real
+ * change to what's being paginated through (category/search/dex/sort)
+ * resets `page` back to 1, unless the caller explicitly overrides `page`
+ * itself.
  */
 export function buildPoolsQuery(state: PoolsQueryState, overrides: Partial<PoolsQueryState> = {}): string {
   const next: PoolsQueryState = { ...state, ...overrides };
+
+  const scopeChanged = PAGE_RESETTING_KEYS.some((key) => overrides[key] !== undefined && overrides[key] !== state[key]);
+  if (scopeChanged && overrides.page === undefined) {
+    next.page = 1;
+  }
 
   const params = new URLSearchParams();
   if (next.category !== DEFAULT_POOLS_QUERY_STATE.category) params.set("category", next.category);
@@ -98,6 +121,7 @@ export function buildPoolsQuery(state: PoolsQueryState, overrides: Partial<Pools
     params.set("sortField", next.sortField);
     params.set("sortOrder", next.sortOrder);
   }
+  if (next.page > 1) params.set("page", String(next.page));
 
   const query = params.toString();
   return query ? `?${query}` : "";

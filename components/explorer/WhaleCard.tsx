@@ -24,7 +24,9 @@ export function WhaleCard({ event, explorerUrl }: WhaleCardProps) {
   const isWhaleAlert = event.classification === "whale-alert";
 
   return (
-    <li className="flex flex-col gap-2 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 dark:border-white/10 dark:bg-white/[0.02]">
+    // PR-084.07 integration pass — the same shared hover formula every
+    // other Market Intelligence card already uses.
+    <li className="group flex flex-col gap-2 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 transition-[transform,box-shadow,border-color,background-color] duration-300 ease-out hover:-translate-y-0.5 hover:border-radar-primary/30 hover:bg-radar-light-card hover:shadow-[0_8px_24px_-12px_rgba(var(--color-radar-primary-rgb),0.18)] motion-reduce:hover:translate-y-0 dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-radar-border-hover dark:hover:bg-white/[0.04]">
       <div className="flex items-start justify-between gap-3">
         <span className="text-sm font-semibold tabular-nums text-radar-light-text dark:text-radar-white">
           {formatCompactCurrency(event.usdValue)}

@@ -12,12 +12,15 @@
  */
 
 import type { LucideIcon } from "lucide-react";
-import { Bell, Clock, FolderKanban, Layers, LayoutDashboard, LayoutGrid, Newspaper, Settings, Zap } from "lucide-react";
+import { Bell, BookOpenCheck, Clock, FileText, FolderKanban, GitCompare, Layers, LayoutDashboard, LayoutGrid, Newspaper, Settings, Sparkles, Zap } from "lucide-react";
 
 export type CommandGroup =
   | "Dashboard"
   | "Navigation"
   | "Projects"
+  | "Smart Collections"
+  | "AI Workspace"
+  | "AI Reports"
   | "Timeline"
   | "Notifications"
   | "Automation"
@@ -55,6 +58,33 @@ export const COMMANDS: Command[] = [
     keywords: ["explorer", "registry", "browse", "search projects"],
   },
   {
+    id: "collections",
+    title: "Smart Collections",
+    description: "Discover projects grouped by Base Radar's own intelligence — AI Grade, Risk, Confidence, on-chain and GitHub activity.",
+    group: "Smart Collections",
+    icon: Sparkles,
+    route: "/dashboard/collections",
+    keywords: ["collections", "smart", "discover", "ai picks", "whale", "governance", "yield", "undervalued", "stable", "narratives"],
+  },
+  {
+    id: "ai-workspace",
+    title: "AI Workspace",
+    description: "See what Base Radar currently believes about the Base ecosystem, with evidence and sources.",
+    group: "AI Workspace",
+    icon: BookOpenCheck,
+    route: "/dashboard/ai-workspace",
+    keywords: ["ai", "evidence", "intelligence", "brief", "workspace", "findings", "sources", "confidence"],
+  },
+  {
+    id: "executive-reports",
+    title: "AI Executive Reports",
+    description: "Daily Brief, Weekly, Monthly, Market Outlook, Ecosystem, and Opportunity reports, generated from Base Radar's own real intelligence.",
+    group: "AI Reports",
+    icon: FileText,
+    route: "/dashboard/reports",
+    keywords: ["reports", "executive", "daily brief", "weekly", "monthly", "market outlook", "ecosystem", "opportunity"],
+  },
+  {
     id: "watchlists",
     title: "Watchlists",
     description: "Organize projects into your own collections.",
@@ -62,6 +92,15 @@ export const COMMANDS: Command[] = [
     icon: Layers,
     route: "/dashboard/watchlists",
     keywords: ["collections", "organize", "personalization", "lists", "watch", "tracked", "following", "saved"],
+  },
+  {
+    id: "compare",
+    title: "Compare",
+    description: "Compare up to 4 tracked projects side by side — AI Grade, Confidence, Risk, Health, and market data.",
+    group: "Navigation",
+    icon: GitCompare,
+    route: "/dashboard/compare",
+    keywords: ["compare", "comparison", "side by side", "versus", "vs"],
   },
   {
     id: "alerts",

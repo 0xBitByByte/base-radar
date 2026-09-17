@@ -15,6 +15,17 @@ describe("buildLiveProjectFromIntelligence", () => {
     expect(result.status).toBe("live");
   });
 
+  it("PR-085.02A — threads the already-fetched 7d change onto LiveProject.market, exactly like changePct24h", () => {
+    const project = registryProject();
+    const result = buildLiveProjectFromIntelligence(
+      project,
+      intelligence({ market: { ...intelligence().market, changePct24h: 3.2, changePct7d: 9.8 } }),
+      null
+    );
+    expect(result.market.changePct24h).toBe(3.2);
+    expect(result.market.changePct7d).toBe(9.8);
+  });
+
   it("leaves discoveryStatus/discoveryMetadata/discoveryEvidence null when no discovery match was made this run", () => {
     const project = registryProject();
     const result = buildLiveProjectFromIntelligence(project, intelligence(), null);
@@ -62,6 +73,27 @@ describe("buildLiveProjectFromIntelligence", () => {
     const result = buildLiveProjectFromIntelligence(project, withContracts, null);
     expect(result.contracts).toEqual({ count: 2, verifiedCount: 1 });
   });
+
+  it("threads the intelligence record's already-computed health and risk level straight through", () => {
+    const project = registryProject();
+    const withHealthAndRisk = intelligence({
+      health: { score: 85, label: "excellent", factors: ["TVL signal (+30)"] },
+      risk: { level: "elevated", explanation: "Concentrated liquidity.", contributors: [] },
+    });
+    const result = buildLiveProjectFromIntelligence(project, withHealthAndRisk, null);
+    expect(result.health).toEqual({ score: 85, label: "excellent", factors: ["TVL signal (+30)"] });
+    expect(result.riskLevel).toBe("elevated");
+  });
+
+  it("derives aiRating from the same Health+Confidence blend the Scorecard uses, never a separately-guessed grade", () => {
+    const project = registryProject();
+    const blended90 = intelligence({
+      health: { score: 90, label: "excellent", factors: [] },
+      confidence: { score: 90, level: "high", factors: [] },
+    });
+    const result = buildLiveProjectFromIntelligence(project, blended90, null);
+    expect(result.aiRating).toBe("A+");
+  });
 });
 
 describe("buildLiveProjectFromDiscovery", () => {
@@ -78,8 +110,16 @@ describe("buildLiveProjectFromDiscovery", () => {
     expect(result.providerAttribution).toBeNull();
   });
 
-  it("derives chains from the candidate's own contracts", () => {
-    const candidate = discoveryProject({ contracts: [{ chain: "base", address: "0x1" }, { chain: "ethereum", address: "0x2" }] });
+  it("never fabricates health, aiRating, or riskLevel for a project with no ProjectIntelligence record", () => {
+    const candidate = discoveryProject();
+    const result = buildLiveProjectFromDiscovery(candidate);
+    expect(result.health).toBeNull();
+    expect(result.aiRating).toBeNull();
+    expect(result.riskLevel).toBeNull();
+  });
+
+  it("PR-085.13B — passes discoveryProject.chains through verbatim, never re-deriving them from contracts", () => {
+    const candidate = discoveryProject({ contracts: [{ chain: "base", address: "0x1" }], chains: ["base", "ethereum"] });
     const result = buildLiveProjectFromDiscovery(candidate);
     expect(result.chains).toEqual(["base", "ethereum"]);
   });
@@ -92,7 +132,24 @@ describe("buildLiveProjectFromDiscovery", () => {
       },
     });
     const result = buildLiveProjectFromDiscovery(candidate);
-    expect(result.market).toEqual({ available: true, priceUsd: null, changePct24h: 12.5, marketCapUsd: null, fdvUsd: null, volume24hUsd: 5000, liquidityUsd: null, tvlUsd: null });
+    expect(result.market).toEqual({
+      available: true,
+      priceUsd: null,
+      changePct24h: 12.5,
+      changePct7d: null,
+      changePct30d: null,
+      marketCapUsd: null,
+      fdvUsd: null,
+      volume24hUsd: 5000,
+      liquidityUsd: null,
+      tvlUsd: null,
+    });
+  });
+
+  it("PR-085.02A — never fabricates a 7d change for a discovery-only project; enrichment has no such field", () => {
+    const candidate = discoveryProject();
+    const result = buildLiveProjectFromDiscovery(candidate);
+    expect(result.market.changePct7d).toBeNull();
   });
 
   it("records an alias when this run's registry match found a differently-named project", () => {

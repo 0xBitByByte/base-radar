@@ -6,14 +6,16 @@ import { ProfileSectionCard } from "@/components/explorer/ProfileSectionCard";
 import { ProfileSourcesBlockscoutAsync } from "@/components/explorer/ProfileSourcesBlockscoutAsync";
 import { PROVIDER_BRANDING } from "@/lib/branding/providers";
 import { RelativeTime } from "@/components/shared/RelativeTime";
+import { GlowBadge } from "@/components/ui/GlowBadge";
+import type { BrandIconComponent } from "@/lib/branding/types";
 import { PROVIDER_NAMES, type ProviderName } from "@/lib/providers/common/types";
-import { getRateLimitStatus as getGithubRateLimitStatus } from "@/lib/providers/github/service";
-import { getRateLimitStatus as getDexscreenerRateLimitStatus } from "@/lib/providers/dexscreener/service";
-import { getRateLimitStatus as getBlockscoutRateLimitStatus } from "@/lib/providers/blockscout/service";
-import type { ContractDetailEntry } from "@/lib/providers/blockscout/service";
-import { getRateLimitStatus as getCoingeckoRateLimitStatus } from "@/lib/providers/coingecko/service";
-import { getRateLimitStatus as getDefillamaRateLimitStatus } from "@/lib/providers/defillama/service";
-import { getRateLimitStatus as getBaseRateLimitStatus } from "@/lib/providers/base/service";
+import { getGithubRateLimitSnapshot as getGithubRateLimitStatus } from "@/lib/providers/github/rateLimit";
+import { getRateLimitStatus as getDexscreenerRateLimitStatus } from "@/lib/providers/dexscreener/rateLimitStatus";
+import { getRateLimitStatus as getBlockscoutRateLimitStatus } from "@/lib/providers/blockscout/rateLimitStatus";
+import type { ContractDetailEntry } from "@/lib/providers/blockscout/contractDetails";
+import { getRateLimitStatus as getCoingeckoRateLimitStatus } from "@/lib/providers/coingecko/rateLimitStatus";
+import { getRateLimitStatus as getDefillamaRateLimitStatus } from "@/lib/providers/defillama/rateLimitStatus";
+import { getRateLimitStatus as getBaseRateLimitStatus } from "@/lib/providers/base/rateLimitStatus";
 import { cn } from "@/lib/utils";
 import type { Sources } from "@/lib/intelligence/types";
 
@@ -168,6 +170,17 @@ export type BlockscoutVerificationOutcome = {
   status: Sources[ProviderName]["status"];
   badgeLabel: string;
   description: string;
+  /**
+   * V1-FOLLOWUP-004 — mirrors `SourceAttribution.stale`/`ProviderSlice.stale`
+   * (the same real, already-proven signal `matchGithub` already threads
+   * through for the generic provider cards). `true` only when at least one
+   * successful `ContractDetailEntry` was served from `withStaleFallback`'s
+   * cache after a live Blockscout refetch failed — a failed entry can never
+   * be `stale` (that flag only ever appears on an `ok: true` result), so
+   * this is honestly `undefined` for every branch below that has no real
+   * successful data to have gone stale in the first place.
+   */
+  stale?: boolean;
 };
 
 /**
@@ -195,6 +208,7 @@ export function classifyBlockscoutVerification(entries: ContractDetailEntry[]): 
   let anyVerified = false;
   let anyRealContract = false;
   let anyOk = false;
+  let anyStale = false;
   let firstFailureDetail: string | null = null;
 
   for (const entry of entries) {
@@ -202,6 +216,7 @@ export function classifyBlockscoutVerification(entries: ContractDetailEntry[]): 
       anyOk = true;
       if (entry.result.data.verified) anyVerified = true;
       if (entry.result.data.isContract) anyRealContract = true;
+      if (entry.result.stale) anyStale = true;
     } else if (!firstFailureDetail) {
       firstFailureDetail = entry.result.error.message;
     }
@@ -212,6 +227,7 @@ export function classifyBlockscoutVerification(entries: ContractDetailEntry[]): 
       status: "live",
       badgeLabel: LIVE,
       description: "Blockscout confirms this project's registered contract is verified — real, on-record source code and compiler metadata.",
+      stale: anyStale || undefined,
     };
   }
   if (anyOk && anyRealContract) {
@@ -220,6 +236,7 @@ export function classifyBlockscoutVerification(entries: ContractDetailEntry[]): 
       badgeLabel: CONTRACT_NOT_VERIFIED,
       description:
         "Blockscout recognizes this project's registered address as a real contract, but has no verified source code on record for it. This is a real state of the contract itself, not a Blockscout limitation.",
+      stale: anyStale || undefined,
     };
   }
   if (anyOk) {
@@ -228,6 +245,7 @@ export function classifyBlockscoutVerification(entries: ContractDetailEntry[]): 
       badgeLabel: ADDRESS_NOT_MATCHED,
       description:
         "The address configured in Base Radar's registry is not recognized as a smart contract by Blockscout — likely a stale or incorrect registry entry, not a provider issue.",
+      stale: anyStale || undefined,
     };
   }
 
@@ -257,6 +275,13 @@ const STATUS_BG: Record<Sources[ProviderName]["status"], string> = {
   live: "bg-radar-success/10",
   unavailable: "bg-radar-danger/10",
   not_configured: "bg-radar-light-muted/10 dark:bg-radar-muted/10",
+};
+
+/** PR-085.xx — a small solid-color status dot overlaid on a real provider logo (mirrors `ProfileHeader.tsx`'s `PresenceDot`, the same established pattern), since `BrandIcons.tsx`'s marks are hard-coded brand-hex fills, not `currentColor` — tinting the logo itself per status isn't possible, so the dot carries that signal instead. */
+const STATUS_DOT_BG: Record<Sources[ProviderName]["status"], string> = {
+  live: "bg-radar-success",
+  unavailable: "bg-radar-danger",
+  not_configured: "bg-radar-light-muted dark:bg-radar-muted",
 };
 
 /**
@@ -420,6 +445,7 @@ export function SourceCard({
   description,
   fetchedAt,
   meta,
+  Icon,
 }: {
   label: string;
   status: Sources[ProviderName]["status"] | "live-registry";
@@ -429,20 +455,58 @@ export function SourceCard({
   fetchedAt?: string | null;
   /** PR-078 §4 — a real, already-tracked diagnostic (GitHub auth mode, remaining request budget) shown alongside "Updated Ns ago" — omitted entirely when nothing real is available, never a fabricated number. */
   meta?: string | null;
+  /** PR-085.xx — this provider's real brand mark (`PROVIDER_BRANDING[provider].Icon`), when this codebase actually has one; omitted for the Registry pseudo-source (no external brand to be faithful to) and any provider without a real mark (DexScreener, Base Network — confirmed no asset exists), which keep the generic status glyph exactly as before. Never a fabricated logo. */
+  Icon?: BrandIconComponent | null;
 }) {
   const key = status === "live-registry" ? "live" : status;
   const StatusIcon = STATUS_ICON[key];
   return (
-    <div className="flex items-start gap-2.5 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 dark:border-white/10 dark:bg-white/[0.02]">
-      <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg", STATUS_BG[key])}>
-        <StatusIcon className={cn("size-4 shrink-0", STATUS_CLASS[key])} aria-hidden="true" />
+    // PR-085.xx premium hover polish — the same shared motion language as
+    // `PairCard.tsx`'s identical values (2px lift, primary-tinted shadow,
+    // brightened border, `duration-300 ease-out`).
+    <div className="group flex items-start gap-2.5 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 transition-[transform,box-shadow,border-color,background-color] duration-300 ease-out hover:-translate-y-0.5 hover:border-radar-primary/30 hover:bg-radar-light-card hover:shadow-[0_8px_24px_-12px_rgba(var(--color-radar-primary-rgb),0.18)] motion-reduce:hover:translate-y-0 dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-radar-border-hover dark:hover:bg-white/[0.04]">
+      {/* PR-085.xx — the real provider logo now leads (was always the
+          generic status glyph, even though `PROVIDER_BRANDING`'s own Icon
+          was already being computed and simply never rendered anywhere).
+          Status moves to a small corner dot (mirrors `ProfileHeader`'s
+          `PresenceDot`) instead of recoloring the whole glyph, since brand
+          marks are hard-coded brand-hex fills, not `currentColor`. */}
+      <span
+        className={cn(
+          "relative flex size-8 shrink-0 items-center justify-center rounded-lg",
+          Icon ? "bg-radar-light-surface dark:bg-white/5" : STATUS_BG[key]
+        )}
+      >
+        {Icon ? <Icon className="size-4 shrink-0" /> : <StatusIcon className={cn("size-4 shrink-0", STATUS_CLASS[key])} aria-hidden="true" />}
+        {Icon && (
+          <span
+            aria-hidden="true"
+            className={cn(
+              "absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full ring-2 ring-radar-light-surface dark:ring-radar-card",
+              STATUS_DOT_BG[key]
+            )}
+          />
+        )}
       </span>
       <div className="flex min-w-0 flex-col gap-0.5">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs font-semibold text-radar-light-text dark:text-radar-white">{label}</span>
-          <span className={cn("text-[10px] font-medium uppercase tracking-wide", STATUS_CLASS[key])}>
-            {badgeLabel ?? STATUS_LABEL[key]}
-          </span>
+          {/* PR-085.xx — a richer, pulsing "Live" pill (reusing `GlowBadge`'s
+              existing `dot` treatment, the same one the Live Status Bar
+              already uses elsewhere) instead of plain uppercase caption
+              text, specifically for the one status that means "working
+              right now." Unavailable/not-configured keep the original
+              plain-text treatment — a dead source pulsing would misstate
+              what's actually happening. */}
+          {key === "live" ? (
+            <GlowBadge color="success" dot className="px-1.5 py-0.5 text-[9px]">
+              {badgeLabel ?? STATUS_LABEL[key]}
+            </GlowBadge>
+          ) : (
+            <span className={cn("text-[10px] font-medium uppercase tracking-wide", STATUS_CLASS[key])}>
+              {badgeLabel ?? STATUS_LABEL[key]}
+            </span>
+          )}
         </div>
         <p className="text-[11px] leading-relaxed text-radar-light-muted dark:text-radar-muted">{description}</p>
         {(meta || fetchedAt) && (
@@ -479,6 +543,7 @@ function BlockscoutCheckingFallback() {
       status="unavailable"
       badgeLabel="Checking…"
       description="Looking up this project's registered contract on Blockscout…"
+      Icon={PROVIDER_BRANDING.blockscout.Icon}
     />
   );
 }
@@ -541,6 +606,7 @@ export function ProfileSources({ sources, thingsWeCouldntVerify, contractDetails
               description={attribution.stale ? (attribution.detail ?? branding.description) : branding.description}
               fetchedAt={attribution.fetchedAt}
               meta={describeLiveProviderMeta(provider)}
+              Icon={branding.Icon}
             />
           );
         })}
@@ -585,6 +651,7 @@ export function ProfileSources({ sources, thingsWeCouldntVerify, contractDetails
                   status={attribution.status}
                   badgeLabel={badgeLabel}
                   description={description}
+                  Icon={branding.Icon}
                 />
               );
             })}

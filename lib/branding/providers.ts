@@ -1,6 +1,6 @@
-import { Activity, Blocks, Landmark, LineChart, Zap } from "lucide-react";
+import { Activity, Zap } from "lucide-react";
 
-import { GithubMark } from "@/components/ui/BrandIcons";
+import { BaseScanMark, CoinGeckoMark, DefiLlamaMark, GithubMark } from "@/components/ui/BrandIcons";
 import type { ProviderName } from "@/lib/providers/common/types";
 import type { ProviderBrand } from "@/lib/branding/types";
 
@@ -8,16 +8,24 @@ import type { ProviderBrand } from "@/lib/branding/types";
  * Display metadata for every provider this Engine integrates with — the
  * single source `ProviderIndicator` (Quick View's Sources section) and
  * `ProviderBadge` both read, replacing what used to be a private label map
- * duplicated inside `ProviderIndicator` alone. No official brand marks
- * exist in this codebase for these six (only GitHub's real mark does, via
- * `BrandIcons`) — the rest get a generic, sensible icon rather than a
- * fabricated logo, kept deliberately muted wherever rendered (attribution,
- * not a promotional lockup).
+ * duplicated inside `ProviderIndicator` alone.
+ *
+ * PR-085.xx — coingecko/defillama/blockscout now reuse the exact same real
+ * brand marks `SOCIAL_BRANDING` (`lib/branding/socials.ts`) already renders
+ * elsewhere on this same page (the Project Profile Hero's icon row) —
+ * `CoinGeckoMark`/`DefiLlamaMark`/`BaseScanMark` (Blockscout is Base's
+ * BaseScan-branded explorer; the Hero's own `explorer` slot already uses
+ * this identical mark for the identical real service), not new assets and
+ * not a fetch. `dexscreener`/`base` (the L2 network itself, distinct from
+ * Base Radar's own brand) genuinely have no real mark anywhere in this
+ * codebase — confirmed no match in `BrandIcons.tsx` — so both keep their
+ * existing generic, deliberately muted lucide icon rather than a fabricated
+ * logo. `github` was already correct (`GithubMark`), unchanged.
  */
 export const PROVIDER_BRANDING: Record<ProviderName, ProviderBrand> = {
   coingecko: {
     label: "CoinGecko",
-    Icon: LineChart,
+    Icon: CoinGeckoMark,
     description: "Price, market cap, and 24h volume, pulled live from CoinGecko's public API.",
   },
   dexscreener: {
@@ -27,12 +35,12 @@ export const PROVIDER_BRANDING: Record<ProviderName, ProviderBrand> = {
   },
   defillama: {
     label: "DefiLlama",
-    Icon: Landmark,
+    Icon: DefiLlamaMark,
     description: "Total value locked (TVL), sourced live from DefiLlama's protocol data.",
   },
   blockscout: {
     label: "Blockscout",
-    Icon: Blocks,
+    Icon: BaseScanMark,
     description: "On-chain contract and network activity, read directly from Base's Blockscout explorer.",
   },
   github: {

@@ -24,8 +24,9 @@ export function MarketWidget({ data, lastUpdated }: MarketWidgetProps) {
       accent="accent"
       source={data.source}
       lastUpdated={lastUpdated}
+      className="gap-3 p-4 sm:p-5"
     >
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2">
         <Stat label="Gas" value={formatGwei(data.gasGwei)} />
         <Stat label="Block Height" value={formatCompactNumber(data.blockHeight)} />
         <Stat label="Latest Block Txns" value={formatNumber(data.txCountLatestBlock)} />

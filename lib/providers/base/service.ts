@@ -1,9 +1,9 @@
 /** Public API for the Base RPC provider — cache- and rate-limit-guarded. */
 
-import { fetchChainIdHex, fetchGasPriceHex, fetchLatestBlock, fetchSafeBlock } from "@/lib/providers/base/client";
-import { mapFinality, mapNetworkStatus, type NetworkStatus } from "@/lib/providers/base/mapper";
+import { fetchChainIdHex, fetchEthBalanceHex, fetchGasPriceHex, fetchLatestBlock, fetchSafeBlock } from "@/lib/providers/base/client";
+import { mapEthBalance, mapFinality, mapNetworkStatus, type NetworkStatus } from "@/lib/providers/base/mapper";
 import { getOrSet } from "@/lib/providers/common/cache";
-import { assertRateLimit, getRateLimitStatus as getSharedRateLimitStatus, type RateLimitConfig } from "@/lib/providers/common/rate-limit";
+import { assertRateLimit, type RateLimitConfig } from "@/lib/providers/common/rate-limit";
 import type { ProviderResult } from "@/lib/providers/common/types";
 import { toProviderResult } from "@/lib/providers/common/utilities";
 
@@ -12,15 +12,12 @@ const CACHE_TTL_MS = 20_000; // matches the window documented in docs/API.md —
 const RATE_LIMIT: RateLimitConfig = { limit: 30, windowMs: 60_000 };
 
 /**
- * PR-074 REVIEW #8 — real-time read of this provider's own app-enforced
- * rate-limit budget (see `common/rate-limit.ts`'s `getRateLimitStatus`),
- * exposed for the Evidence & Sources panel to report exact remaining/
- * limit/reset numbers instead of a generic "try again later" — the same
- * pattern already built for GitHub's response-header-based tracker.
+ * Final Production Hardening PR — moved to `base/rateLimitStatus.ts` (a
+ * pure module with no `client.ts`/fetch import), re-exported here so every
+ * existing server-side consumer of `"@/lib/providers/base/service"` is
+ * unaffected.
  */
-export function getRateLimitStatus() {
-  return getSharedRateLimitStatus(PROVIDER, RATE_LIMIT);
-}
+export { getRateLimitStatus } from "@/lib/providers/base/rateLimitStatus";
 
 export async function getBaseNetworkStatus(): Promise<ProviderResult<NetworkStatus>> {
   return toProviderResult(PROVIDER, () =>
@@ -51,6 +48,27 @@ export async function getFinality(): Promise<ProviderResult<number>> {
       assertRateLimit(PROVIDER, RATE_LIMIT);
       const [latestBlock, safeBlock] = await Promise.all([fetchLatestBlock(), fetchSafeBlock()]);
       return mapFinality(latestBlock.number, safeBlock.number);
+    })
+  );
+}
+
+const ETH_BALANCE_CACHE_TTL_MS = 30_000;
+
+/**
+ * V3-WALLET-002 — a connected wallet's native ETH balance. Per-address, not
+ * chain-wide like every other export here, so the cache key includes the
+ * (lowercased — never case-sensitive, matching every other address-keyed
+ * cache entry in this codebase) address rather than being a single shared
+ * key. Returns a raw `bigint` (wei) — see `mapEthBalance`'s own doc comment
+ * for why this never becomes a `Number`.
+ */
+export async function getEthBalance(address: string): Promise<ProviderResult<bigint>> {
+  const normalizedAddress = address.toLowerCase();
+  return toProviderResult(PROVIDER, () =>
+    getOrSet(`${PROVIDER}:eth-balance:${normalizedAddress}`, ETH_BALANCE_CACHE_TTL_MS, async () => {
+      assertRateLimit(PROVIDER, RATE_LIMIT);
+      const balanceHex = await fetchEthBalanceHex(normalizedAddress);
+      return mapEthBalance(balanceHex);
     })
   );
 }

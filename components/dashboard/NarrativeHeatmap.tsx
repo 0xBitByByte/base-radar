@@ -62,6 +62,7 @@ export function NarrativeHeatmap({ data, lastUpdated }: NarrativeHeatmapProps) {
       accent="orange"
       source={data.source}
       lastUpdated={lastUpdated}
+      className="gap-3 p-4 sm:p-5"
     >
       <p className="text-[11px] leading-relaxed text-radar-light-muted/80 dark:text-radar-muted/70">
         Each bar combines price and volume momentum across Base projects in that category — a taller bar means
@@ -71,7 +72,7 @@ export function NarrativeHeatmap({ data, lastUpdated }: NarrativeHeatmapProps) {
         <p className="text-xs leading-relaxed text-radar-light-text dark:text-radar-white">{summary}</p>
       )}
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-2">
         {data.map((row) => {
           const Icon = TREND_ICON[row.momentum];
           return (

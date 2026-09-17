@@ -145,14 +145,25 @@ export function SplashScreen() {
       completed = true;
       cancelAnimationFrame(rafId);
       // PR-071 Round 3 — Task 10: no hold, no extra delay once the app is
-      // genuinely ready. `visible` flips to `false` in the same frame as
-      // `progress` hits 100 — `AnimatePresence`'s own exit transition (below)
-      // is the only thing left on screen after that, and it's a real fade
-      // of an already-finished state, not a second wait bolted onto it.
-      rafId = requestAnimationFrame(() => {
-        setProgress(100);
-        setVisible(false);
-      });
+      // genuinely ready. `visible` flips to `false` in the same React commit
+      // as `progress` hits 100 (both set here, synchronously) —
+      // `AnimatePresence`'s own exit transition (below) is the only thing
+      // left on screen after that, and it's a real fade of an already-
+      // finished state, not a second wait bolted onto it.
+      //
+      // PR-085.xx audit fix — this used to defer the two `setState` calls
+      // into a further `requestAnimationFrame`. That's the exact mechanism
+      // that broke the `MAX_WAIT_MS` `setTimeout` backstop below: Chrome
+      // fully suspends rAF callbacks for a backgrounded tab (confirmed
+      // live — a freshly-scheduled rAF never fired across 200+ real
+      // seconds), so when the backstop fired `completeNow()` from a
+      // background tab, this inner rAF callback was queued and then never
+      // ran, leaving the splash's full-viewport overlay mounted (and
+      // blocking clicks) indefinitely — defeating the one guarantee this
+      // backstop exists to provide. Setting state directly here has no
+      // downside: React still batches both updates into one commit.
+      setProgress(100);
+      setVisible(false);
     }
 
     function tick(now: number) {
@@ -209,8 +220,18 @@ export function SplashScreen() {
         <motion.div
           aria-hidden="true"
           className="fixed inset-0 z-[200] flex flex-col items-center justify-center gap-7 overflow-hidden bg-radar-light-bg dark:bg-radar-bg"
-          initial={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          initial={{ opacity: 1, pointerEvents: "auto" }}
+          // PR-085.xx audit fix — `pointerEvents` isn't a value framer-motion
+          // interpolates (there's nothing to tween between "auto" and
+          // "none"), so it's applied the instant the exit transition starts,
+          // not once the opacity fade visually finishes. Verified live: a
+          // throttled/backgrounded tab's exit fade can stall for a long time
+          // mid-transition (rAF-driven, so its real-world completion time
+          // isn't guaranteed) — without this, the still-fading overlay kept
+          // `pointer-events: auto` (its `initial` value) for that entire
+          // stall, blocking every click underneath it even though the app
+          // had already genuinely decided loading was done.
+          exit={{ opacity: 0, pointerEvents: "none" }}
           transition={{ duration: prefersReducedMotion ? 0 : FADE_MS / 1000, ease: "easeInOut" }}
         >
           {!prefersReducedMotion &&

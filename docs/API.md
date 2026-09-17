@@ -162,11 +162,13 @@ strategy discussion.
   asset prices (`getMajorPrices`, `getEthPrice`)
 - **Endpoint base**: `https://api.coingecko.com/api/v3` (public, free tier,
   no API key)
-- **Cache window**: 90s (`next: { revalidate: 90 }`)
+- **Cache window**: 120s — PR-098.07's "Token Price / Token 24H" freshness
+  class (2-5min; see `lib/intelligence/freshness.ts`), the floor of that
+  range. Was 90s.
 - **Rate limits**: CoinGecko's public free-tier API enforces a per-minute
   call budget (their own docs are the source of truth for the current
   number, since free-tier limits change over time). Base Radar does not
-  authenticate, so it shares the anonymous/IP-based limit. The 90s cache
+  authenticate, so it shares the anonymous/IP-based limit. The 120s cache
   window keeps this comfortably under typical free-tier budgets for a
   single-server deployment.
 
@@ -176,10 +178,12 @@ strategy discussion.
 - **Used for**: Trending Base pairs (`getBaseTrendingPairs`) — powers
   Signals and part of the Activity Feed
 - **Endpoint base**: DexScreener's public API (no key required)
-- **Cache window**: 60s
+- **Cache window**: 300s (5min) — PR-098.07's "DEX Liquidity/Volume" and
+  "Onchain Activity" freshness classes (~5min / 5-10min; see
+  `lib/intelligence/freshness.ts`) share this one real cache entry. Was 60s.
 - **Rate limits**: Not authenticated; subject to DexScreener's public rate
   limiting for unauthenticated clients. Mitigated the same way — via the
-  60s revalidate window rather than a bespoke client-side limiter.
+  300s revalidate window rather than a bespoke client-side limiter.
 
 ### DefiLlama
 
@@ -188,9 +192,12 @@ strategy discussion.
   top-protocol lookup (`getBaseChainTvl`, `getBaseStablecoinMcap`,
   `getBaseProtocols`, `getTopBaseProtocol`, `getBaseProjectCount`)
 - **Endpoint base**: `https://api.llama.fi` (free, no API key)
-- **Cache window**: 120s for most calls. The `/protocols` payload is
-  multi-megabyte and deliberately **not cached** (`cache: "no-store"`) —
-  see [docs/DATABASE.md](DATABASE.md#caching-strategy) for why.
+- **Cache window**: 720s (12min) for `getBaseProtocols` (the bulk
+  `/protocols` list — PR-098.07's "TVL" freshness class, 10-15min; was
+  120s). Other calls use the provider layer's own `getOrSet` cache the same
+  way; the underlying HTTP `fetch()` itself deliberately uses
+  `cache: "no-store"` — see [docs/DATABASE.md](DATABASE.md#caching-strategy)
+  for why that's a separate, lower-level concern from this cache window.
 - **Rate limits**: DefiLlama's free API has no documented hard rate limit
   at the time of writing, but the `/protocols` endpoint being uncached
   means every call to functions that depend on it hits the network fresh —
@@ -203,7 +210,11 @@ strategy discussion.
   contracts (`getRecentlyVerifiedContract`)
 - **Endpoint base**: `https://base.blockscout.com/api/v2` (Base's public
   Blockscout instance, no API key)
-- **Cache window**: 60s
+- **Cache window**: 60s for `getChainStats` (a live network-health ticker).
+  `getRecentlyVerifiedContract`/`getContractDetail` (contract-verification
+  data, the real basis for the "Security" freshness class) use a separate
+  2700s (45min) window instead — see `lib/intelligence/freshness.ts`.
+  Split apart in PR-098.07; both were previously 60s.
 - **Rate limits**: Public instance rate limiting applies; no API key is
   used, so requests share the anonymous quota for `base.blockscout.com`.
 
@@ -236,8 +247,11 @@ strategy discussion.
   `lib/providers/github/client.ts` sends it as a `Bearer` `Authorization`
   header on every GitHub request. When unset, every call runs exactly as
   before — fully unauthenticated, no code path change, no error.
-- **Cache window**: 600s (10 minutes) — the longest of any provider, since
-  repo stats change slowly.
+- **Cache window**: 1800s (30 minutes) — PR-098.07's "GitHub Developer
+  Activity" freshness class (30-60min; see `lib/intelligence/freshness.ts`),
+  the floor of that range; was 600s. Repo stats/commit activity genuinely
+  don't move faster than this, and the slower window eases pressure on
+  GitHub's rate limit too.
 - **Rate limits**: GitHub's REST API is capped at **60 requests/hour per
   IP unauthenticated**, or **5,000 requests/hour** with `GITHUB_TOKEN` set.
   This app's own self-imposed budget (`lib/providers/github/service.ts`'s

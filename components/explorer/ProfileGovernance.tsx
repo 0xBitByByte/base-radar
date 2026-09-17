@@ -2,6 +2,7 @@ import { ArrowRight, Landmark } from "lucide-react";
 import Link from "next/link";
 
 import { GovernanceList } from "@/components/explorer/GovernanceList";
+import { GOVERNANCE_TYPE_EMPTY_STATE } from "@/components/explorer/governanceIntelligenceHelpers";
 import { ProfileSectionCard } from "@/components/explorer/ProfileSectionCard";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { GovernanceEvent } from "@/lib/governance";
@@ -15,27 +16,6 @@ type ProfileGovernanceProps = {
   governanceType: "snapshot" | "on-chain" | "forum" | "none" | null;
   /** PR-084.04 — the real Governance Explorer route for this project (`/dashboard/projects/{slug}/governance`), built once in `page.tsx` from `slug`. */
   governanceHref: string;
-};
-
-/** One entry per non-Snapshot `governanceType` — keeps the three real, confirmed-mechanism empty states from drifting out of sync with each other. */
-const GOVERNANCE_TYPE_EMPTY_STATE: Record<"on-chain" | "forum" | "none", { title: string; description: string; badge: string }> = {
-  "on-chain": {
-    title: "Governance uses on-chain voting",
-    description:
-      "This project doesn't use Snapshot for governance — real decisions are made through on-chain voting instead, which Base Radar doesn't currently track. This isn't a missing registry entry; it's how this project actually governs itself.",
-    badge: "Governance Uses On-chain Voting",
-  },
-  forum: {
-    title: "Governance uses forum discussion",
-    description:
-      "This project doesn't use Snapshot for governance — real decisions are made through forum discussion and signaling instead, which Base Radar doesn't currently track. This isn't a missing registry entry; it's how this project actually governs itself.",
-    badge: "Governance Uses Forum Discussion",
-  },
-  none: {
-    title: "No governance mechanism",
-    description: "This project is confirmed to have no governance mechanism — no token vote, on-chain process, or forum. There is nothing for this section to track.",
-    badge: "No Governance",
-  },
 };
 
 /**

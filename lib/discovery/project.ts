@@ -17,7 +17,7 @@
 
 import { getProjects } from "@/data/projects/helpers";
 import type { Project } from "@/data/projects/types";
-import type { ProjectCategory, ProjectTag, DiscoverySource } from "@/data/projects/enums";
+import type { Chain, ProjectCategory, ProjectTag, DiscoverySource } from "@/data/projects/enums";
 import { classifyCandidate, type ClassificationResult } from "@/lib/discovery/classify";
 import { computeDiscoveryConfidence, type DiscoveryConfidence } from "@/lib/discovery/confidence";
 import { dedupeCandidates, type DeduplicatedCandidate } from "@/lib/discovery/dedupe";
@@ -53,6 +53,16 @@ export type DiscoveryProject = {
   github?: GithubRepoRef;
   socials: CandidateSocials;
   contracts: CandidateContract[];
+  /**
+   * PR-085.13B — every chain this project is known to be on, real evidence
+   * only: the union of every contributing candidate's own `contracts[].chain`
+   * plus every contributing candidate's own `knownChains` (source-query-level
+   * evidence — see `CandidateProject.knownChains`'s own doc comment),
+   * across `primary` AND every merged `duplicates` entry — see
+   * `deriveChains` below. Never a fallback/default; empty when neither kind
+   * of evidence exists for this project.
+   */
+  chains: Chain[];
   coingeckoId?: string;
   defillamaSlug?: string;
   /** PR-072 — real logo/image URL, when any contributing candidate (primary or a merged duplicate) has one — see `pickCandidateLogoUrl` below. `undefined` when none do; never fabricated. */
@@ -82,6 +92,30 @@ function pickCandidateLogoUrl(deduped: DeduplicatedCandidate): string | undefine
 }
 
 /**
+ * PR-085.13B — the union of real chain evidence across every contributing
+ * candidate in this dedup group: `contracts[].chain` (on-chain evidence)
+ * and `knownChains` (source-query-level evidence — see
+ * `CandidateProject.knownChains`'s own doc comment), from BOTH `primary`
+ * AND `duplicates` — mirrors `pickCandidateLogoUrl`'s own
+ * "loop primary+duplicates, take every real value" pattern immediately
+ * above, not a new one. Fixes the latent gap the previous audit found:
+ * `contracts` alone (pre-PR-085.13B) only ever read `primary`'s own
+ * contracts, silently dropping any chain evidence carried by a
+ * higher-source-confidence group's merged duplicates. Never a
+ * fallback/default — a project with no real evidence from any
+ * contributing candidate gets `[]`, never a guessed chain.
+ */
+function deriveChains(deduped: DeduplicatedCandidate): Chain[] {
+  const candidates = [deduped.primary, ...deduped.duplicates];
+  const chains = new Set<Chain>();
+  for (const candidate of candidates) {
+    for (const contract of candidate.contracts) chains.add(contract.chain);
+    for (const chain of candidate.knownChains ?? []) chains.add(chain);
+  }
+  return Array.from(chains);
+}
+
+/**
  * Builds the final `DiscoveryProject` for one deduplicated candidate group
  * — runs Registry Matching, Provider Enrichment, Classification, and
  * Confidence Scoring in that order (enrichment needs the registry match
@@ -106,6 +140,7 @@ export async function buildDiscoveryProject(deduped: DeduplicatedCandidate, exis
     github: candidate.github,
     socials: candidate.socials,
     contracts: candidate.contracts,
+    chains: deriveChains(deduped),
     coingeckoId: candidate.coingeckoId,
     defillamaSlug: candidate.defillamaSlug,
     logoUrl: pickCandidateLogoUrl(deduped),

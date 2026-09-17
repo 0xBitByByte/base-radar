@@ -1,11 +1,16 @@
 "use client";
 
-import { RotateCcw, Zap } from "lucide-react";
+import { RotateCcw, Wallet, Zap } from "lucide-react";
 import { Switch } from "@base-ui/react/switch";
 
 import { AutomationActionBadge, AutomationTriggerBadge } from "@/components/automation/AutomationBadge";
 import { useAutomationPreferences } from "@/lib/hooks/useAutomationPreferences";
 import { useAutomationRules } from "@/lib/hooks/useAutomationRules";
+import { useWalletAutomationRules } from "@/lib/hooks/useWalletAutomationRules";
+import { useWallet } from "@/lib/hooks/useWallet";
+import { GLASS_TILE_SURFACE } from "@/components/ui/glassStyles";
+import { PAGE_HEADER_GROUP_CLASS, PAGE_HEADER_TITLE_CLASS, PAGE_HEADER_SUBTITLE_CLASS } from "@/components/dashboard/pageHeaderStyles";
+import { cn } from "@/lib/utils";
 
 const SWITCH_ROOT_CLASS =
   "relative flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full bg-radar-light-border outline-none transition-colors data-[checked]:bg-radar-primary focus-visible:ring-2 focus-visible:ring-radar-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-radar-light-bg dark:bg-white/10 dark:data-[checked]:bg-radar-primary dark:focus-visible:ring-offset-radar-bg";
@@ -28,12 +33,14 @@ const SWITCH_THUMB_CLASS =
 export function AutomationPreferencesPage() {
   const { preferences, setEnabled: setAutomationEnabled } = useAutomationPreferences();
   const { rules, setEnabled: setRuleEnabled, reset } = useAutomationRules();
+  const { rules: walletRules, setEnabled: setWalletRuleEnabled } = useWalletAutomationRules();
+  const { isConnected } = useWallet();
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold text-radar-light-text dark:text-radar-white">Automation Preferences</h1>
-        <p className="text-sm leading-relaxed text-radar-light-muted dark:text-radar-muted">
+      <div className={PAGE_HEADER_GROUP_CLASS}>
+        <h1 className={PAGE_HEADER_TITLE_CLASS}>Automation Preferences</h1>
+        <p className={PAGE_HEADER_SUBTITLE_CLASS}>
           Turn the Automation System on or off, and choose which rules are allowed to fire.
         </p>
       </div>
@@ -45,7 +52,7 @@ export function AutomationPreferencesPage() {
         >
           Automation System
         </h2>
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-radar-light-border bg-radar-light-card p-4 dark:border-white/10 dark:bg-white/[0.02]">
+        <div className={cn("flex items-center justify-between gap-3 p-4", GLASS_TILE_SURFACE)}>
           <span className="flex min-w-0 items-center gap-2.5 text-sm font-medium text-radar-light-text dark:text-radar-white">
             <Zap className="size-4 shrink-0 text-radar-light-muted dark:text-radar-muted" aria-hidden="true" />
             Automation Enabled
@@ -84,7 +91,7 @@ export function AutomationPreferencesPage() {
             Reset all rules to defaults
           </button>
         </div>
-        <div className="flex flex-col divide-y divide-radar-light-border rounded-xl border border-radar-light-border bg-radar-light-card dark:divide-white/10 dark:border-white/10 dark:bg-white/[0.02]">
+        <div className={cn("flex flex-col divide-y divide-radar-light-border dark:divide-white/10", GLASS_TILE_SURFACE)}>
           {rules.map((rule) => (
             <div key={rule.id} className="flex flex-col gap-2 px-4 py-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -109,6 +116,46 @@ export function AutomationPreferencesPage() {
                   <AutomationActionBadge key={action} action={action} />
                 ))}
               </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/*
+        V3-WALLET-004 — same per-rule toggle pattern as "Rules" above,
+        reading/writing `lib/wallet-automation/rules.ts`'s own overlay
+        instead of `lib/automation/rules.ts`'s. Shown regardless of
+        connection state, same as every other setting on this page — a
+        preference is something a user configures once, not a live
+        connection-dependent view.
+      */}
+      <section aria-labelledby="automation-preferences-wallet-heading" className="flex flex-col gap-3">
+        <h2 id="automation-preferences-wallet-heading" className="text-sm font-semibold text-radar-light-text dark:text-radar-white">
+          Wallet Alerts
+        </h2>
+        {!isConnected && (
+          <p className="text-xs text-radar-light-muted dark:text-radar-muted">
+            Connect a wallet to see these rules in action — your choices below still apply once you do.
+          </p>
+        )}
+        <div className={cn("flex flex-col divide-y divide-radar-light-border dark:divide-white/10", GLASS_TILE_SURFACE)}>
+          {walletRules.map((rule) => (
+            <div key={rule.id} className="flex flex-col gap-2 px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                  <Wallet className="size-3.5 shrink-0 text-radar-light-muted dark:text-radar-muted" aria-hidden="true" />
+                  <span className="truncate text-sm font-medium text-radar-light-text dark:text-radar-white">{rule.name}</span>
+                </div>
+                <Switch.Root
+                  checked={rule.enabled}
+                  onCheckedChange={(checked) => setWalletRuleEnabled(rule.id, checked)}
+                  aria-label={`${rule.enabled ? "Disable" : "Enable"} the "${rule.name}" wallet alert`}
+                  className={SWITCH_ROOT_CLASS}
+                >
+                  <Switch.Thumb className={SWITCH_THUMB_CLASS} />
+                </Switch.Root>
+              </div>
+              <p className="text-xs leading-relaxed text-radar-light-muted dark:text-radar-muted">{rule.description}</p>
             </div>
           ))}
         </div>

@@ -1,11 +1,24 @@
 /**
- * Blockscout (Base explorer instance) — free, no API key required.
+ * Blockscout. Works keyless against the public per-chain host
+ * (`base.blockscout.com`) — but Blockscout's own current docs warn that
+ * host sits behind bot protection and can 403 scripted/programmatic
+ * traffic. `BLOCKSCOUT_API_KEY` (a PRO API key, format `proapi_...`) is
+ * read once at module load, same pattern as `github/client.ts`'s
+ * `GITHUB_TOKEN`; when set, every call here switches to the authenticated
+ * PRO API instead (`api.blockscout.com/8453/...` — `8453` is Base
+ * mainnet's chain id in that path scheme). Every existing path SUFFIX
+ * after `/api/v2/` is identical between the two hosts, so this is a
+ * same-shape swap, not a rewrite of any endpoint below. When unset, every
+ * call behaves exactly as before (keyless, public host).
  * https://docs.blockscout.com/devs/apis/rest
+ * https://docs.blockscout.com/devs/pro-api-responses-and-routes
  */
 
 import { fetchJson } from "@/lib/providers/common/utilities";
 
-const BASE_URL = "https://base.blockscout.com/api/v2";
+const BLOCKSCOUT_API_KEY = process.env.BLOCKSCOUT_API_KEY;
+const BASE_URL = BLOCKSCOUT_API_KEY ? "https://api.blockscout.com/8453/api/v2" : "https://base.blockscout.com/api/v2";
+const HEADERS: Record<string, string> = BLOCKSCOUT_API_KEY ? { authorization: `Bearer ${BLOCKSCOUT_API_KEY}` } : {};
 
 export type RawChainStats = {
   total_addresses: string;
@@ -97,19 +110,19 @@ export type RawAddressInfo = {
 };
 
 export async function fetchChainStats(): Promise<RawChainStats> {
-  return fetchJson<RawChainStats>("blockscout", `${BASE_URL}/stats`);
+  return fetchJson<RawChainStats>("blockscout", `${BASE_URL}/stats`, { headers: HEADERS });
 }
 
 export async function fetchRecentSmartContracts(): Promise<RawSmartContractsResponse> {
-  return fetchJson<RawSmartContractsResponse>("blockscout", `${BASE_URL}/smart-contracts`);
+  return fetchJson<RawSmartContractsResponse>("blockscout", `${BASE_URL}/smart-contracts`, { headers: HEADERS });
 }
 
 export async function fetchContractDetail(address: string): Promise<RawContractDetail> {
-  return fetchJson<RawContractDetail>("blockscout", `${BASE_URL}/smart-contracts/${address}`);
+  return fetchJson<RawContractDetail>("blockscout", `${BASE_URL}/smart-contracts/${address}`, { headers: HEADERS });
 }
 
 export async function fetchAddressInfo(address: string): Promise<RawAddressInfo> {
-  return fetchJson<RawAddressInfo>("blockscout", `${BASE_URL}/addresses/${address}`);
+  return fetchJson<RawAddressInfo>("blockscout", `${BASE_URL}/addresses/${address}`, { headers: HEADERS });
 }
 
 /**
@@ -133,5 +146,49 @@ export async function fetchAddressInfo(address: string): Promise<RawAddressInfo>
  * call site only.
  */
 export async function fetchTokenTransfers(tokenAddress: string): Promise<RawTokenTransfersResponse> {
-  return fetchJson<RawTokenTransfersResponse>("blockscout", `${BASE_URL}/tokens/${tokenAddress}/transfers`, undefined, 12_000, 0);
+  return fetchJson<RawTokenTransfersResponse>("blockscout", `${BASE_URL}/tokens/${tokenAddress}/transfers`, { headers: HEADERS }, 12_000, 0);
+}
+
+/**
+ * V3-WALLET-002 — one real Blockscout token, as returned nested inside a
+ * `RawTokenBalance` entry. Shape confirmed against Blockscout's own public
+ * OpenAPI spec (github.com/blockscout/blockscout-api-v2-swagger) — the live
+ * `base.blockscout.com` API was mid-outage while this was written (matching
+ * this session's own `circuit-breaker provider=blockscout` warnings), so the
+ * static spec was the only reliable source, not a guess. `exchange_rate` is
+ * a real per-token USD price Blockscout already computes — `null`/absent for
+ * lesser-known tokens, never fabricated when missing; `icon_url` is real but
+ * frequently `null` for anything outside the most common tokens.
+ */
+export type RawBlockscoutToken = {
+  address_hash: string;
+  symbol: string;
+  name: string;
+  decimals: string;
+  type: string;
+  exchange_rate: string | null;
+  icon_url?: string | null;
+};
+
+/**
+ * One holding — Blockscout returns this as a flat array (`RawTokenBalance[]`),
+ * unlike the paginated `/addresses/{address}/tokens` endpoint. `value` is the
+ * raw balance in the token's smallest unit, as a decimal string — never
+ * parsed as `Number` here (see `mapper.ts`'s own note on why `balance` stays
+ * a `bigint` all the way through this feature).
+ */
+export type RawTokenBalance = {
+  value: string;
+  token: RawBlockscoutToken;
+};
+
+/**
+ * Every real ERC-20 balance for `address`, in one call — this is the actual
+ * "discovery" mechanism for V3-WALLET-002: no hardcoded token list to check
+ * against and miss something on, Blockscout already indexes every transfer
+ * this address has ever received. NFTs (ERC-721/ERC-1155) come back through
+ * the same endpoint too — the mapper filters to `type === "ERC-20"` only.
+ */
+export async function fetchAddressTokenBalances(address: string): Promise<RawTokenBalance[]> {
+  return fetchJson<RawTokenBalance[]>("blockscout", `${BASE_URL}/addresses/${address}/token-balances`, { headers: HEADERS });
 }

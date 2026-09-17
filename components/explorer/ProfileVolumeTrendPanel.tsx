@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
-import { ProfileChart } from "@/components/explorer/ProfileChart";
+import { ProfileChart } from "@/components/explorer/LazyProfileChart";
 import { getProjectVolumeHistory, type PricePeriod } from "@/app/dashboard/projects/[slug]/actions";
 import { formatCompactCurrency } from "@/lib/data/format";
 import { cn } from "@/lib/utils";
@@ -32,6 +32,8 @@ export function ProfileVolumeTrendPanel({ coingeckoId }: ProfileVolumeTrendPanel
   const [status, setStatus] = useState<"loading" | "ready" | "failed">("loading");
   const [failedPeriods, setFailedPeriods] = useState<Set<PricePeriod>>(new Set());
   const [isPending, startTransition] = useTransition();
+  // Same stale-response guard as `ProfilePriceChart` — see its comment.
+  const latestRequestId = useRef(0);
 
   useEffect(() => {
     if (!coingeckoId) return;
@@ -53,9 +55,11 @@ export function ProfileVolumeTrendPanel({ coingeckoId }: ProfileVolumeTrendPanel
   function handlePeriodClick(next: PricePeriod) {
     if (next === period || !coingeckoId || failedPeriods.has(next)) return;
     const previous = period;
+    const requestId = ++latestRequestId.current;
     setPeriod(next);
     startTransition(async () => {
       const history = await getProjectVolumeHistory(coingeckoId, next);
+      if (latestRequestId.current !== requestId) return;
       if (history && history.length > 0) {
         setData(history);
       } else {

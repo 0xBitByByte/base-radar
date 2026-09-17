@@ -50,3 +50,58 @@ export const TREND_COLOR_VAR: Record<"up" | "down" | "flat", string> = {
   down: "var(--color-radar-danger)",
   flat: "var(--color-radar-muted)",
 };
+
+/**
+ * V3-NOTIFICATION-001 — today's UTC date as `YYYY-MM-DD`. The stable anchor
+ * for anything whose real-world trigger is a *live, continuously-moving*
+ * value (a price % change, a TVL % change, a rolling commit count, "the
+ * moment this cache last rebuilt") rather than a discrete, already-fixed
+ * fact. Several independent id/timestamp schemes across this codebase
+ * (`lib/alerts/providers/{coingecko,defillama,github}.ts`,
+ * `lib/brief/storage.ts`, `lib/portfolio/storage.ts`) previously stamped
+ * `new Date().toISOString()` — the exact rebuild moment, not any real event
+ * time — directly into a value used as (or to derive) a stable id. Since a
+ * browser refresh re-evaluates every module-scope cache from scratch, that
+ * moment differs on every single reload, which broke every downstream
+ * consumer keying persisted state off that id (most visibly,
+ * `lib/notifications/storage.ts`'s read-state overlay — see the
+ * V3-NOTIFICATION-001 report for the full trace). A day-bucket keeps such
+ * an id stable across any number of refreshes within the same day, while a
+ * genuinely new day still produces a genuinely new id, so a real new signal
+ * tomorrow is never silently suppressed.
+ */
+export function dayBucket(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * Midnight UTC today, as a real ISO timestamp — the same day-bucket
+ * `dayBucket()` anchors to, shaped as a valid timestamp field. Used in
+ * place of `new Date().toISOString()` by the same call sites `dayBucket()`
+ * documents: without this, even a stabilized id would keep re-sorting to
+ * "just now" and showing a fake, ever-changing recency on every reload.
+ */
+export function startOfTodayIso(): string {
+  return `${dayBucket()}T00:00:00.000Z`;
+}
+
+/**
+ * V4-FUTURE-001 — the one real browser-download trigger this app uses: a
+ * `Blob` + `URL.createObjectURL` + a synthetic anchor click, cleaned up
+ * immediately after. Extracted from `PersonalizationPreferencesPage.tsx`'s
+ * own `downloadJson` (that file's local copy now calls this instead) once
+ * Chat Export and Historical Report Export needed the identical pattern —
+ * "no new implementation style," per those features' own briefs. No
+ * network request, no data leaves the tab.
+ */
+export function downloadTextFile(filename: string, content: string, mimeType: string): void {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}

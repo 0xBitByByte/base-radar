@@ -4,9 +4,22 @@
  * pattern as every other engine's storage layer this session
  * (`lib/notifications/storage.ts`, `lib/automation/rules.ts`): lazy
  * SSR-safe hydration, graceful recovery from malformed storage.
+ *
+ * PR-094.01 (Recent Searches Cross-Device Sync) — `recordSearch()`/
+ * `clearSearchHistory()` now optionally enqueue a real Sync operation when
+ * the caller supplies the real, authenticated account id, the exact same
+ * `authAccountId`-parameter shape `lib/account/service.ts`'s
+ * `updateAccount()` already established — never enqueued when the caller
+ * doesn't, which keeps every existing Guest-only caller's behavior
+ * completely unchanged. `applyRemoteRecentSearches()` applies a real
+ * pulled remote list directly, the same bypass-the-queue shape
+ * `applyRemoteAccountFields()` already established, so a pull can never
+ * re-trigger a push of the state it just received.
  */
 
 import { getSearchPreferences } from "@/lib/search/preferences";
+import { searchSyncAdapter, RECENT_SEARCHES_ENTITY_ID } from "@/lib/sync/adapters/search";
+import { enqueueOperation, performSync } from "@/lib/sync/service";
 
 const RECENT_SEARCHES_STORAGE_KEY = "base-radar:search-recent";
 const RECENT_SEARCHES_VERSION = 1;
@@ -67,6 +80,12 @@ export function getRecentSearches(): string[] {
   return recentSearches;
 }
 
+/** The Sync Queue/Engine don't need to know *which* account — only the caller (gated on a real `authAccountId` being present) decides whether to call this at all. */
+function enqueueRecentSearchesSync(): void {
+  enqueueOperation(searchSyncAdapter.createOperation("update", RECENT_SEARCHES_ENTITY_ID, { queries: recentSearches }));
+  void performSync();
+}
+
 /**
  * Records `query` as a recent search — newest first, de-duplicated
  * case-insensitively, capped to the Maximum Recent Searches preference.
@@ -76,8 +95,14 @@ export function getRecentSearches(): string[] {
  * selected from a non-empty query (see `CommandPalette.tsx`'s
  * `navigateTo`), so "only store queries that produced results" holds by
  * construction — there is no result-less code path that reaches here.
+ *
+ * `authAccountId`, when supplied, is the real, session-derived server
+ * account id (never this file's own anonymous local list, which carries
+ * no id at all) — when present, the updated list is also queued for real
+ * Cloud Sync and an immediate push is attempted, the exact same pattern
+ * `lib/account/service.ts`'s `updateAccount()` already established.
  */
-export function recordSearch(query: string): void {
+export function recordSearch(query: string, authAccountId?: string): void {
   ensureHydrated();
   const trimmed = query.trim();
   if (!trimmed) return;
@@ -88,12 +113,33 @@ export function recordSearch(query: string): void {
   recentSearches = [trimmed, ...deduped].slice(0, maxSize);
   persist();
   notify();
+
+  if (authAccountId) enqueueRecentSearchesSync();
 }
 
-export function clearSearchHistory(): void {
+export function clearSearchHistory(authAccountId?: string): void {
   ensureHydrated();
   if (recentSearches.length === 0) return;
   recentSearches = [];
+  persist();
+  notify();
+
+  if (authAccountId) enqueueRecentSearchesSync();
+}
+
+/**
+ * PR-094.01 — applies a real pulled remote Recent Searches list directly,
+ * bypassing the Sync Queue entirely. Never called for a local edit — only
+ * by `lib/hooks/useCloudSyncActivation.ts`, after `performPull()` has
+ * already confirmed no unsynced local change conflicts with it. The list
+ * is trusted as already-valid (query strings only, already capped
+ * server-side to what was actually pushed) — this never re-applies the
+ * maximum-history clamp itself, since the remote list already reflects a
+ * real, previously-enforced cap from whichever device pushed it.
+ */
+export function applyRemoteRecentSearches(queries: string[]): void {
+  ensureHydrated();
+  recentSearches = queries;
   persist();
   notify();
 }

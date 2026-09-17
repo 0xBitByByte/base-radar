@@ -8,17 +8,23 @@ import {
   mapRepoStats,
   type CommitActivity,
   type ContributorCount,
+  type DeveloperCadence,
   type ReleaseSummary,
   type RepoStats,
 } from "@/lib/providers/github/mapper";
-import { getOrSet, getStale } from "@/lib/providers/common/cache";
+import { getOrSet } from "@/lib/providers/common/cache";
 import { assertRateLimit, type RateLimitConfig } from "@/lib/providers/common/rate-limit";
 import type { ProviderResult } from "@/lib/providers/common/types";
-import { toProviderResult } from "@/lib/providers/common/utilities";
+import { toProviderResult, withStaleFallback } from "@/lib/providers/common/utilities";
 import { getGithubRateLimitSnapshot, type GithubRateLimitSnapshot } from "@/lib/providers/github/rateLimit";
 
 const PROVIDER = "github" as const;
-const CACHE_TTL_MS = 600_000; // matches the window documented in docs/API.md
+// PR-098.07 — was 10min; retuned to the floor of the "GitHub Developer
+// Activity" freshness class (30-60min, `lib/intelligence/freshness.ts`) —
+// repo stats/commit activity genuinely don't move faster than this, and
+// the slower window also eases pressure on GitHub's rate limit (a real,
+// previously-documented constraint for this provider).
+const CACHE_TTL_MS = 1_800_000;
 /**
  * PR-074 REVIEW #1 — this budget must track `GITHUB_TOKEN`, not just
  * GitHub's own real ceiling: a `GITHUB_TOKEN` genuinely raises GitHub's own
@@ -58,20 +64,15 @@ export async function getRepoStats(fullName: string): Promise<ProviderResult<Rep
       return mapRepoStats(fullName, repo, release);
     })
   );
-  if (result.ok) return result;
 
   // PR-074 DATA INTEGRITY AUDIT — Engineering Health shouldn't collapse to
   // "Not Assessed" (Repository/Stars/Forks/Language/License/Last Push all
   // blank) just because GitHub's rate limit is exhausted or the API is
-  // briefly down. Fall back to the last real, successfully-fetched value
-  // for this repo, if this process has ever fetched it — honestly
-  // timestamped with when it was ACTUALLY fetched (never "just now"), so
-  // the real age of the data is never misrepresented. Only reached when
-  // the live fetch above genuinely failed; never masks a real first-ever
-  // failure with fabricated data (`undefined` when nothing was ever cached).
-  const stale = getStale<RepoStats>(cacheKey);
-  if (!stale) return result;
-  return { ok: true, data: stale.value, source: PROVIDER, fetchedAt: stale.fetchedAt, stale: true };
+  // briefly down. `withStaleFallback` degrades to the last real,
+  // successfully-fetched value for this repo, honestly timestamped with
+  // when it was ACTUALLY fetched (never "just now") — never masks a real
+  // first-ever failure with fabricated data.
+  return withStaleFallback(PROVIDER, cacheKey, result);
 }
 
 /** Weekly commit-count trend for a repo — used for real "Developer Activity"/"GitHub Trend" fields (PR10 Part 3, and the Base Radar Brief). */
@@ -116,4 +117,4 @@ export function getRateLimitStatus(): GithubRateLimitSnapshot | null {
   return getGithubRateLimitSnapshot();
 }
 
-export type { CommitActivity, ContributorCount, ReleaseSummary, RepoStats };
+export type { CommitActivity, ContributorCount, DeveloperCadence, ReleaseSummary, RepoStats };

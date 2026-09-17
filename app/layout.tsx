@@ -5,6 +5,10 @@ import "./globals.css";
 
 import { SITE, SITE_KEYWORDS, SITE_TWITTER_HANDLE, SITE_URL } from "@/constants/site";
 import { SplashScreen } from "@/components/branding/SplashScreen";
+import { CloudSyncActivation } from "@/components/sync/CloudSyncActivation";
+import { AnalyticsTracker } from "@/components/observability/AnalyticsTracker";
+import { WebVitalsReporter } from "@/components/observability/WebVitalsReporter";
+import { WalletProvider } from "@/components/wallet/WalletProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -82,8 +86,13 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-          <SplashScreen />
-          {children}
+          <WalletProvider>
+            <SplashScreen />
+            <CloudSyncActivation />
+            <WebVitalsReporter />
+            <AnalyticsTracker />
+            {children}
+          </WalletProvider>
         </ThemeProvider>
       </body>
     </html>

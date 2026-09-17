@@ -27,13 +27,13 @@ const ACCENT_CLASS: Record<RichTooltipAccent, string> = {
 
 /**
  * The one shared content wrapper rendered inside every informational
- * `Tooltip`'s `content` prop — Health/Confidence (`ScoreBadge`), Verification
- * (`VerificationBadge`), every metric info icon including GitHub Stars
- * (`MetricItem`), and Provider (`ProviderBadge`) all compose this instead of
- * hand-building their own title/description/divider markup, so every
- * informational tooltip in the app shares identical spacing, typography,
- * and footer/divider treatment — Quick View, Grid, and Table included,
- * since they all render the same component instance, not lookalikes.
+ * `Tooltip`'s `content` prop — Verification (`VerificationBadge`),
+ * Lifecycle/Verification-level (`LifecycleBadge`/`VerificationLevelBadge`),
+ * Health (`ProjectHealthScorecard`), Provider (`ProviderBadge`), Chain
+ * (`ChainBadgeGroup`), and every metric info icon including GitHub Stars
+ * (`MetricItem`) all compose this instead of hand-building their own
+ * title/description/divider markup, so every informational tooltip in the
+ * app shares identical spacing, typography, and footer/divider treatment.
  */
 export function RichTooltip({
   icon: Icon,

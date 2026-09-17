@@ -42,8 +42,13 @@ const accountService: AccountService = {
   },
 };
 
+// `accountId` is accepted (per the shared `SyncService` contract — see its
+// own doc comment) but genuinely unused here: `localConnector` and
+// `lib/sync/service.ts`'s cached snapshot are both already scoped to
+// "this device's one local account," the same real limitation the rest of
+// this file's local-only implementation already has.
 const syncService: SyncService = {
-  push: (operations) => localConnector.push(operations),
+  push: (_accountId, operations) => localConnector.push(operations),
   pull: () => localConnector.pull(),
   async getStatus() {
     return getSyncStatus();

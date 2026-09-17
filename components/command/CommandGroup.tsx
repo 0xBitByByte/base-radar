@@ -1,4 +1,5 @@
 import type { SearchableItem, SearchGroup } from "@/lib/search/types";
+import type { LiveProject } from "@/lib/projects/types";
 import { CommandItem } from "@/components/command/CommandItem";
 
 type CommandGroupProps = {
@@ -7,10 +8,11 @@ type CommandGroupProps = {
   activeItemId: string | null;
   onSelect: (item: SearchableItem) => void;
   onHover: (itemId: string) => void;
+  liveProjectById?: Map<string, LiveProject>;
 };
 
 /** One labeled section of the results listbox. `CommandResults` only ever calls this with a non-empty `items` slice (via `groupSearchResults`), so empty groups are never rendered. */
-export function CommandGroup({ group, items, activeItemId, onSelect, onHover }: CommandGroupProps) {
+export function CommandGroup({ group, items, activeItemId, onSelect, onHover, liveProjectById }: CommandGroupProps) {
   if (items.length === 0) return null;
 
   return (
@@ -25,6 +27,7 @@ export function CommandGroup({ group, items, activeItemId, onSelect, onHover }: 
           active={item.id === activeItemId}
           onSelect={onSelect}
           onHover={() => onHover(item.id)}
+          liveProjectById={liveProjectById}
         />
       ))}
     </section>

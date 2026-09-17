@@ -1,6 +1,8 @@
+import type { ReactNode } from "react";
+
 type AutomationMetricProps = {
   label: string;
-  value: string | number;
+  value: ReactNode;
   align?: "start" | "end";
 };
 

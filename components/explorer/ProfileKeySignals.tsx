@@ -7,6 +7,7 @@ import { ChangeValue } from "@/components/explorer/ChangeValue";
 import { ExpandableMetricCard } from "@/components/ui/ExpandableMetricCard";
 import { formatCompactCurrency } from "@/lib/data/format";
 import { cn } from "@/lib/utils";
+import { countActiveProposals } from "@/lib/governance/helpers";
 import type { GovernanceEvent } from "@/lib/governance/types";
 import type { Market } from "@/lib/intelligence/types";
 import type { WhaleEvent } from "@/lib/whale/types";
@@ -177,7 +178,7 @@ export function ProfileKeySignals({
   whaleEvents,
   whaleHref,
 }: ProfileKeySignalsProps) {
-  const activeProposals = governance?.filter((event) => event.status === "active").length ?? null;
+  const activeProposals = countActiveProposals(governance);
   const momentumAvailable = market.available && market.changePct7d !== null;
   const confirmedGovernanceType = governance === null && (governanceType === "on-chain" || governanceType === "forum" || governanceType === "none") ? governanceType : null;
 

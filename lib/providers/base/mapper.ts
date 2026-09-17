@@ -3,6 +3,20 @@
 import type { RawRpcBlock } from "@/lib/providers/base/client";
 import { hexToNumber } from "@/lib/providers/common/utilities";
 
+/**
+ * V3-WALLET-002 — a wallet's ETH balance, kept as a raw wei `bigint`, never
+ * routed through `hexToNumber`/`Number()`. `hexToNumber` is safe for gas
+ * price/block height (both comfortably under `Number.MAX_SAFE_INTEGER`), but
+ * a balance in wei is not: `Number.MAX_SAFE_INTEGER` (~9×10^15) is worth
+ * only ~0.009 ETH once expressed in wei, so any real balance above that
+ * would silently lose precision the instant it became a `Number`. Every
+ * consumer of this value formats it via viem's own `formatUnits`, which
+ * operates on the `bigint` directly.
+ */
+export function mapEthBalance(balanceHex: string): bigint {
+  return BigInt(balanceHex);
+}
+
 export type NetworkStatus = {
   gasGwei: number;
   blockHeight: number;

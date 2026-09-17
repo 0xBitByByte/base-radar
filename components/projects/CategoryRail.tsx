@@ -32,6 +32,12 @@
  * trend); the rest render as a denser, quieter compact pill list. Two
  * tiers, not twenty-two identical cards — an entry point into the
  * ecosystem's most active verticals first, everything else one click away.
+ *
+ * PR-085.04 — this rail now lives on Discover, which no longer has a
+ * directory to filter in place. Category links now navigate to the new
+ * `/dashboard/projects/all` route with that category applied, instead of
+ * updating `?category=` on this same page (Discover has nothing left that
+ * reads it). `isActive`/highlighting logic is unchanged.
  */
 
 import { useEffect, useState } from "react";
@@ -51,6 +57,8 @@ type CategoryRailProps = {
 
 const FEATURED_CAP = 6;
 const VISIBLE_CAP = 14;
+/** PR-085.04 — every category link's real destination now that Discover has no in-page directory to filter. */
+const ALL_PROJECTS_PATH = `${PROJECTS_PATH}/all`;
 /** PR-071 Round 2 — remembers this section's own collapse choice, same convention `CollapsibleSection` uses for KPI Pulse/Smart Views (this rail keeps its own toggle, not the shared wrapper, since its header already carries real Clear/Show-All controls tied to internal state). */
 const COLLAPSE_STORAGE_KEY = "br-projects-section-collapsed:explore-by-category";
 
@@ -100,7 +108,7 @@ export function CategoryRail({ byCategory, state }: CategoryRailProps) {
 
   function hrefFor(category: ProjectCategory, isActive: boolean): string {
     const nextCategories = isActive ? state.categories.filter((item) => item !== category) : [...state.categories, category];
-    return `${PROJECTS_PATH}${buildProjectsQuery(state, { categories: nextCategories })}`;
+    return `${ALL_PROJECTS_PATH}${buildProjectsQuery(state, { categories: nextCategories })}`;
   }
 
   return (

@@ -1,18 +1,22 @@
 "use client";
 
-import type { KeyboardEvent } from "react";
+import { Suspense, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@base-ui/react/dialog";
-import { History, Search } from "lucide-react";
+import { Bookmark, History, Search, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useCommandPalette } from "@/lib/hooks/useCommandPalette";
 import type { SearchableItem } from "@/lib/search/types";
+import type { LiveProject } from "@/lib/projects/types";
 import { CommandSearch } from "@/components/command/CommandSearch";
 import { CommandResults } from "@/components/command/CommandResults";
+import { CommandResultsAsync } from "@/components/command/CommandResultsAsync";
 
 type CommandPaletteProps = {
   className?: string;
+  /** Universal Project Card, PR-8 — see `app/dashboard/layout.tsx`. */
+  liveProjectsPromise: Promise<LiveProject[]>;
 };
 
 /**
@@ -27,7 +31,7 @@ type CommandPaletteProps = {
  * established, including focus trap and return-focus-to-trigger, which Base
  * UI's Dialog provides for free.
  */
-export function CommandPalette({ className }: CommandPaletteProps) {
+export function CommandPalette({ className, liveProjectsPromise }: CommandPaletteProps) {
   const router = useRouter();
   const {
     open,
@@ -44,6 +48,12 @@ export function CommandPalette({ className }: CommandPaletteProps) {
     showRecentSearches,
     recordSearch,
     selectRecentSearch,
+    savedSearches,
+    showSavedSearches,
+    isCurrentQuerySaved,
+    toggleSaveCurrentQuery,
+    selectSavedSearch,
+    removeSavedSearch,
   } = useCommandPalette();
 
   const activeItem = results[selectedIndex] ?? null;
@@ -114,7 +124,46 @@ export function CommandPalette({ className }: CommandPaletteProps) {
             Search commands, projects, and activity across Base Radar, then press Enter to navigate.
           </Dialog.Description>
 
-          <CommandSearch value={query} onChange={setQuery} onKeyDown={handleKeyDown} activeDescendantId={activeDescendantId} />
+          <CommandSearch
+            value={query}
+            onChange={setQuery}
+            onKeyDown={handleKeyDown}
+            activeDescendantId={activeDescendantId}
+            isSaved={isCurrentQuerySaved}
+            onToggleSave={toggleSaveCurrentQuery}
+          />
+
+          {showSavedSearches && (
+            <section
+              role="group"
+              aria-label="Saved Searches"
+              className="border-b border-radar-light-border p-2 dark:border-white/10"
+            >
+              <p className="px-2.5 py-1.5 text-[10.5px] font-semibold tracking-[0.1em] text-radar-light-muted uppercase dark:text-radar-muted/60">
+                Saved Searches
+              </p>
+              {savedSearches.map((saved) => (
+                <div key={saved.id} className="group flex w-full items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => selectSavedSearch(saved.query)}
+                    className="flex flex-1 items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm text-radar-light-text outline-none transition-colors hover:bg-radar-light-surface focus-visible:bg-radar-light-surface dark:text-radar-white dark:hover:bg-white/5 dark:focus-visible:bg-white/5"
+                  >
+                    <Bookmark className="size-4 shrink-0 text-radar-light-muted dark:text-radar-muted" aria-hidden="true" />
+                    <span className="truncate">{saved.query}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeSavedSearch(saved.id)}
+                    aria-label={`Remove "${saved.query}" from Saved Searches`}
+                    className="shrink-0 rounded-lg p-1.5 text-radar-light-muted opacity-0 outline-none transition-colors hover:bg-radar-danger/5 hover:text-radar-danger focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-radar-primary/50 group-hover:opacity-100 dark:text-radar-muted"
+                  >
+                    <X className="size-3.5" aria-hidden="true" />
+                  </button>
+                </div>
+              ))}
+            </section>
+          )}
 
           {showRecentSearches && (
             <section
@@ -139,15 +188,30 @@ export function CommandPalette({ className }: CommandPaletteProps) {
             </section>
           )}
 
-          <CommandResults
-            results={results}
-            activeItemId={activeItem?.id ?? null}
-            onSelect={navigateTo}
-            onHover={(itemId) => {
-              const index = results.findIndex((item) => item.id === itemId);
-              if (index !== -1) setSelectedIndex(index);
-            }}
-          />
+          <Suspense
+            fallback={
+              <CommandResults
+                results={results}
+                activeItemId={activeItem?.id ?? null}
+                onSelect={navigateTo}
+                onHover={(itemId) => {
+                  const index = results.findIndex((item) => item.id === itemId);
+                  if (index !== -1) setSelectedIndex(index);
+                }}
+              />
+            }
+          >
+            <CommandResultsAsync
+              liveProjectsPromise={liveProjectsPromise}
+              results={results}
+              activeItemId={activeItem?.id ?? null}
+              onSelect={navigateTo}
+              onHover={(itemId) => {
+                const index = results.findIndex((item) => item.id === itemId);
+                if (index !== -1) setSelectedIndex(index);
+              }}
+            />
+          </Suspense>
         </Dialog.Popup>
       </Dialog.Portal>
     </Dialog.Root>

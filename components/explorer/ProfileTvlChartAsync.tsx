@@ -2,7 +2,7 @@
 
 import { use } from "react";
 
-import { ProfileChart } from "@/components/explorer/ProfileChart";
+import { ProfileChart } from "@/components/explorer/LazyProfileChart";
 import type { SparklinePoint } from "@/lib/data/types";
 import type { ProviderResult } from "@/lib/providers/common/types";
 

@@ -1,39 +1,45 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-import { RotateCcw, Trash2 } from "lucide-react";
+import { Bookmark, RotateCcw, Trash2, X } from "lucide-react";
 import { Switch } from "@base-ui/react/switch";
 
+import { useRecentSearches } from "@/lib/hooks/useRecentSearches";
+import { useSavedSearches } from "@/lib/hooks/useSavedSearches";
 import { useSearchPreferences } from "@/lib/hooks/useSearchPreferences";
-import { clearSearchHistory, getRecentSearches, subscribeToRecentSearches } from "@/lib/search/storage";
+import { GLASS_TILE_SURFACE } from "@/components/ui/glassStyles";
+import { PAGE_HEADER_GROUP_CLASS, PAGE_HEADER_TITLE_CLASS, PAGE_HEADER_SUBTITLE_CLASS } from "@/components/dashboard/pageHeaderStyles";
+import { cn } from "@/lib/utils";
 
 const SWITCH_ROOT_CLASS =
   "relative flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full bg-radar-light-border outline-none transition-colors data-[checked]:bg-radar-primary focus-visible:ring-2 focus-visible:ring-radar-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-radar-light-bg dark:bg-white/10 dark:data-[checked]:bg-radar-primary dark:focus-visible:ring-offset-radar-bg";
 const SWITCH_THUMB_CLASS =
   "block size-4 translate-x-1 rounded-full bg-radar-light-card shadow transition-transform data-[checked]:translate-x-6 dark:bg-radar-bg";
 
-const EMPTY_RECENT_SEARCHES: string[] = [];
-function getServerSnapshot(): string[] {
-  return EMPTY_RECENT_SEARCHES;
-}
-
 /**
  * `/dashboard/settings/search` — the same card/section chrome
  * `AutomationPreferencesPage.tsx`/`NotificationPreferencesPage.tsx`
  * established. Reads/writes `lib/search/preferences.ts` via
- * `useSearchPreferences`, and reads/clears `lib/search/storage.ts`'s
- * Recent Searches list directly — a small, self-contained subscription,
- * not worth a dedicated hook file for one read-only list on one page.
+ * `useSearchPreferences`, and reads/clears Recent Searches via
+ * `useRecentSearches()` (PR-094.01 — the same hook `CommandPalette.tsx`
+ * uses, so clearing history here also enqueues a real Sync operation when
+ * authenticated, exactly like recording a search does).
+ *
+ * PR-094.02 adds a real Saved Searches management list via
+ * `useSavedSearches()` — unlike Recent Searches, there's no bulk "clear"
+ * here (each entry was an explicit, individual user action, so removal
+ * stays individual too), and no Cloud Sync wiring in this pass (see
+ * `lib/search/savedSearches.ts`'s own doc comment for why).
  */
 export function SearchPreferencesPage() {
   const { preferences, setPreferences, resetPreferences } = useSearchPreferences();
-  const recentSearches = useSyncExternalStore(subscribeToRecentSearches, getRecentSearches, getServerSnapshot);
+  const { recentSearches, clearSearchHistory } = useRecentSearches();
+  const { savedSearches, deleteSavedSearch } = useSavedSearches();
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold text-radar-light-text dark:text-radar-white">Search Preferences</h1>
-        <p className="text-sm leading-relaxed text-radar-light-muted dark:text-radar-muted">
+      <div className={PAGE_HEADER_GROUP_CLASS}>
+        <h1 className={PAGE_HEADER_TITLE_CLASS}>Search Preferences</h1>
+        <p className={PAGE_HEADER_SUBTITLE_CLASS}>
           Control how Global Search and the Command Palette behave, and manage your search history.
         </p>
       </div>
@@ -45,7 +51,7 @@ export function SearchPreferencesPage() {
         >
           Keyboard
         </h2>
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-radar-light-border bg-radar-light-card p-4 dark:border-white/10 dark:bg-white/[0.02]">
+        <div className={cn("flex items-center justify-between gap-3 p-4", GLASS_TILE_SURFACE)}>
           <span className="text-sm font-medium text-radar-light-text dark:text-radar-white">Open with ⌘K / Ctrl+K</span>
           <Switch.Root
             checked={preferences.enableKeyboardShortcut}
@@ -74,7 +80,7 @@ export function SearchPreferencesPage() {
         >
           Recent Searches
         </h2>
-        <div className="flex flex-col divide-y divide-radar-light-border rounded-xl border border-radar-light-border bg-radar-light-card dark:divide-white/10 dark:border-white/10 dark:bg-white/[0.02]">
+        <div className={cn("flex flex-col divide-y divide-radar-light-border dark:divide-white/10", GLASS_TILE_SURFACE)}>
           <div className="flex items-center justify-between gap-3 p-4">
             <span className="text-sm font-medium text-radar-light-text dark:text-radar-white">Enable Recent Searches</span>
             <Switch.Root
@@ -135,6 +141,45 @@ export function SearchPreferencesPage() {
               Clear
             </button>
           </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="search-preferences-saved-heading" className="flex flex-col gap-3">
+        <h2
+          id="search-preferences-saved-heading"
+          className="text-sm font-semibold text-radar-light-text dark:text-radar-white"
+        >
+          Saved Searches
+        </h2>
+        <p className="text-xs text-radar-light-muted dark:text-radar-muted">
+          Searches you&apos;ve explicitly saved from Global Search — never auto-recorded, and never cleared automatically.
+        </p>
+        <div className={cn("flex flex-col", GLASS_TILE_SURFACE)}>
+          {savedSearches.length === 0 ? (
+            <p className="p-4 text-xs text-radar-light-muted dark:text-radar-muted">
+              No saved searches yet. Use the bookmark icon in Global Search (⌘K / Ctrl+K) to save one.
+            </p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-radar-light-border dark:divide-white/10">
+              {savedSearches.map((saved) => (
+                <li key={saved.id} className="flex items-center justify-between gap-3 p-4">
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    <Bookmark className="size-4 shrink-0 text-radar-light-muted dark:text-radar-muted" aria-hidden="true" />
+                    <span className="truncate text-sm font-medium text-radar-light-text dark:text-radar-white">{saved.query}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => deleteSavedSearch(saved.id)}
+                    aria-label={`Remove "${saved.query}" from Saved Searches`}
+                    className="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-radar-light-muted outline-none transition-colors hover:bg-radar-danger/5 hover:text-radar-danger focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:text-radar-muted"
+                  >
+                    <X className="size-3.5" aria-hidden="true" />
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </section>
 

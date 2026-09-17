@@ -6,12 +6,23 @@
  * a plain REST API) means registering a new connector and calling
  * `setActive()`, never touching the Sync Engine, Sync Queue, or any Sync
  * Adapter.
+ *
+ * PR-093.06 (Ongoing Cloud Sync) — `backendConnector` (this app's real
+ * `/api/sync/*` backend) is now registered alongside `localConnector`, but
+ * `localConnector` stays the default active one — real Cloud Sync activity
+ * is opt-in, driven entirely by `lib/hooks/useCloudSyncActivation.ts`
+ * calling `setActive("backend")` only while a real authenticated session
+ * exists, and back to `"local"` the moment it doesn't.
  */
 
+import { backendConnector } from "@/lib/sync/connectors/backend";
 import { localConnector } from "@/lib/sync/connectors/local";
 import type { SyncConnector } from "@/lib/sync/connectors/base";
 
-const connectors = new Map<string, SyncConnector>([[localConnector.id, localConnector]]);
+const connectors = new Map<string, SyncConnector>([
+  [localConnector.id, localConnector],
+  [backendConnector.id, backendConnector],
+]);
 let activeId: string = localConnector.id;
 
 export function register(connector: SyncConnector): void {

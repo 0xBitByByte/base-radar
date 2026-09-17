@@ -16,11 +16,23 @@
  * Never touches any other layer's storage — Personalization, the flat
  * Watchlist, Search/Notification/Automation preferences are all untouched
  * by every function below, including `signOut`/`deleteAccount`.
+ *
+ * PR-093.06 (Ongoing Cloud Sync) — the one deliberate exception to the
+ * paragraph above: `updateAccount()` now also enqueues a real Sync
+ * operation (via `accountSyncAdapter`/`enqueueOperation`, the exact
+ * existing Sync Queue machinery) when the caller supplies the real,
+ * authenticated account id — never when it doesn't, which keeps every
+ * existing Guest-only caller's behavior completely unchanged. This file
+ * still never imports auth state itself; `lib/hooks/useAccount.ts` is the
+ * one place that knows whether the caller is authenticated and passes the
+ * id through.
  */
 
 import { buildGuestAccount, readAccount, writeAccount } from "@/lib/account/storage";
-import type { Account, ProfileInput, ProfileValidationError } from "@/lib/account/types";
+import { BIO_MAX_LENGTH, type Account, type ProfileInput, type ProfileValidationError } from "@/lib/account/types";
 import { validateAccountImport } from "@/lib/account/validation";
+import { accountSyncAdapter } from "@/lib/sync/adapters/account";
+import { enqueueOperation, performSync } from "@/lib/sync/service";
 
 /** Re-exported so consumers only ever need `lib/account/service.ts` as the one public entry point, the same shape every other export here follows — foundation for a future "Import Account" action, not wired to any UI yet. */
 export { validateAccountImport };
@@ -74,12 +86,14 @@ export function validateProfileInput(input: ProfileInput, currentAccountId: stri
   const name = input.name.trim();
   const username = input.username.trim();
   const email = input.email.trim();
+  const bio = input.bio.trim();
 
   if (name === "") errors.push("empty-name");
   if (username === "") errors.push("empty-username");
   else if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) errors.push("invalid-username");
   if (email !== "" && !isValidEmailFormat(email)) errors.push("invalid-email");
   if (username !== "" && isDuplicateUsername(username, currentAccountId)) errors.push("duplicate-username");
+  if (bio.length > BIO_MAX_LENGTH) errors.push("bio-too-long");
 
   return errors;
 }
@@ -89,9 +103,51 @@ export function validateProfileInput(input: ProfileInput, currentAccountId: stri
  * run `validateProfileInput` — this never re-validates, so it stays a
  * simple, honest "apply this patch" mutator like every other `update*` in
  * this app.
+ *
+ * `authAccountId`, when supplied, is the real, session-derived server
+ * account id (`useAuthSession()`'s own `account.id` — never this file's
+ * own local `cached.id`, which is a different, locally-generated value —
+ * see this file's top-of-file doc comment). When present, the same
+ * updated fields are also queued for real Cloud Sync via the existing
+ * Sync Queue, then an immediate `performSync()` attempt is made — the
+ * exact same queue/engine/connector path a manual "Retry" already uses,
+ * just triggered automatically here instead of by a button.
  */
-export async function updateAccount(patch: Partial<Pick<Account, "name" | "username" | "email" | "avatar">>): Promise<void> {
-  persist({ ...cached, ...patch, updatedAt: new Date().toISOString() });
+export async function updateAccount(
+  patch: Partial<Pick<Account, "name" | "username" | "email" | "avatar" | "bio">>,
+  authAccountId?: string
+): Promise<void> {
+  const next = { ...cached, ...patch, updatedAt: new Date().toISOString() };
+  persist(next);
+
+  if (authAccountId) {
+    enqueueOperation(accountSyncAdapter.createOperation("update", authAccountId, next));
+    void performSync();
+  }
+}
+
+/**
+ * PR-093.06 (Ongoing Cloud Sync) — applies a real pulled remote state
+ * directly, bypassing the Sync Queue entirely. Never called for a local
+ * edit — only by `lib/hooks/useCloudSyncActivation.ts`, after
+ * `performPull()` has already confirmed no unsynced local change
+ * conflicts with it. Deliberately does not enqueue anything: re-queuing
+ * what was just pulled would create a real push/pull loop, syncing the
+ * server's own state back to itself forever.
+ *
+ * Bug 3 (Authentication Flow) — also normalizes `isGuest` to `false`. This
+ * function is only ever called from `useCloudSyncActivation()`'s
+ * `status === "authenticated"` branch (see that file), so receiving any
+ * remote account fields at all already proves a real, server-verified
+ * session exists — there is no call path where this runs for a guest.
+ * Previously this field was left untouched, so a genuinely authenticated
+ * account (confirmed live via `/api/auth/session` reporting `isGuest:
+ * false`) still showed "Guest account" everywhere `useAccount().account.
+ * isGuest` is read (`AccountMenu`, `ProfilePage`'s Hero, etc.) — a real
+ * client/server auth-state mismatch, not a cosmetic label bug.
+ */
+export function applyRemoteAccountFields(patch: Pick<Account, "name" | "username" | "email" | "avatar" | "bio">): void {
+  persist({ ...cached, ...patch, isGuest: false, updatedAt: new Date().toISOString() });
 }
 
 /**

@@ -5,12 +5,26 @@
  * calls `activeBackend()` yet; this is architecture only, a seam for a
  * future PR to route the Connector Layer (or a future real connector)
  * through instead of talking to Account/Sync/localStorage directly.
+ *
+ * Release 1 Phase C registers `sqliteBackend` (real, SQLite-backed
+ * Storage/Health) alongside `localBackend` — registered, not activated:
+ * `localBackend` stays the default, unchanged. Activating a real backend
+ * is a Phase D+ decision, made once real authentication exists to scope
+ * data to. `sqliteBackend` pulls in `node:sqlite`, a server-only native
+ * module — this file must never be imported from client code as a
+ * result; nothing does today (confirmed zero consumers of `lib/backend/`
+ * anywhere in the app), and a bundler would fail loudly if that changed,
+ * rather than silently shipping a broken client bundle.
  */
 
 import { localBackend } from "@/lib/backend/local";
+import { sqliteBackend } from "@/lib/backend/sqlite";
 import type { Backend } from "@/lib/backend/types";
 
-const backends = new Map<string, Backend>([[localBackend.id, localBackend]]);
+const backends = new Map<string, Backend>([
+  [localBackend.id, localBackend],
+  [sqliteBackend.id, sqliteBackend],
+]);
 let activeId: string = localBackend.id;
 
 export function register(backend: Backend): void {

@@ -25,6 +25,9 @@ export type BriefOpportunity = BriefProjectRef & {
   timestamp: string;
 };
 
+/** PR-085.02 — the `decline`/`security-risk` counterpart to `BriefOpportunity`. Same shape (a risk is scored/reasoned/narrated exactly like an opportunity, just selected from the opposite set of narratives — see `sections.ts`'s `RISK_NARRATIVES`), kept as its own named type rather than reusing `BriefOpportunity` directly so call sites read "this is a risk," not "this is an opportunity, coincidentally shaped the same." */
+export type BriefRisk = BriefOpportunity;
+
 /** Shared shape for the Security/Governance/Development/TVL section entries — one real `IntelligenceAlert`, reduced to what a Brief reader needs. */
 export type BriefHighlight = BriefProjectRef & {
   headline: string;
@@ -48,6 +51,8 @@ export type DailyBrief = {
   /** Presentation-ready bullet lines (see `sections.ts`'s `buildMarketSummarySection`) — the same real stats as `narrativeCounts`/`averageConfidence` below, formatted as prose. */
   marketSummary: string[];
   topOpportunities: BriefOpportunity[];
+  /** PR-090.02 — `buildTopRisks()` (PR-085.02) already existed but was never wired into the top-level `DailyBrief` output; this closes that gap so any consumer of the Brief (not just `EcosystemRisksWidget`, which calls the builder directly) can see the same real `decline`/`security-risk` findings. */
+  topRisks: BriefRisk[];
   securityHighlights: BriefHighlight[];
   governanceHighlights: BriefHighlight[];
   developmentHighlights: BriefHighlight[];

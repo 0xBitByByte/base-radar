@@ -92,7 +92,7 @@ const DOCS_URL = `${SITE.social.github}/tree/main/docs`;
 export const NAV_LINKS: NavLink[] = [
   { label: "Features", href: "#features" },
   { label: "Dashboard", href: "/dashboard" },
-  { label: "Roadmap", href: "#roadmap" },
+  { label: "How It Works", href: "#how-it-works" },
   { label: "Docs", href: DOCS_URL, external: true },
   { label: "GitHub", href: SITE.social.github, external: true },
 ];
@@ -111,7 +111,7 @@ export const FOOTER_LINK_GROUPS: FooterLinkGroup[] = [
       { label: "Projects", href: "/dashboard/projects" },
       { label: "AI Intelligence", href: "/dashboard/alerts" },
       { label: "Watchlists", href: "/dashboard/watchlists" },
-      { label: "Roadmap", href: "#roadmap" },
+      { label: "How It Works", href: "#how-it-works" },
     ],
   },
   {
@@ -134,39 +134,68 @@ export const FOOTER_LINK_GROUPS: FooterLinkGroup[] = [
 
 export const TRUST_INDICATORS: string[] = ["Free", "Open Source", "Built for Base"];
 
-/** `format` selects which of `lib/data/format.ts`'s shared `*Parts` formatters (the same ones `KPIRow` uses) renders `value` — the Hero preview's stat grid is a real `AnimatedNumber`/`KpiValueDisplay` consumer, not a lookalike with pre-formatted strings. */
-export type DashboardStat = {
+/** The two CTA pairs Hero and the Final CTA both render byte-identically — one shared source so the two never drift if edited independently later. Navbar's own persistent "Launch App" button is intentionally separate (a terser, always-visible affordance) and does not read from here. */
+export const LANDING_CTAS = {
+  primary: { label: "Explore Base Radar", href: "/dashboard" },
+  secondary: { label: "Explore Projects", href: "/dashboard/projects" },
+} as const;
+
+/**
+ * Presentational fixture data for the Hero/Product Proof dashboard preview —
+ * shaped after the real Dashboard's Executive Summary strip
+ * (`components/dashboard/ExecutiveSummaryStrip.tsx`) and AI Command Center
+ * (`components/dashboard/TodaysTopInsight.tsx`), never a live query. `format`
+ * selects which of `lib/data/format.ts`'s shared `*Parts` formatters (the
+ * same ones `KPIRow` uses) renders `value` — the preview's stat row is a
+ * real `AnimatedNumber`/`KpiValueDisplay` consumer, not a lookalike with
+ * pre-formatted strings.
+ */
+export type PreviewStat = {
   label: string;
   value: number;
-  format: "gwei" | "compactCurrency" | "compactNumber";
+  format: "compactCurrency" | "compactNumber";
   delta?: string;
   trend?: "up" | "down";
 };
 
-export const DASHBOARD_STATS: DashboardStat[] = [
-  { label: "Gas", value: 0.014, format: "gwei", delta: "+6%", trend: "up" },
-  { label: "Active Projects", value: 2314, format: "compactNumber", delta: "+42", trend: "up" },
-  { label: "TVL", value: 3_680_000_000, format: "compactCurrency", delta: "+3.4%", trend: "up" },
+export const PREVIEW_STATS: PreviewStat[] = [
+  { label: "Projects Tracked", value: 759, format: "compactNumber", delta: "+18", trend: "up" },
+  { label: "Ecosystem TVL", value: 5_470_000_000, format: "compactCurrency", delta: "+3.4%", trend: "up" },
   { label: "24H Volume", value: 486_000_000, format: "compactCurrency", delta: "+9.2%", trend: "up" },
 ];
 
-export type DashboardHighlight = {
+/** Mirrors `lib/dashboard/executiveSummary.ts`'s real `computeMarketSentiment()` output shape (a Bullish/Neutral/Bearish label plus a real "N of M categories trending" justification) — illustrative values, same shape as the real feature. */
+export const PREVIEW_MARKET_SENTIMENT = {
+  label: "Bullish" as const,
+  justification: "3 of 5 tracked categories trending up",
+};
+
+/** Mirrors Executive Summary's real Ecosystem Health line (a verified/tracked ratio) — rendered as static text, not `AnimatedNumber` (no percent formatter exists in `lib/data/format.ts`, and a slow count-up reads oddly for a ratio like this anyway). */
+export const PREVIEW_ECOSYSTEM_HEALTH = {
+  percent: 42,
+  detail: "of tracked projects verified",
+};
+
+/**
+ * Illustrative AI Command Center cards — same real category vocabulary as
+ * `lib/dashboard/commandCenter.ts`'s `RECOMMENDATION_CATEGORY_LABEL` (TVL,
+ * Whale Activity, Governance, Security, Developer Activity, Market
+ * Momentum), never the live `Recommendation[]` itself (that requires a real
+ * signed-in session's Watchlist data, which a static marketing page never
+ * has) — clearly presentational, not a fabricated live feed.
+ */
+export type PreviewOpportunity = {
   label: string;
   value: string;
-  icon: "trending" | "whale" | "hot" | "signal";
+  icon: "tvl" | "whale" | "governance" | "security" | "dev" | "momentum";
   tone: "primary" | "accent" | "success" | "warning";
 };
 
-export const DASHBOARD_HIGHLIGHTS: DashboardHighlight[] = [
-  { label: "Trending Narrative", value: "AI Agents", icon: "trending", tone: "primary" },
-  { label: "Whale Activity", value: "24 buys · 1h", icon: "whale", tone: "warning" },
-  { label: "Hot AI Project", value: "NeuroBase AI", icon: "hot", tone: "accent" },
-  {
-    label: "Latest Alpha Signal",
-    value: "LP inflow surge · BASE/ETH",
-    icon: "signal",
-    tone: "success",
-  },
+export const PREVIEW_TOP_OPPORTUNITIES: PreviewOpportunity[] = [
+  { label: "TVL", value: "Aerodrome Finance +4.2%", icon: "tvl", tone: "success" },
+  { label: "Whale Activity", value: "$2.1M inflow · 12m ago", icon: "whale", tone: "warning" },
+  { label: "Governance", value: "Proposal passed · Moonwell", icon: "governance", tone: "primary" },
+  { label: "Security", value: "Contract verified · 1h ago", icon: "security", tone: "accent" },
 ];
 
 /** Landing page "Live Intelligence Ticker" (PR9.3, replaces the old static Key Metrics grid) — same `*Parts` formatter pipeline as `DashboardStat` above, routed through the identical `AnimatedNumber`/KPI rendering `KPIRow` uses on the real dashboard. */

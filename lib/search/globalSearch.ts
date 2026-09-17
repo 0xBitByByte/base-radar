@@ -168,23 +168,103 @@ function metadataToText(metadata: Record<string, unknown>): string {
     .toLowerCase();
 }
 
-/** Simple weighted substring scoring — title match ranks highest, then keyword match, then description/group/metadata. No fuzzy-match library, per the PR brief. Identical formula regardless of `item.type`, so a Command has no inherent advantage over a Project/Notification/etc. — "best match wins," not "commands first." */
+/**
+ * PR-094.03 — Levenshtein edit distance, the standard, dependency-free way
+ * to measure "how many single-character insert/delete/substitute edits
+ * turn `a` into `b`." Plain iterative DP (two rolling rows, not a full
+ * matrix) — both inputs here are always short (a search query and a
+ * title/keyword), so this is cheap even run per-item per-keystroke, and
+ * needs no library.
+ */
+function levenshteinDistance(a: string, b: string): number {
+  if (a === b) return 0;
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+
+  let previousRow = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 0; i < a.length; i++) {
+    const currentRow = [i + 1];
+    for (let j = 0; j < b.length; j++) {
+      const insertCost = currentRow[j] + 1;
+      const deleteCost = previousRow[j + 1] + 1;
+      const substituteCost = previousRow[j] + (a[i] === b[j] ? 0 : 1);
+      currentRow.push(Math.min(insertCost, deleteCost, substituteCost));
+    }
+    previousRow = currentRow;
+  }
+  return previousRow[b.length];
+}
+
+/** 1 = identical, 0 = completely different, scaled by the longer string's length so a one-letter typo on a short word costs more than the same one-letter typo on a long word (matching how noticeable each actually is). */
+function similarity(a: string, b: string): number {
+  const maxLen = Math.max(a.length, b.length);
+  if (maxLen === 0) return 1;
+  return 1 - levenshteinDistance(a, b) / maxLen;
+}
+
+function bestSimilarity(candidates: string[], query: string): number {
+  let best = 0;
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    best = Math.max(best, similarity(candidate, query));
+  }
+  return best;
+}
+
+/**
+ * PR-094.03 — below this length, fuzzy matching is skipped entirely: a
+ * 1-2 character query is already handled fine by the exact/prefix/
+ * substring tiers above, and edit-distance similarity on that few
+ * characters is too noisy to mean anything (almost everything is "close"
+ * to a 1-2 character string).
+ */
+const MIN_FUZZY_QUERY_LENGTH = 3;
+/** A typo has to land noticeably closer to a real word than to a random one — see this file's own scoring notes for the empirical spread behind this number (real typos land ~0.65-0.92 similarity; unrelated words land ~0.12-0.5). */
+const FUZZY_SIMILARITY_THRESHOLD = 0.6;
+/** Deliberately just under the real substring-match tiers (60 for title, 50 for keyword) they sit below, so a genuine typo can rescue an otherwise-zero score but can never outrank or tie a real substring/prefix/exact match of the same field. */
+const FUZZY_TITLE_SCORE_CEILING = 55;
+const FUZZY_KEYWORD_SCORE_CEILING = 45;
+
+/** Simple weighted substring scoring — title match ranks highest, then keyword match, then description/group/metadata — plus a typo-tolerant fuzzy fallback (PR-094.03) on title/keywords only. Identical formula regardless of `item.type`, so a Command has no inherent advantage over a Project/Notification/etc. — "best match wins," not "commands first." */
 function scoreItem(item: SearchableItem, query: string): number {
   const title = normalize(item.title);
   const description = normalize(item.description);
   const group = normalize(item.group);
+  const keywords = item.keywords.map(normalize);
 
   let score = 0;
   if (title === query) score = Math.max(score, 100);
   else if (title.startsWith(query)) score = Math.max(score, 80);
   else if (title.includes(query)) score = Math.max(score, 60);
 
-  if (item.keywords.some((keyword) => normalize(keyword) === query)) score = Math.max(score, 90);
-  else if (item.keywords.some((keyword) => normalize(keyword).includes(query))) score = Math.max(score, 50);
+  if (keywords.some((keyword) => keyword === query)) score = Math.max(score, 90);
+  else if (keywords.some((keyword) => keyword.includes(query))) score = Math.max(score, 50);
 
   if (description.includes(query)) score = Math.max(score, 30);
   if (group.includes(query)) score = Math.max(score, 20);
   if (metadataToText(item.metadata).includes(query)) score = Math.max(score, 15);
+
+  // PR-094.03 — fuzzy/typo tolerance. Only ever a fallback: it can rescue
+  // a query that scored below its own ceiling on that field (most often
+  // 0, i.e. no exact/prefix/substring hit at all), never lower an
+  // already-stronger score, and never run at all on description/group/
+  // metadata (free-text fields where "close edit distance" stops meaning
+  // "the same word" and starts meaning noise).
+  if (query.length >= MIN_FUZZY_QUERY_LENGTH) {
+    if (score < FUZZY_TITLE_SCORE_CEILING) {
+      const titleWords = title.split(/\s+/).filter(Boolean);
+      const titleSimilarity = bestSimilarity([title, ...titleWords], query);
+      if (titleSimilarity >= FUZZY_SIMILARITY_THRESHOLD) {
+        score = Math.max(score, Math.round(titleSimilarity * FUZZY_TITLE_SCORE_CEILING));
+      }
+    }
+    if (score < FUZZY_KEYWORD_SCORE_CEILING) {
+      const keywordSimilarity = bestSimilarity(keywords, query);
+      if (keywordSimilarity >= FUZZY_SIMILARITY_THRESHOLD) {
+        score = Math.max(score, Math.round(keywordSimilarity * FUZZY_KEYWORD_SCORE_CEILING));
+      }
+    }
+  }
 
   return score;
 }

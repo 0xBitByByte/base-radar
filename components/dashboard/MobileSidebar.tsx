@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { SidebarNav } from "@/components/dashboard/Sidebar";
+import { GLASS_MODAL_SCRIM } from "@/components/ui/glassStyles";
 
 type MobileSidebarProps = {
   open: boolean;
@@ -17,7 +18,8 @@ export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
       <Dialog.Portal>
         <Dialog.Backdrop
           className={cn(
-            "fixed inset-0 z-40 bg-radar-bg/40 backdrop-blur-sm lg:hidden dark:bg-black/60",
+            GLASS_MODAL_SCRIM,
+            "lg:hidden",
             "transition-opacity duration-300 motion-reduce:transition-none",
             "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0"
           )}

@@ -7,6 +7,7 @@ import { NotificationBadge } from "@/components/notifications/NotificationBadge"
 import { NotificationMetric } from "@/components/notifications/NotificationMetric";
 import { TimelineEventBadge } from "@/components/timeline/TimelineEventBadge";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
+import { WatchlistEmptyNotice } from "@/components/dashboard/WatchlistEmptyNotice";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { RelativeTime } from "@/components/shared/RelativeTime";
 import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
@@ -36,11 +37,7 @@ export function NotificationWidget() {
       lastUpdated={latest?.timestamp}
     >
       {activeWatchlist && activeWatchlist.projectIds.length === 0 ? (
-        <EmptyState
-          icon={Bell}
-          title="No notifications yet."
-          description="Add projects to your Watchlist to receive intelligent alerts about the activity that matters to you."
-        />
+        <WatchlistEmptyNotice icon={Bell} label="Intelligent alerts about what matters to you appear here" />
       ) : !hasNotifications ? (
         <EmptyState
           icon={Bell}

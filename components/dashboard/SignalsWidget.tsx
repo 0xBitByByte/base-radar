@@ -41,6 +41,7 @@ export function SignalsWidget({ data, lastUpdated }: SignalsWidgetProps) {
       accent="orange"
       source={data.source}
       lastUpdated={lastUpdated}
+      className="gap-3 p-4 sm:p-5"
     >
       {data.length === 0 ? (
         <EmptyState
@@ -49,9 +50,9 @@ export function SignalsWidget({ data, lastUpdated }: SignalsWidgetProps) {
           description="Buy, watch and momentum alerts will appear here as they fire."
         />
       ) : (
-        <div className="flex flex-col gap-3.5">
+        <div className="flex flex-col gap-2.5">
           {data.map((signal) => (
-            <div key={signal.id} className="flex flex-col gap-1.5">
+            <div key={signal.id} className="flex flex-col gap-1">
               <div className="flex items-center justify-between gap-2 text-xs">
                 <span className="font-semibold text-radar-light-text dark:text-radar-white">
                   {signal.project}

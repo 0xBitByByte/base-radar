@@ -1,6 +1,10 @@
+"use client";
+
+import { useState } from "react";
 import {
   AlertTriangle,
   ArrowRightLeft,
+  ChevronDown,
   Compass,
   Fish,
   GitCommit,
@@ -16,6 +20,7 @@ import {
 import { QuickViewSectionLabel } from "@/components/explorer/QuickViewSectionLabel";
 import { RelativeTime } from "@/components/shared/RelativeTime";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { cn } from "@/lib/utils";
 import type { TimelineEvent, TimelineEventKind } from "@/lib/intelligence/timeline";
 
 type ProfileTimelineProps = {
@@ -26,7 +31,13 @@ const DATE_GROUP_KEYS = ["today", "yesterday", "earlier"] as const;
 type DateGroupKey = (typeof DATE_GROUP_KEYS)[number];
 const DATE_GROUP_LABEL: Record<DateGroupKey, string> = { today: "Today", yesterday: "Yesterday", earlier: "Earlier" };
 
-const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
+// PR-085.xx executive usability pass — narrowed from 90 to 15 days: every
+// event beyond that stays real, undropped data (still fully reachable via
+// "Show Earlier Events" below), only the *default* view narrows to what an
+// executive actually needs to scan first. No API/data change — this only
+// moves where the client-side split falls on the exact same, already-real
+// `events` array `buildProjectTimeline()` already produced.
+const RECENT_WINDOW_MS = 15 * 24 * 60 * 60 * 1000;
 
 /** PR-083 — the 5 real `TimelineEventKind`s this activity summary strip counts; every other kind (`whale`, `signal`, `tvl-change`, `registry-update`, `discovery`) isn't part of this summary but stays fully visible in the timeline rows below. */
 const ACTIVITY_SUMMARY_KINDS: { label: string; kind: TimelineEventKind }[] = [
@@ -37,9 +48,9 @@ const ACTIVITY_SUMMARY_KINDS: { label: string; kind: TimelineEventKind }[] = [
   { label: "Commits", kind: "commit-activity" },
 ];
 
-/** PR-082 — splits the (already newest-first) event list at the 90-day mark, so the default view only ever shows recent activity; anything older is real data, just tucked behind the "Show more" disclosure below rather than dropped. */
+/** PR-082, narrowed by PR-085.xx to 15 days — splits the (already newest-first) event list at the recency cutoff, so the default view only ever shows the most immediately relevant activity; anything older is real data, just tucked behind the "Show Earlier Events" disclosure below rather than dropped. */
 function splitByRecency(events: TimelineEvent[]): { recent: TimelineEvent[]; older: TimelineEvent[] } {
-  const cutoff = Date.now() - NINETY_DAYS_MS;
+  const cutoff = Date.now() - RECENT_WINDOW_MS;
   const recent: TimelineEvent[] = [];
   const older: TimelineEvent[] = [];
   for (const event of events) {
@@ -131,8 +142,15 @@ function TimelineEventRow({ event }: { event: TimelineEvent }) {
   const Icon = KIND_ICON[event.kind];
   const detailSuffix = event.detail ? ` — ${event.detail}` : "";
   return (
+    // PR-086 — "Timeline Cards" named in this pass's shared motion-language
+    // requirement, but deliberately a lighter touch than the lift+shadow
+    // treatment `PairCard`/`ScorecardCardView`/Trust tiles use: this is a
+    // dense, repeated ticker row (see this file's own PR-074 doc comment on
+    // why it was compacted to one line), and a full lift on every row in a
+    // long list would read as visual noise, not "subtle." Same color/
+    // duration language, scaled to a border+background brighten only.
     <li
-      className="flex items-center gap-2 rounded-lg border border-radar-light-border bg-radar-light-surface px-2.5 py-1.5 dark:border-white/10 dark:bg-white/[0.02]"
+      className="flex items-center gap-2 rounded-lg border border-radar-light-border bg-radar-light-surface px-2.5 py-1.5 transition-colors duration-300 hover:border-radar-primary/30 hover:bg-radar-light-card dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-radar-border-hover dark:hover:bg-white/[0.04]"
       title={`${event.title}${detailSuffix} · Source: ${KIND_SOURCE[event.kind]}`}
     >
       <span className="flex size-5 shrink-0 items-center justify-center rounded-md bg-radar-primary/10 text-radar-primary dark:text-radar-accent">
@@ -164,6 +182,15 @@ function TimelineEventRow({ event }: { event: TimelineEvent }) {
  * instead of one undifferentiated list.
  */
 export function ProfileTimeline({ events }: ProfileTimelineProps) {
+  // PR-085.xx — "remember expanded state" means for the lifetime of this
+  // page view: this is server-rendered HTML with no backing API for
+  // per-user UI preferences (explicitly out of scope — "no API changes"),
+  // so plain component state is the correct, honest scope. It doesn't
+  // reset while the section streams in or re-renders, which is the only
+  // "remembering" a client component can promise without a new persistence
+  // layer this pass isn't adding.
+  const [expanded, setExpanded] = useState(false);
+
   if (events.length === 0) {
     return (
       <section id="timeline" className="scroll-mt-28 flex flex-col gap-2">
@@ -195,7 +222,7 @@ export function ProfileTimeline({ events }: ProfileTimelineProps) {
       <QuickViewSectionLabel>Timeline</QuickViewSectionLabel>
       {activitySummary.length > 0 && (
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10.5px] text-radar-light-muted dark:text-radar-muted">
-          <span className="font-semibold tracking-wide text-radar-light-muted/80 uppercase dark:text-radar-muted/70">Last 90 Days</span>
+          <span className="font-semibold tracking-wide text-radar-light-muted/80 uppercase dark:text-radar-muted/70">Last 15 Days</span>
           {activitySummary.map((item) => (
             <span key={item.label}>
               <span className="font-semibold tabular-nums text-radar-light-text dark:text-radar-white">{item.count}</span> {item.label}
@@ -220,19 +247,32 @@ export function ProfileTimeline({ events }: ProfileTimelineProps) {
         );
       })}
       {recent.length === 0 && older.length > 0 && (
-        <p className="text-xs text-radar-light-muted dark:text-radar-muted">No activity in the last 90 days.</p>
+        <p className="text-xs text-radar-light-muted dark:text-radar-muted">No activity in the last 15 days.</p>
       )}
       {older.length > 0 && (
-        <details className="group">
-          <summary className="w-fit cursor-pointer list-none text-[10.5px] font-medium text-radar-light-muted underline decoration-dotted underline-offset-2 outline-none select-none hover:text-radar-light-text focus-visible:text-radar-light-text dark:text-radar-muted dark:hover:text-radar-white dark:focus-visible:text-radar-white [&::-webkit-details-marker]:hidden">
-            Show {older.length} earlier event{older.length === 1 ? "" : "s"} (90+ days ago)
-          </summary>
-          <ul className="mt-1.5 flex flex-col gap-1">
-            {older.map((event) => (
-              <TimelineEventRow key={event.id} event={event} />
-            ))}
-          </ul>
-        </details>
+        <div className="flex flex-col gap-1.5">
+          <button
+            type="button"
+            onClick={() => setExpanded((value) => !value)}
+            aria-expanded={expanded}
+            className="flex w-fit items-center gap-1 text-[10.5px] font-medium text-radar-light-muted outline-none transition-colors hover:text-radar-light-text focus-visible:text-radar-light-text dark:text-radar-muted dark:hover:text-radar-white dark:focus-visible:text-radar-white"
+          >
+            <ChevronDown className={cn("size-3 shrink-0 transition-transform duration-200", expanded && "rotate-180")} aria-hidden="true" />
+            {expanded ? "Hide Earlier Events" : `Show Earlier Events (${older.length})`}
+          </button>
+          {/* PR-085.xx — the `grid-rows-[0fr]`/`grid-rows-[1fr]` technique:
+              a real, animatable height transition with no JS-measured
+              pixel value and no fixed `max-height` guess to get wrong for
+              a long history. `overflow-hidden` on the inner wrapper clips
+              the content while its row track is still animating open. */}
+          <div className={cn("grid transition-[grid-template-rows] duration-300 ease-out motion-reduce:transition-none", expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
+            <ul className="flex flex-col gap-1 overflow-hidden">
+              {older.map((event) => (
+                <TimelineEventRow key={event.id} event={event} />
+              ))}
+            </ul>
+          </div>
+        </div>
       )}
     </section>
   );

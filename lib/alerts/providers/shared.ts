@@ -18,3 +18,16 @@ export function isWithinDays(iso: string | null | undefined, days: number): bool
 export function makeAlertId(...parts: string[]): string {
   return parts.join(":");
 }
+
+/**
+ * V3-NOTIFICATION-001 — `dayBucket()`/`startOfTodayIso()` (`@/lib/utils`)
+ * are the stable-id/stable-timestamp anchors this file's own volatile-
+ * metric alert types (`coingecko`/`defillama`/`github`'s price-move/tvl/
+ * activity builders) need — re-exported here for convenience since every
+ * alert provider already imports from this file, but defined in the
+ * generic shared-utils module since `lib/brief/storage.ts`/`lib/portfolio/
+ * storage.ts` independently needed the exact same fix for an unrelated id
+ * scheme (see the V3-NOTIFICATION-001 report) — a feature-neutral concept,
+ * not an alerts-specific one.
+ */
+export { dayBucket, startOfTodayIso } from "@/lib/utils";

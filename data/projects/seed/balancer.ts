@@ -12,7 +12,16 @@ export const balancer: Project = {
   tags: ["cross-chain"],
   status: "live",
   chains: ["base", "ethereum", "arbitrum", "polygon"],
-  contracts: [],
+  // Trading Discovery Strategy audit — re-checked live against CoinGecko's
+  // own `platforms` listing for the `balancer` coin id: it now returns
+  // exactly one Base address, resolving PR-051's earlier "two addresses,
+  // couldn't disambiguate" caution below. Filled in as real data, not a
+  // guess — though pool discovery itself no longer depends on this at all:
+  // Balancer's `categories` include `"dex"` with `dexscreenerDexIds`
+  // configured (see `providerIds` below), so its pools resolve via its
+  // exchange identity, not this token address. Kept for logo resolution
+  // and any other consumer that legitimately wants "Balancer's own token."
+  contracts: [{ chain: "base", address: "0x4158734d47fc9692176b5085e0f52ee0da5d47f1", type: "token", label: "BAL token (Base)" }],
   github: {
     owner: "balancer",
     // PR-051 — resolved to the org's real, pinned, most-starred contracts
@@ -31,10 +40,12 @@ export const balancer: Project = {
   providerIds: {
     coingeckoId: "balancer",
     defillamaSlug: "balancer-v2",
-    // PR-051 — no Base contract address added: CoinGecko's BAL page listed
-    // two distinct Base-chain addresses without a clear "this one is
-    // canonical" label, and this pass couldn't confidently disambiguate
-    // them within audit time. Left empty rather than guessed — a real
-    // remaining gap, not an oversight.
+    // Trading Discovery Strategy — verified live against real DexScreener
+    // pair data for Balancer's own Base token (BAL): every pair returned
+    // real `dexId: "balancer"`. This is what makes Balancer's Pools page
+    // show its real, active Base pools instead of "no pools" — the same
+    // root-cause class of bug Uniswap had (no Base governance token to key
+    // a lookup off of), fixed the same general way, not a one-off patch.
+    dexscreenerDexIds: ["balancer"],
   },
 };

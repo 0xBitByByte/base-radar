@@ -55,7 +55,7 @@ export function KPIRow({ items, lastUpdated }: KPIRowProps) {
                 viewport={{ once: true, margin: "-40px" }}
                 whileHover={{ y: -3 }}
                 transition={{ duration: 0.25, ease: "easeOut", delay: index * 0.03 }}
-                className="flex h-[112px] w-full flex-col gap-1.5 overflow-hidden rounded-2xl border border-radar-light-border bg-radar-light-card/80 p-4 backdrop-blur-xl transition-[border-color,box-shadow] duration-200 hover:border-radar-primary/30 hover:shadow-lg dark:hover:shadow-[0_12px_40px_-12px_rgba(var(--color-radar-primary-rgb),0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:border-white/10 dark:bg-radar-card/60 dark:hover:border-radar-primary/40"
+                className="flex h-[112px] w-full flex-col gap-1.5 overflow-hidden rounded-2xl border border-radar-primary/[0.18] bg-radar-light-card/40 p-4 shadow-[0_8px_28px_-14px_rgba(16,34,58,0.22),inset_0_1px_0_0_rgba(255,255,255,0.6)] backdrop-blur-2xl transition-[border-color,box-shadow] duration-200 hover:border-radar-primary/45 hover:shadow-[0_12px_36px_-12px_rgba(16,34,58,0.28),inset_0_1px_0_0_rgba(255,255,255,0.7)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:border-white/10 dark:bg-radar-card/40 dark:shadow-[0_8px_28px_-14px_rgba(0,0,0,0.5),inset_0_1px_0_0_rgba(255,255,255,0.06)] dark:hover:border-radar-primary/40 dark:hover:shadow-[0_12px_40px_-12px_rgba(var(--color-radar-primary-rgb),0.25),inset_0_1px_0_0_rgba(255,255,255,0.08)]"
               >
                 <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-radar-light-muted dark:text-radar-muted">
                   {kpi.label}

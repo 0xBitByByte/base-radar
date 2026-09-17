@@ -13,6 +13,7 @@ import { RelativeTime } from "@/components/shared/RelativeTime";
 import type { ActivityEvent, ActivityKind, WithSource } from "@/lib/data/types";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { GLASS_TILE_SURFACE } from "@/components/ui/glassStyles";
 
 type ActivityFeedProps = {
   data: WithSource<ActivityEvent[]>;
@@ -55,6 +56,7 @@ export function ActivityFeed({ data, lastUpdated }: ActivityFeedProps) {
       accent="accent"
       source={data.source}
       lastUpdated={lastUpdated}
+      className="gap-3 p-4 sm:p-5"
     >
       {data.length === 0 ? (
         <EmptyState
@@ -63,11 +65,20 @@ export function ActivityFeed({ data, lastUpdated }: ActivityFeedProps) {
           description="Whale transfers, releases, governance, and pool events across Base will appear here as they happen."
         />
       ) : (
-        <ol className="flex flex-col gap-3">
+        <ol className="flex flex-col gap-2">
           {data.slice(0, 6).map((event) => {
             const Icon = KIND_ICON[event.kind];
             return (
-              <li key={event.id} className="flex items-start gap-3">
+              <li
+                key={event.id}
+                className={cn(
+                  // Same tile-scale row treatment `WatchlistWidget.tsx`/
+                  // `AIProjectsWidget.tsx`/`PairCard.tsx` already
+                  // established for this glass system's dense-list rows.
+                  "flex items-start gap-3 p-2 transition-[transform,box-shadow,border-color] duration-300 ease-out hover:-translate-y-0.5 hover:border-radar-primary/40 hover:shadow-[0_8px_24px_-12px_rgba(var(--color-radar-primary-rgb),0.18)] motion-reduce:hover:translate-y-0 dark:hover:border-white/25",
+                  GLASS_TILE_SURFACE
+                )}
+              >
                 <span
                   className={cn(
                     "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg",

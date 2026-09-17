@@ -83,7 +83,24 @@ export function ProjectRail({
       {visible.length === 0 ? (
         <RailEmptyState icon={Icon} title={emptyTitle} description={emptyDescription} />
       ) : (
-        <div className="flex snap-x gap-3 overflow-x-auto pb-1">
+        // PR-085.07 — root-cause fix, not the previous PR's symptom-only
+        // hide. `overflow-y: visible` (PR-085.06's attempt) can't actually
+        // stop vertical scroll capture: per the CSS Overflow spec, a
+        // `visible` value on one axis is *always* computed as `auto`
+        // whenever the other axis is non-`visible` — this container was
+        // therefore a real (if invisibly-scrollbarred) vertical scroll
+        // container the whole time, which is exactly why the mouse wheel
+        // still scrolled it instead of the page. `overflow-y: hidden` is
+        // not subject to that coercion — it's the one value that actually,
+        // definitively removes vertical scroll capacity (confirmed live:
+        // no vertical `scrollTop` movement on wheel, page scrolls instead),
+        // while `overflow-x: auto` keeps horizontal scrolling exactly as
+        // it was. Scrollbar-hiding is now scoped directly here via
+        // Tailwind arbitrary properties (this file's own established
+        // convention, e.g. `LiveProjectCard.tsx`'s `transition-[...]`) —
+        // `app/globals.css` no longer carries a global `.scrollbar-none`
+        // utility for this one consumer.
+        <div className="[scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden flex snap-x gap-3 overflow-x-auto overflow-y-hidden pb-1">
           {visible.map((project) => (
             <div key={project.id} className="w-[236px] shrink-0 snap-start">
               <LiveProjectCard project={project} variant="compact" />

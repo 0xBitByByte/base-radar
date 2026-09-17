@@ -9,12 +9,15 @@ import { compound } from "./compound";
 import { curveFinance } from "./curve-finance";
 import { extraFinance } from "./extra-finance";
 import { farcaster } from "./farcaster";
+import { hydrex } from "./hydrex";
 import { layerZero } from "./layerzero";
 import { moonwell } from "./moonwell";
 import { morpho } from "./morpho";
+import { oku } from "./oku";
 import { pythNetwork } from "./pyth-network";
 import { safe } from "./safe";
 import { seamlessProtocol } from "./seamless-protocol";
+import { spark } from "./spark";
 import { uniswap } from "./uniswap";
 import { usdCoin } from "./usd-coin";
 import { virtualsProtocol } from "./virtuals-protocol";
@@ -41,4 +44,8 @@ export const SEED_PROJECTS: Project[] = [
   acrossProtocol,
   pythNetwork,
   usdCoin,
+  // PR-098.01 — Featured Ecosystem Provider Mapping Audit
+  hydrex,
+  spark,
+  oku,
 ];

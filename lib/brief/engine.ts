@@ -25,6 +25,7 @@ import {
   buildRecommendations,
   buildSecurityHighlights,
   buildTopOpportunities,
+  buildTopRisks,
   buildTvlHighlights,
   computeMarketStats,
 } from "@/lib/brief/sections";
@@ -35,6 +36,7 @@ import type { IntelligenceAlert } from "@/lib/alerts/intelligence/types";
 export function buildDailyBrief(alerts: IntelligenceAlert[], generatedAt: string): DailyBrief {
   const stats = computeMarketStats(alerts);
   const topOpportunities = buildTopOpportunities(alerts);
+  const topRisks = buildTopRisks(alerts);
   const securityHighlights = buildSecurityHighlights(alerts);
   const governanceHighlights = buildGovernanceHighlights(alerts);
   const developmentHighlights = buildDevelopmentHighlights(alerts);
@@ -44,12 +46,24 @@ export function buildDailyBrief(alerts: IntelligenceAlert[], generatedAt: string
   const recommendations = buildRecommendations(stats, securityHighlights, governanceHighlights);
 
   return {
-    id: `brief:${generatedAt}`,
+    // V3-NOTIFICATION-001 — day-truncated, not the full `generatedAt`
+    // timestamp: `storage.ts` calls this with a fresh `new Date()` on every
+    // rebuild (once per browser refresh, since its module-scope cache
+    // resets), so a full-precision id changed on every single reload —
+    // this is `buildDailyBrief`'s only real-world identity, and every
+    // downstream id that derives from it (`lib/timeline/sections.ts`'s
+    // `timeline:daily-brief:${dailyBrief.id}`, and transitively
+    // `lib/notifications/storage.ts`'s read-state overlay) inherited that
+    // instability. Still fully deterministic given `generatedAt` — this
+    // function's own contract — just coarser. `generatedAt` itself is
+    // untouched, so "Generated X ago" displays stay honest.
+    id: `brief:${generatedAt.slice(0, 10)}`,
     generatedAt,
     headline: buildBriefHeadline(),
     summary: buildBriefSummary(stats, topOpportunities),
     marketSummary,
     topOpportunities,
+    topRisks,
     securityHighlights,
     governanceHighlights,
     developmentHighlights,

@@ -39,6 +39,13 @@ export type ContractsQueryState = {
   sortOrder: SortOrder;
   /** `true` when the URL itself named a sort — lets the page keep the category's own natural (registry) order otherwise. */
   sortExplicit: boolean;
+  /**
+   * PR-097.01 (Performance — C1) — 1-indexed, mirroring the Whale
+   * Explorer's own `WhaleQueryState.page` (`lib/whale/queryState.ts`),
+   * itself mirroring `ProjectsQueryState.page`. Bounds the per-render
+   * contract count the same way.
+   */
+  page: number;
 };
 
 export const DEFAULT_CONTRACTS_QUERY_STATE: ContractsQueryState = {
@@ -48,7 +55,11 @@ export const DEFAULT_CONTRACTS_QUERY_STATE: ContractsQueryState = {
   sortField: "type",
   sortOrder: "asc",
   sortExplicit: false,
+  page: 1,
 };
+
+/** Query params whose change should reset `page` back to 1 — anything that changes what set of contracts is being paginated through. Mirrors `lib/whale/queryState.ts`'s `PAGE_RESETTING_KEYS` exactly. */
+const PAGE_RESETTING_KEYS: (keyof ContractsQueryState)[] = ["category", "search", "chain", "sortField", "sortOrder"];
 
 function parseChainList(value: string | string[] | undefined): string[] {
   const raw = first(value);
@@ -70,6 +81,9 @@ export function parseContractsQueryState(searchParams: RawSearchParams): Contrac
   const sortField = sortExplicit ? (rawSortField as ContractSortField) : DEFAULT_CONTRACTS_QUERY_STATE.sortField;
   const sortOrder = rawSortOrder === "asc" || rawSortOrder === "desc" ? rawSortOrder : DEFAULT_CONTRACTS_QUERY_STATE.sortOrder;
 
+  const rawPage = Number(first(searchParams.page));
+  const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : DEFAULT_CONTRACTS_QUERY_STATE.page;
+
   return {
     category,
     search: (first(searchParams.search) ?? "").trim(),
@@ -77,16 +91,25 @@ export function parseContractsQueryState(searchParams: RawSearchParams): Contrac
     sortField,
     sortOrder,
     sortExplicit,
+    page,
   };
 }
 
 /**
  * Builds the query string for `state` merged with `overrides` — the single
  * function every control on the Contract Explorer uses to navigate. Returns
- * a `?`-prefixed string, or `""` when every value is default.
+ * a `?`-prefixed string, or `""` when every value is default. Any real
+ * change to what's being paginated through (category/search/chain/sort)
+ * resets `page` back to 1, unless the caller explicitly overrides `page`
+ * itself.
  */
 export function buildContractsQuery(state: ContractsQueryState, overrides: Partial<ContractsQueryState> = {}): string {
   const next: ContractsQueryState = { ...state, ...overrides };
+
+  const scopeChanged = PAGE_RESETTING_KEYS.some((key) => overrides[key] !== undefined && overrides[key] !== state[key]);
+  if (scopeChanged && overrides.page === undefined) {
+    next.page = 1;
+  }
 
   const params = new URLSearchParams();
   if (next.category !== DEFAULT_CONTRACTS_QUERY_STATE.category) params.set("category", next.category);
@@ -96,6 +119,7 @@ export function buildContractsQuery(state: ContractsQueryState, overrides: Parti
     params.set("sortField", next.sortField);
     params.set("sortOrder", next.sortOrder);
   }
+  if (next.page > 1) params.set("page", String(next.page));
 
   const query = params.toString();
   return query ? `?${query}` : "";

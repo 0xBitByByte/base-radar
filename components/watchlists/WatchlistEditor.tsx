@@ -9,13 +9,17 @@ import { getProject } from "@/data/projects/helpers";
 import { useGlobalSearch } from "@/lib/hooks/useGlobalSearch";
 import { WATCHLIST_COLORS, WATCHLIST_ICONS } from "@/lib/personalization/types";
 import type { PersonalWatchlist, WatchlistColorKey, WatchlistIconKey } from "@/lib/personalization/types";
+import type { LiveProject } from "@/lib/projects/types";
 import { WATCHLIST_COLOR_CLASSES, WATCHLIST_ICON_COMPONENTS, WATCHLIST_ICON_LABELS } from "@/components/watchlists/meta";
+import { LiveProjectCard } from "@/components/projects/LiveProjectCard";
 
 type WatchlistEditorProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** `null` = create mode (name/description/icon/color only). A real watchlist = edit mode, which also shows project management — a brand-new watchlist has no id yet to attach projects to, so that section only appears once it exists. */
   watchlist: PersonalWatchlist | null;
+  /** PR-4 — the same lookup `WatchlistsWorkspace` builds once from its `getLiveProjects()`-sourced prop; never re-fetched or re-derived here. */
+  liveProjectById: Map<string, LiveProject>;
   onCreate: (input: { name: string; description: string; icon: WatchlistIconKey; color: WatchlistColorKey }) => void;
   onUpdate: (id: string, patch: { name: string; description: string; icon: WatchlistIconKey; color: WatchlistColorKey }) => void;
   onAddProject: (watchlistId: string, projectId: string) => void;
@@ -75,6 +79,7 @@ export function WatchlistEditor(props: WatchlistEditorProps) {
 function WatchlistEditorForm({
   onOpenChange,
   watchlist,
+  liveProjectById,
   onCreate,
   onUpdate,
   onAddProject,
@@ -208,17 +213,24 @@ function WatchlistEditorForm({
             {watchlist.projectIds.length > 0 && (
               <ul className="flex flex-col gap-1">
                 {watchlist.projectIds.map((projectId) => {
+                  // PR-4 — same `LiveProject`-first, honest-fallback pattern as `WatchlistsWorkspace`'s row rendering.
+                  const liveProject = liveProjectById.get(projectId);
                   const project = getProject(projectId);
+                  const displayName = liveProject?.identity.name ?? project?.name ?? projectId;
                   return (
                     <li
                       key={projectId}
                       className="flex items-center justify-between gap-2 rounded-lg bg-radar-light-surface px-2.5 py-1.5 text-sm dark:bg-white/5"
                     >
-                      <span className="truncate text-radar-light-text dark:text-radar-white">{project?.name ?? projectId}</span>
+                      {liveProject ? (
+                        <LiveProjectCard project={liveProject} variant="micro" className="min-w-0 flex-1 !p-0 hover:bg-transparent dark:hover:bg-transparent" />
+                      ) : (
+                        <span className="truncate text-radar-light-text dark:text-radar-white">{displayName}</span>
+                      )}
                       <button
                         type="button"
                         onClick={() => onRemoveProject(watchlist.id, projectId)}
-                        aria-label={`Remove ${project?.name ?? projectId} from ${watchlist.name}`}
+                        aria-label={`Remove ${displayName} from ${watchlist.name}`}
                         className="flex size-6 shrink-0 items-center justify-center rounded-md text-radar-light-muted outline-none transition-colors hover:bg-radar-light-card focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:text-radar-muted dark:hover:bg-white/10"
                       >
                         <X className="size-3.5" aria-hidden="true" />

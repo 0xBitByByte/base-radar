@@ -11,12 +11,25 @@
 
 import { NARRATIVE_TYPES } from "@/lib/alerts/intelligence/types";
 import type { IntelligenceAlert, NarrativeType } from "@/lib/alerts/intelligence/types";
-import type { BriefHighlight, BriefNarrativeTrend, BriefOpportunity } from "@/lib/brief/types";
+import type { BriefHighlight, BriefNarrativeTrend, BriefOpportunity, BriefRisk } from "@/lib/brief/types";
 
 const TOP_OPPORTUNITY_COUNT = 3;
+const TOP_RISK_COUNT = 3;
 const HIGHLIGHT_COUNT = 5;
 /** Narratives read as a real, positive "opportunity" — deliberately excludes `governance-active`/`stable` (procedural/neutral) and `decline`/`security-risk` (not opportunities). */
 const OPPORTUNITY_NARRATIVES: NarrativeType[] = ["growth", "accumulation", "development-active"];
+/**
+ * PR-085.02 — the `decline`/`security-risk` counterpart to
+ * `OPPORTUNITY_NARRATIVES`, closing a real gap: no "Risks" section existed
+ * anywhere in this pipeline before this, at any scope. Covers the spec's
+ * "Declining Confidence"/"Liquidity deterioration" (→ `decline`, the
+ * engine's real negative-momentum narrative) and "Contract concerns" (→
+ * `security-risk`). "Governance inactivity" and "Whale sell pressure" have
+ * no corresponding `NarrativeType` anywhere in this codebase today —
+ * honestly omitted rather than invented, the same discipline every other
+ * builder in this file already follows.
+ */
+const RISK_NARRATIVES: NarrativeType[] = ["decline", "security-risk"];
 
 function emptyNarrativeCounts(): Record<NarrativeType, number> {
   return Object.fromEntries(NARRATIVE_TYPES.map((narrative) => [narrative, 0])) as Record<NarrativeType, number>;
@@ -102,12 +115,56 @@ export function buildMarketSummarySection(stats: MarketStats): string[] {
   return lines;
 }
 
+/**
+ * UX Polish, Phase 3/Command Center — the single highest-scored alert
+ * across *every* narrative (not filtered to
+ * `OPPORTUNITY_NARRATIVES`/`RISK_NARRATIVES` the way
+ * `buildTopOpportunities`/`buildTopRisks` below are), for a dashboard
+ * surface that answers "what's the one thing worth knowing today" honestly
+ * — which some days is a risk, not an opportunity. Same sort as those two,
+ * generalized to rank 1 of the whole set instead of top-3-within-a-
+ * narrative-subset. Returns the real `IntelligenceAlert` itself (not
+ * reduced to `BriefOpportunity`, unlike the two builders below) — the
+ * Command Center surface needs `signals`/`reasoning`/`nextStep` too, which
+ * `BriefOpportunity` doesn't carry and doesn't need to for its own
+ * top-3-list consumers. `null` when there are no alerts at all, never a
+ * fabricated placeholder.
+ */
+export function buildTopInsight(alerts: IntelligenceAlert[]): IntelligenceAlert | null {
+  return alerts.slice().sort(byScoreDescending)[0] ?? null;
+}
+
 /** Highest-scored projects among the real "opportunity" narratives, capped at `TOP_OPPORTUNITY_COUNT`. */
 export function buildTopOpportunities(alerts: IntelligenceAlert[]): BriefOpportunity[] {
   return alerts
     .filter((alert) => OPPORTUNITY_NARRATIVES.includes(alert.narrative))
     .sort(byScoreDescending)
     .slice(0, TOP_OPPORTUNITY_COUNT)
+    .map((alert) => ({
+      projectId: alert.projectId,
+      projectName: alert.projectName,
+      headline: alert.headline,
+      reason: alert.summary,
+      score: alert.score,
+      confidence: alert.confidence,
+      narrative: alert.narrative,
+      timestamp: alert.timestamp,
+    }));
+}
+
+/**
+ * PR-085.02 — the `decline`/`security-risk` counterpart to
+ * `buildTopOpportunities()` above, structurally identical (same sort, same
+ * cap, same field mapping) but over `RISK_NARRATIVES`. Closes a real gap:
+ * before this, no "Risks" section existed anywhere in this pipeline —
+ * `buildSecurityHighlights()` below covers only the `security-risk` slice
+ * of it, never the broader `decline` narrative.
+ */
+export function buildTopRisks(alerts: IntelligenceAlert[]): BriefRisk[] {
+  return alerts
+    .filter((alert) => RISK_NARRATIVES.includes(alert.narrative))
+    .sort(byScoreDescending)
+    .slice(0, TOP_RISK_COUNT)
     .map((alert) => ({
       projectId: alert.projectId,
       projectName: alert.projectName,

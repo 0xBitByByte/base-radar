@@ -72,3 +72,66 @@ export async function fetchProposals(space: string): Promise<RawSnapshotProposal
   }
   return res.data?.proposals ?? [];
 }
+
+/** Same shape as `RawSnapshotProposal`, plus which space it belongs to — only meaningful for the multi-space batched query below, where results from several spaces are interleaved in one list. */
+export type RawSnapshotProposalWithSpace = RawSnapshotProposal & { space: { id: string } };
+
+type RawProposalsForSpacesResponse = {
+  data: { proposals: RawSnapshotProposalWithSpace[] } | null;
+  errors?: Array<{ message: string }>;
+};
+
+/**
+ * MASTER HARDENING PASS — Concern 1 (API cost audit). One real, verified
+ * capability of Snapshot's public GraphQL API (confirmed live against
+ * `hub.snapshot.org/graphql` before writing this, not assumed): `where`
+ * accepts `space_in: [String!]`, so every registry project's governance
+ * space can be queried in a SINGLE request instead of one per project —
+ * `fetchProposals` above stays untouched for its own (single-space)
+ * callers; this is an addition, not a replacement.
+ *
+ * `first: 200`, sorted by `created desc` GLOBALLY across every matched
+ * space (Snapshot's API has no native "top-N per group") — a deliberate,
+ * documented assumption: this is only correct as long as no single space
+ * in `spaces` produces enough very-recent proposals to push another
+ * space's own most-recent proposal past the 200th slot. For the current
+ * ~9 configured registry spaces (real, low-volume governance forums, not
+ * high-frequency ones), 200 is a wide margin — but this is a genuine
+ * limitation of the batching approach, not a mathematical guarantee, and
+ * is why `getProposalsForSpaces` (service.ts) is documented to verify
+ * every requested space actually appears before trusting an empty result
+ * as "no proposals" rather than "crowded out."
+ */
+const PROPOSALS_FOR_SPACES_QUERY = `
+  query ProposalsForSpaces($spaces: [String!]) {
+    proposals(where: { space_in: $spaces }, orderBy: "created", orderDirection: desc, first: 200) {
+      id
+      title
+      body
+      state
+      start
+      end
+      scores_total
+      quorum
+      link
+      votes
+      discussion
+      author
+      space {
+        id
+      }
+    }
+  }
+`;
+
+export async function fetchProposalsForSpaces(spaces: string[]): Promise<RawSnapshotProposalWithSpace[]> {
+  const res = await fetchJson<RawProposalsForSpacesResponse>(PROVIDER_TAG, GRAPHQL_URL, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ query: PROPOSALS_FOR_SPACES_QUERY, variables: { spaces } }),
+  });
+  if (res.errors?.length) {
+    throw new Error(`Snapshot GraphQL error: ${res.errors[0].message}`);
+  }
+  return res.data?.proposals ?? [];
+}

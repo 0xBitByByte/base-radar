@@ -1,12 +1,15 @@
 import { unstable_rethrow } from "next/navigation";
 
 import {
+  ProviderCircuitOpenError,
   ProviderError,
   ProviderHttpError,
   ProviderParseError,
   ProviderTimeoutError,
   toProviderError,
 } from "@/lib/providers/common/errors";
+import { getStale } from "@/lib/providers/common/cache";
+import { recordRequestOutcome, shouldAllowRequest } from "@/lib/providers/common/circuitBreaker";
 import { recordProviderFailure, recordProviderSuccess } from "@/lib/providers/common/health";
 import type { ProviderName, ProviderResult } from "@/lib/providers/common/types";
 
@@ -93,11 +96,37 @@ export async function fetchJson<T>(
   /** PR-074 REVIEW #11 — lets a provider's `client.ts` inspect real response headers (e.g. GitHub's `x-ratelimit-*`) without every provider needing its own fetch wrapper. */
   onHeaders?: (headers: Headers) => void
 ): Promise<T> {
+  // V1-PHASE-2 (ADR V1-BLOCKER-001) — the circuit breaker gate. Checked once,
+  // here, before this call's own retry loop even starts — never inside
+  // `fetchJsonOnce` (that would gate each individual retry attempt
+  // separately, the wrong unit — see `circuitBreaker.ts`'s own doc comment).
+  // When open, this throws before any network attempt is made and never
+  // touches `recordRequestOutcome` — a skipped call is not itself a new
+  // failure to count.
+  if (!shouldAllowRequest(provider)) {
+    throw new ProviderCircuitOpenError(provider);
+  }
+
   for (let attempt = 0; ; attempt++) {
     try {
-      return await fetchJsonOnce<T>(provider, url, init, timeoutMs, onHeaders);
+      const result = await fetchJsonOnce<T>(provider, url, init, timeoutMs, onHeaders);
+      // One outcome per logical `fetchJson()` call, recorded exactly once —
+      // never once per raw retry attempt, matching the ADR's own explicit
+      // "retries occur first, breaker observes only the final outcome" rule.
+      recordRequestOutcome(provider, "success");
+      return result;
     } catch (err) {
-      if (attempt >= retries || !isRetryable(err)) throw err;
+      if (attempt >= retries || !isRetryable(err)) {
+        // `isRetryable` is reused unmodified as the breaker's own failure
+        // classifier too — the two questions ("is this worth retrying?" and
+        // "does this count as evidence the provider is down?") resolve to
+        // the exact same set of conditions (timeout/network_error/5xx),
+        // confirmed by direct comparison against the ADR's required failure
+        // table: a 404/429/parse_error is already excluded from retries by
+        // this same predicate, and must also never trip the breaker.
+        if (isRetryable(err)) recordRequestOutcome(provider, "failure");
+        throw err;
+      }
       await delay(RETRY_BASE_DELAY_MS * 2 ** attempt);
     }
   }
@@ -149,5 +178,84 @@ export async function toProviderResult<T>(
     // `ProviderErrorInfo` shape without the `Error` prototype, so it
     // serializes untouched.
     return { ok: false, source: provider, error: { code: providerError.code, message: providerError.message } };
+  }
+}
+
+/**
+ * Final Production Readiness PR — extends the graceful-degradation pattern
+ * `CoinGecko`'s `getMarketsByIds`/GitHub's `getRepoStats` already prove out
+ * (see `types.ts`'s `ProviderSuccess.stale` doc comment, which already
+ * documents this as the intended cross-provider design) to any other
+ * `service.ts` call, without each one repeating the same
+ * "if failed, check `getStale`, re-tag as stale" block by hand.
+ *
+ * Call with the same `cacheKey` passed to the `getOrSet` inside `fn`, on
+ * the `ProviderResult` `toProviderResult(fn)` already produced. A genuine
+ * failure with no prior successful fetch for that key passes through
+ * unchanged (`getStale` returns `undefined`) — this never fabricates data
+ * for a real first-ever failure, only degrades an already-proven-good read.
+ */
+export function withStaleFallback<T>(provider: ProviderName, cacheKey: string, result: ProviderResult<T>): ProviderResult<T> {
+  if (result.ok) return result;
+  const stale = getStale<T>(cacheKey);
+  if (!stale) return result;
+  return { ok: true, data: stale.value, source: provider, fetchedAt: stale.fetchedAt, stale: true };
+}
+
+/**
+ * PR-105 — Provider-Latency Resilience. Bounds how long a caller waits for
+ * a `ProviderResult` before treating it as unavailable, for calls that are
+ * deferred/streamed (never on a page's awaited critical path — see the
+ * `whalePromise` race in `app/dashboard/projects/[slug]/page.tsx` for the
+ * existing, already-shipped precedent this generalizes, one layer down so
+ * any deferred caller can reuse it instead of hand-rolling its own race).
+ *
+ * Never rejects — every `ProviderResult`-returning export already only
+ * ever resolves (see `toProviderResult` above), and this preserves that
+ * contract exactly: a timeout resolves to the same `{ok: false, error}`
+ * shape a genuine provider failure already produces, so every existing
+ * N/A/error-state UI path handles it unchanged. Never fabricates a value —
+ * `data` is simply absent on timeout, exactly like a real failure.
+ *
+ * `promise` is NEVER cancelled or abandoned on timeout — it keeps running
+ * in the background (every `service.ts` export this wraps already calls
+ * `getOrSet`/`withStaleFallback` internally), so a slow-but-eventually-
+ * successful call still populates the provider cache for the *next*
+ * request even when this render stopped waiting for it. This only bounds
+ * one render's wait; it never discards real in-flight work or changes what
+ * gets cached.
+ *
+ * Deliberately not used for every provider call in this codebase — only at
+ * specific deferred call sites where real, evidenced elevated tail latency
+ * was measured (PR-105's own investigation: DefiLlama TVL history up to
+ * ~2.5s, Blockscout token-transfers up to ~1.7s, even when each
+ * individually "succeeds") and where the existing `DEFAULT_TIMEOUT_MS`
+ * (8s) plus retries (up to ~24.75s worst case) had no bound at all on how
+ * long that could extend a deferred Suspense boundary's resolution — never
+ * applied to the awaited critical-path batch, which already has its own,
+ * separate, already-proven timeout treatment (the whale race) and is
+ * explicitly out of this PR's scope.
+ */
+export async function withBoundedWait<T>(provider: ProviderName, promise: Promise<ProviderResult<T>>, timeoutMs: number): Promise<ProviderResult<T>> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+  const timedOut: Promise<ProviderResult<T>> = new Promise((resolve) => {
+    timeoutHandle = setTimeout(
+      () =>
+        resolve({
+          ok: false,
+          source: provider,
+          error: {
+            code: "timeout",
+            message: `Timed out after ${timeoutMs}ms waiting for ${provider} (deferred call) — the underlying request keeps running in the background for the next request's cache.`,
+          },
+        }),
+      timeoutMs
+    );
+  });
+
+  try {
+    return await Promise.race([promise, timedOut]);
+  } finally {
+    clearTimeout(timeoutHandle);
   }
 }

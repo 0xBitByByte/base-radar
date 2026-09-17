@@ -38,6 +38,16 @@ export const curveFinance: Project = {
   providerIds: {
     coingeckoId: "curve-dao-token",
     defillamaSlug: "curve-dex",
+    // Trading Discovery Strategy — "curve" confirmed as the real
+    // DexScreener dexId slug (verified live: real pairs across multiple
+    // chains use it), but no Base-specific pair using it showed up in a
+    // live trending-pairs check during this audit — an honest, disclosed
+    // provider ceiling (DexScreener's search only surfaces currently-
+    // trending pairs, not every pool a DEX hosts), not a wrong slug.
+    // Curve's own CRV token contract below still makes its Pools page work
+    // via the `"token"` strategy in the meantime. See
+    // `lib/trading/discoveryStrategy.ts`.
+    dexscreenerDexIds: ["curve"],
     // PR-051 — verified via CoinGecko's own "Contract" panel / Basescan link.
     blockscoutAddress: "0x8Ee73c484A26e0A5df2Ee2a4960B789967dd0415",
   },

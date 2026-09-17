@@ -8,6 +8,7 @@ import { MoreHorizontal, RefreshCw } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { RelativeTime } from "@/components/shared/RelativeTime";
+import { GLASS_CARD_SURFACE } from "@/components/ui/glassStyles";
 import type { DataSource } from "@/lib/data/types";
 
 export type WidgetAccent = "primary" | "success" | "purple" | "orange" | "danger" | "accent";
@@ -66,11 +67,7 @@ export function WidgetCard({
       viewport={{ once: true, margin: "-40px" }}
       whileHover={{ y: -3 }}
       transition={{ duration: 0.25, ease: "easeOut" }}
-      className={cn(
-        "flex flex-col gap-4 rounded-2xl border border-radar-light-border bg-gradient-to-b from-radar-light-card/90 to-radar-light-surface/70 p-5 shadow-[0_1px_2px_rgba(16,34,58,0.04)] backdrop-blur-xl transition-[border-color,box-shadow] duration-200 hover:border-radar-primary/30 hover:shadow-[0_0_50px_-15px_rgba(var(--color-radar-primary-rgb),0.12)] sm:p-6",
-        "dark:border-radar-border dark:bg-gradient-to-b dark:from-radar-elevated/60 dark:to-radar-card/70 dark:shadow-[0_1px_2px_rgba(0,0,0,0.2)] dark:hover:border-radar-border-hover dark:hover:shadow-[0_0_50px_-15px_rgba(var(--color-radar-primary-rgb),0.15)]",
-        className
-      )}
+      className={cn("flex flex-col gap-4 p-5 sm:p-6", GLASS_CARD_SURFACE, className)}
     >
       <div className="flex items-center gap-3">
         <span
@@ -94,6 +91,21 @@ export function WidgetCard({
         {source === "mock" && (
           <span className="shrink-0 rounded-full border border-radar-light-border px-2 py-0.5 text-[10px] font-medium text-radar-light-muted dark:border-white/10 dark:text-radar-muted/70">
             Demo data
+          </span>
+        )}
+        {/* UX Polish, Phase 9 — the real, symmetric counterpart to "Demo
+            data" above: `source` is a genuine `"live" | "mock"` flag
+            (`lib/data/types.ts`), never invented per-widget, so a widget
+            backed by real data now says so instead of only ever flagging
+            the mock case. Same ping-dot + "LIVE" idiom `LiveStatusBar.tsx`
+            already established — not a new visual language. */}
+        {source === "live" && (
+          <span className="flex shrink-0 items-center gap-1 text-[10px] font-semibold text-radar-success">
+            <span className="relative flex size-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-radar-success opacity-75 motion-reduce:animate-none" />
+              <span className="relative inline-flex size-1.5 rounded-full bg-radar-success" />
+            </span>
+            LIVE
           </span>
         )}
 

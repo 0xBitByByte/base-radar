@@ -164,3 +164,71 @@ export function formatRelativeTime(iso: string): string {
   const days = Math.round(hours / 24);
   return `${days}d ago`;
 }
+
+/**
+ * PR-093.03 (Regional Format) — locale-parameterized variants of `formatDate`/
+ * `formatPrice`/`formatNumber` above, added rather than changing those
+ * functions' own behavior: every existing caller of the plain, hardcoded-
+ * `"en-US"` exports keeps its exact current output, everywhere in the app,
+ * including any server-rendered call site — this file's own top-of-file
+ * comment already documents a real, previously-fixed SSR/CSR hydration
+ * mismatch from `Intl` formatting differing between environments, so
+ * nothing here makes an existing formatter silently locale-dependent.
+ * These variants are for a caller that already has a real, explicit
+ * locale in hand (the Regional Format preference, read client-side via
+ * `useLocalePreference()`) — never an implicit global.
+ *
+ * Currency stays fixed at USD regardless of locale — every amount in this
+ * app is genuinely USD-denominated, so the locale changes how a USD amount
+ * is written (grouping/decimal marks), never what currency it's in. This
+ * is regional formatting, not currency conversion.
+ *
+ * Formatter instances are cached per locale (mirroring the module-level
+ * "construct once, reuse" formatters above) rather than rebuilt on every
+ * call.
+ */
+const priceFormattersByLocale = new Map<string, Intl.NumberFormat>();
+const numberFormattersByLocale = new Map<string, Intl.NumberFormat>();
+const dateFormattersByLocale = new Map<string, Intl.DateTimeFormat>();
+
+function priceFormatterFor(locale: string): Intl.NumberFormat {
+  let formatter = priceFormattersByLocale.get(locale);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(locale, { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    priceFormattersByLocale.set(locale, formatter);
+  }
+  return formatter;
+}
+
+function numberFormatterFor(locale: string): Intl.NumberFormat {
+  let formatter = numberFormattersByLocale.get(locale);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(locale);
+    numberFormattersByLocale.set(locale, formatter);
+  }
+  return formatter;
+}
+
+function dateFormatterFor(locale: string): Intl.DateTimeFormat {
+  let formatter = dateFormattersByLocale.get(locale);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, { year: "numeric", month: "short", day: "numeric" });
+    dateFormattersByLocale.set(locale, formatter);
+  }
+  return formatter;
+}
+
+/** Full-precision USD price display for an explicit, caller-supplied locale — see the doc comment above. */
+export function formatPriceForLocale(value: number, locale: string): string {
+  return priceFormatterFor(locale).format(value);
+}
+
+/** Plain, non-currency number display for an explicit, caller-supplied locale. */
+export function formatNumberForLocale(value: number, locale: string): string {
+  return numberFormatterFor(locale).format(Math.round(value));
+}
+
+/** Plain calendar-date display for an explicit, caller-supplied locale — same fields as `formatDate` above, just locale-aware. */
+export function formatDateForLocale(iso: string, locale: string): string {
+  return dateFormatterFor(locale).format(new Date(iso));
+}

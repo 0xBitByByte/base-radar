@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
-import { Blocks, ArrowLeft, ChevronRight } from "lucide-react";
-import Link from "next/link";
+import { Blocks } from "lucide-react";
 
 import { getProject } from "@/data/projects/helpers";
+import { ProjectSubpageBreadcrumb } from "@/components/explorer/ProjectSubpageBreadcrumb";
 import { normalizeName } from "@/lib/intelligence/helpers";
 import * as blockscout from "@/lib/providers/blockscout/service";
+import { paginateLiveProjects } from "@/lib/projects/pagination";
 import { ContractCategoryTabs } from "@/components/explorer/ContractCategoryTabs";
 import { ContractExplorerFilterBar } from "@/components/explorer/ContractExplorerFilterBar";
 import { ContractExplorerList } from "@/components/explorer/ContractExplorerList";
+import { ContractExplorerPagination } from "@/components/explorer/ContractExplorerPagination";
 import { ContractExplorerSortSelect } from "@/components/explorer/ContractExplorerSortSelect";
 import { formatLabel } from "@/components/explorer/format";
 import {
@@ -23,11 +25,19 @@ import {
 import { MetricItem } from "@/components/explorer/MetricItem";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { parseContractsQueryState, type RawSearchParams } from "@/lib/contracts/queryState";
+import { PAGE_HEADER_GROUP_CLASS, PAGE_HEADER_TITLE_CLASS, PAGE_HEADER_SUBTITLE_CLASS } from "@/components/dashboard/pageHeaderStyles";
 
 type ContractExplorerPageProps = {
   params: Promise<{ slug: string }>;
   searchParams: Promise<RawSearchParams>;
 };
+
+/**
+ * PR-097.01 (Performance — C1) — same real gap and same fix already
+ * applied to the Whale/Governance Explorers: this page previously
+ * rendered every real matching contract in one unbounded list.
+ */
+const CONTRACTS_PAGE_SIZE = 25;
 
 export async function generateMetadata({ params }: ContractExplorerPageProps): Promise<Metadata> {
   const { slug } = await params;
@@ -50,48 +60,7 @@ export default async function ContractExplorerPage({ params, searchParams }: Con
   const project = getProject(slug);
 
   const projectHref = `/dashboard/projects/${slug}`;
-  const breadcrumb = (
-    <div className="flex flex-col gap-2">
-      <nav aria-label="Breadcrumb">
-        <ol className="flex flex-wrap items-center gap-1.5 text-xs text-radar-light-muted dark:text-radar-muted">
-          <li>
-            <Link href="/dashboard" className="rounded-md font-medium outline-none transition-colors hover:text-radar-light-text focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:hover:text-radar-white">
-              Dashboard
-            </Link>
-          </li>
-          <li aria-hidden="true">
-            <ChevronRight className="size-3.5" />
-          </li>
-          <li>
-            <Link href="/dashboard/projects" className="rounded-md font-medium outline-none transition-colors hover:text-radar-light-text focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:hover:text-radar-white">
-              Projects
-            </Link>
-          </li>
-          <li aria-hidden="true">
-            <ChevronRight className="size-3.5" />
-          </li>
-          <li>
-            <Link href={projectHref} className="rounded-md font-medium outline-none transition-colors hover:text-radar-light-text focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:hover:text-radar-white">
-              {project?.name ?? "Project"}
-            </Link>
-          </li>
-          <li aria-hidden="true">
-            <ChevronRight className="size-3.5" />
-          </li>
-          <li aria-current="page" className="truncate font-semibold text-radar-light-text dark:text-radar-white">
-            Contracts
-          </li>
-        </ol>
-      </nav>
-      <Link
-        href={projectHref}
-        className="group inline-flex w-fit items-center gap-1.5 rounded-lg text-xs font-medium text-radar-light-muted outline-none transition-colors hover:text-radar-light-text focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:text-radar-muted dark:hover:text-radar-white"
-      >
-        <ArrowLeft className="size-3.5 shrink-0 transition-transform duration-200 group-hover:-translate-x-0.5" aria-hidden="true" />
-        Back to {project?.name ?? "Project"}
-      </Link>
-    </div>
-  );
+  const breadcrumb = <ProjectSubpageBreadcrumb projectName={project?.name ?? null} projectHref={projectHref} currentPageLabel="Contracts" />;
 
   if (!project) {
     return (
@@ -106,7 +75,7 @@ export default async function ContractExplorerPage({ params, searchParams }: Con
     return (
       <div className="flex flex-col gap-6">
         {breadcrumb}
-        <h1 className="text-xl font-bold text-radar-light-text dark:text-radar-white">{project.name} Contracts</h1>
+        <h1 className={PAGE_HEADER_TITLE_CLASS}>{project.name} Contracts</h1>
         <EmptyState
           icon={Blocks}
           title="No registered contracts"
@@ -183,13 +152,15 @@ export default async function ContractExplorerPage({ params, searchParams }: Con
     });
   }
 
+  const paginated = paginateLiveProjects(displayCards, { page: state.page, pageSize: CONTRACTS_PAGE_SIZE });
+
   return (
     <div className="flex flex-col gap-6">
       {breadcrumb}
 
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-bold text-radar-light-text dark:text-radar-white">{project.name} Contracts</h1>
-        <p className="text-sm text-radar-light-muted dark:text-radar-muted">
+      <div className={PAGE_HEADER_GROUP_CLASS}>
+        <h1 className={PAGE_HEADER_TITLE_CLASS}>{project.name} Contracts</h1>
+        <p className={PAGE_HEADER_SUBTITLE_CLASS}>
           Every contract Base Radar has registered for {project.name}, with real Blockscout verification detail — not a raw explorer mirror.
         </p>
       </div>
@@ -215,7 +186,15 @@ export default async function ContractExplorerPage({ params, searchParams }: Con
         <ContractExplorerSortSelect state={state} />
       </div>
 
-      <ContractExplorerList cards={displayCards} />
+      <ContractExplorerList cards={paginated.items} />
+      <ContractExplorerPagination
+        basePath={`${projectHref}/contracts`}
+        state={state}
+        currentPage={paginated.page}
+        totalPages={paginated.totalPages}
+        hasPreviousPage={paginated.hasPreviousPage}
+        hasNextPage={paginated.hasNextPage}
+      />
     </div>
   );
 }

@@ -1,7 +1,6 @@
-"use client";
-
 import { groupSearchResults } from "@/lib/search/globalSearch";
 import type { SearchableItem } from "@/lib/search/types";
+import type { LiveProject } from "@/lib/projects/types";
 import { CommandGroup } from "@/components/command/CommandGroup";
 import { CommandEmpty } from "@/components/command/CommandEmpty";
 
@@ -10,6 +9,8 @@ type CommandResultsProps = {
   activeItemId: string | null;
   onSelect: (item: SearchableItem) => void;
   onHover: (itemId: string) => void;
+  /** Universal Project Card, PR-8 — omit (or pass an empty Map) while `liveProjectsPromise` hasn't resolved yet; every project result honestly falls back to its generic row until then. */
+  liveProjectById?: Map<string, LiveProject>;
 };
 
 /**
@@ -21,7 +22,7 @@ type CommandResultsProps = {
  * `CommandItem`'s `role="option"` and the search input's
  * `aria-activedescendant`.
  */
-export function CommandResults({ results, activeItemId, onSelect, onHover }: CommandResultsProps) {
+export function CommandResults({ results, activeItemId, onSelect, onHover, liveProjectById }: CommandResultsProps) {
   if (results.length === 0) {
     return <CommandEmpty />;
   }
@@ -43,6 +44,7 @@ export function CommandResults({ results, activeItemId, onSelect, onHover }: Com
           activeItemId={activeItemId}
           onSelect={onSelect}
           onHover={onHover}
+          liveProjectById={liveProjectById}
         />
       ))}
     </div>

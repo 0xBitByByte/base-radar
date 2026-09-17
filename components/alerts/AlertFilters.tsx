@@ -5,6 +5,7 @@ import { ArrowUpDown } from "lucide-react";
 import { CATEGORY_LABEL, SEVERITY_LABEL } from "@/components/alerts/meta";
 import { ALERT_CATEGORIES, ALERT_SEVERITIES } from "@/lib/alerts/types";
 import type { AlertCategory, AlertSeverity, AlertSortOrder, AlertStatusFilter } from "@/lib/alerts/types";
+import { GLASS_TILE_SURFACE } from "@/components/ui/glassStyles";
 import { cn } from "@/lib/utils";
 
 type ProjectOption = { id: string; name: string };
@@ -58,7 +59,7 @@ export function AlertFilters({
       <div
         role="group"
         aria-label="Filter by status"
-        className="flex items-center gap-1 rounded-xl border border-radar-light-border bg-radar-light-surface p-1 dark:border-white/10 dark:bg-white/5"
+        className={cn("flex items-center gap-1 p-1", GLASS_TILE_SURFACE)}
       >
         {STATUS_TABS.map((tab) => (
           <button

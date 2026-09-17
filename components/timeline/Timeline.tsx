@@ -12,6 +12,12 @@ import { TimelineMetric } from "@/components/timeline/TimelineMetric";
 import { TimelineSection } from "@/components/timeline/TimelineSection";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { RelativeTime } from "@/components/shared/RelativeTime";
+import {
+  EXECUTIVE_SUMMARY_HEADER_GROUP_CLASS,
+  EXECUTIVE_SUMMARY_SUBTITLE_CLASS,
+  EXECUTIVE_SUMMARY_TIMESTAMP_CLASS,
+  EXECUTIVE_SUMMARY_TITLE_CLASS,
+} from "@/components/shared/executiveSummaryCardStyles";
 import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
 import { capitalize } from "@/lib/timeline/summary";
 import type { TimelineEventType } from "@/lib/timeline/types";
@@ -75,14 +81,14 @@ export function Timeline() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
+      <div className={EXECUTIVE_SUMMARY_HEADER_GROUP_CLASS}>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h1 className="text-xl font-semibold text-radar-light-text dark:text-radar-white">{timeline.headline}</h1>
-          <span className="text-[10.5px] whitespace-nowrap text-radar-light-muted dark:text-radar-muted">
+          <h1 className={EXECUTIVE_SUMMARY_TITLE_CLASS}>{timeline.headline}</h1>
+          <span className={EXECUTIVE_SUMMARY_TIMESTAMP_CLASS}>
             Generated <RelativeTime iso={timeline.generatedAt} />
           </span>
         </div>
-        <p className="text-sm leading-relaxed text-radar-light-muted dark:text-radar-muted">{timeline.summary}</p>
+        <p className={EXECUTIVE_SUMMARY_SUBTITLE_CLASS}>{timeline.summary}</p>
       </div>
 
       <TimelineSection id="metrics" title="Metrics" icon={Gauge}>

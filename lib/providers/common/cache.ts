@@ -58,13 +58,31 @@ export function getStale<T>(key: string): { value: T; fetchedAt: string } | unde
   return { value: entry.value as T, fetchedAt: new Date(entry.fetchedAt).toISOString() };
 }
 
-/** Removes a single cached entry, forcing the next call to refetch. */
+/**
+ * V3-WALLET-002 — the one addition to this module: an explicit way to drop
+ * a key before its TTL naturally expires. Every existing caller of
+ * `getOrSet`/`getStale` is unaffected (this is additive, not a change to
+ * either function's behavior) — it exists because a manual "Refresh" action
+ * on wallet holdings needs to force a genuinely fresh read, not just wait
+ * out an already-short balance-cache window. `getStale` shares this same
+ * `store`, so this also clears whatever stale-fallback value existed for
+ * `key` — an accepted tradeoff for a user-initiated refresh (they asked for
+ * current data, not a graceful degrade), unlike a passive TTL expiry.
+ */
 export function invalidate(key: string): void {
   store.delete(key);
 }
 
-/** Clears the entire cache. Primarily useful for tests. */
-export function clearCache(): void {
+/**
+ * PR-098.06 — test-only reset, mirroring `circuitBreaker.ts`'s
+ * `__resetCircuitBreakerForTests()` exactly: production code never calls
+ * this. Exists so a provider-call-count test (e.g. "cold cache" vs "warm
+ * cache" for the Featured Intelligence refresh cycle) can start from a
+ * genuinely empty cache instead of leaking state across test cases via
+ * this module's own singleton `store`/`inFlight` maps.
+ */
+export function __resetProviderCacheForTests(): void {
   store.clear();
   inFlight.clear();
 }
+

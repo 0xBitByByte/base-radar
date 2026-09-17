@@ -26,7 +26,7 @@ function isValidOperation(value: unknown): value is SyncOperation {
   return (
     typeof op.id === "string" &&
     (op.type === "create" || op.type === "update" || op.type === "delete") &&
-    (op.entity === "watchlist" || op.entity === "preferences" || op.entity === "account") &&
+    (op.entity === "watchlist" || op.entity === "preferences" || op.entity === "account" || op.entity === "search" || op.entity === "savedSearch") &&
     typeof op.entityId === "string" &&
     (typeof op.payload === "string" || op.payload === null) &&
     typeof op.createdAt === "string" &&

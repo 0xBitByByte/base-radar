@@ -1,50 +1,77 @@
 /** Public API for the Blockscout provider — cache- and rate-limit-guarded. */
 
-import { fetchAddressInfo, fetchChainStats, fetchContractDetail, fetchRecentSmartContracts, fetchTokenTransfers } from "@/lib/providers/blockscout/client";
+import { fetchAddressInfo, fetchAddressTokenBalances, fetchChainStats, fetchContractDetail, fetchRecentSmartContracts, fetchTokenTransfers } from "@/lib/providers/blockscout/client";
 import {
   mapChainStats,
   mapContractDetail,
+  mapDiscoveredTokenBalances,
   mapRecentlyVerifiedContract,
   mapTokenTransfers,
   type ChainStats,
   type ContractDetail,
+  type DiscoveredTokenBalance,
   type TokenTransfer,
   type VerifiedContract,
 } from "@/lib/providers/blockscout/mapper";
 import { getOrSet } from "@/lib/providers/common/cache";
 import { ProviderHttpError, ProviderParseError } from "@/lib/providers/common/errors";
-import { assertRateLimit, getRateLimitStatus as getSharedRateLimitStatus, type RateLimitConfig } from "@/lib/providers/common/rate-limit";
+import { assertRateLimit, type RateLimitConfig } from "@/lib/providers/common/rate-limit";
 import type { ProviderResult } from "@/lib/providers/common/types";
-import { toProviderResult } from "@/lib/providers/common/utilities";
+import { toProviderResult, withStaleFallback } from "@/lib/providers/common/utilities";
 
 const PROVIDER = "blockscout" as const;
-const CACHE_TTL_MS = 60_000; // matches the window documented in docs/API.md
+const CACHE_TTL_MS = 60_000; // live chain-stats ticker only (getChainStats) — matches the window documented in docs/API.md
+// PR-098.07 — contract-verification calls (`getRecentlyVerifiedContract`,
+// `getContractDetail`) split off the shared 60s ticker TTL above into their
+// own named constant: verification status is close to static (the
+// "Security" freshness class, 30-60min — `lib/intelligence/freshness.ts`),
+// nothing like `getChainStats`' live network-health numbers. Split rather
+// than bumping the shared constant, which would have also slowed down the
+// unrelated chain-stats ticker.
+const SECURITY_CACHE_TTL_MS = 2_700_000;
 const RATE_LIMIT: RateLimitConfig = { limit: 30, windowMs: 60_000 };
 
 /**
- * PR-074 REVIEW #8 — real-time read of this provider's own app-enforced
- * rate-limit budget (see `common/rate-limit.ts`'s `getRateLimitStatus`),
- * exposed for the Evidence & Sources panel to report exact remaining/
- * limit/reset numbers instead of a generic "try again later" — the same
- * pattern already built for GitHub's response-header-based tracker.
+ * Final Production Hardening PR — moved to `blockscout/rateLimitStatus.ts`
+ * (a pure module with no `client.ts`/fetch import), re-exported here so
+ * every existing server-side consumer of `"@/lib/providers/blockscout/service"`
+ * is unaffected.
  */
-export function getRateLimitStatus() {
-  return getSharedRateLimitStatus(PROVIDER, RATE_LIMIT);
-}
+export { getRateLimitStatus } from "@/lib/providers/blockscout/rateLimitStatus";
 
+/**
+ * Final Production Readiness PR — feeds the topbar's live Block/Gas/
+ * Transactions ticker, a prominent, high-traffic read on every dashboard
+ * page. A transient Blockscout failure now degrades to the last real,
+ * successfully-fetched value (`withStaleFallback`, honestly tagged
+ * `stale: true`) instead of blanking the ticker entirely.
+ */
 export async function getChainStats(): Promise<ProviderResult<ChainStats>> {
-  return toProviderResult(PROVIDER, () =>
-    getOrSet(`${PROVIDER}:chain-stats`, CACHE_TTL_MS, async () => {
+  const cacheKey = `${PROVIDER}:chain-stats`;
+  const result = await toProviderResult(PROVIDER, () =>
+    getOrSet(cacheKey, CACHE_TTL_MS, async () => {
       assertRateLimit(PROVIDER, RATE_LIMIT);
       const raw = await fetchChainStats();
       return mapChainStats(raw);
     })
   );
+  return withStaleFallback(PROVIDER, cacheKey, result);
 }
 
+/**
+ * V1-IMPLEMENT-001 (ADR V1-BLOCKER-001, Phase 1) — same `withStaleFallback`
+ * pattern already used by `getChainStats` above and `github.getRepoStats`:
+ * a genuine failure (Blockscout down, rate-limited, timed out) degrades to
+ * the last real, successfully-fetched value for this exact cache key,
+ * honestly tagged `stale: true` by `withStaleFallback` itself, rather than
+ * surfacing an empty "recently verified" read. No effect on the healthy
+ * path — `withStaleFallback` returns `result` unchanged whenever
+ * `result.ok` is true.
+ */
 export async function getRecentlyVerifiedContract(): Promise<ProviderResult<VerifiedContract>> {
-  return toProviderResult(PROVIDER, () =>
-    getOrSet(`${PROVIDER}:recently-verified`, CACHE_TTL_MS, async () => {
+  const cacheKey = `${PROVIDER}:recently-verified`;
+  const result = await toProviderResult(PROVIDER, () =>
+    getOrSet(cacheKey, SECURITY_CACHE_TTL_MS, async () => {
       assertRateLimit(PROVIDER, RATE_LIMIT);
       const raw = await fetchRecentSmartContracts();
       const mapped = mapRecentlyVerifiedContract(raw);
@@ -52,19 +79,30 @@ export async function getRecentlyVerifiedContract(): Promise<ProviderResult<Veri
       return mapped;
     })
   );
+  return withStaleFallback(PROVIDER, cacheKey, result);
 }
 
 const TOKEN_TRANSFERS_CACHE_TTL_MS = 30_000;
 
-/** Most recent transfers for a single ERC-20 token contract — used for whale-transfer detection (`lib/whale`). */
+/**
+ * Most recent transfers for a single ERC-20 token contract — used for
+ * whale-transfer detection (`lib/whale`).
+ *
+ * V1-IMPLEMENT-001 (ADR V1-BLOCKER-001, Phase 1) — same `withStaleFallback`
+ * pattern as `getChainStats`/`getRecentlyVerifiedContract` above; see that
+ * function's own doc comment for the rationale. No effect on the healthy
+ * path.
+ */
 export async function getTokenTransfers(tokenAddress: string): Promise<ProviderResult<TokenTransfer[]>> {
-  return toProviderResult(PROVIDER, () =>
-    getOrSet(`${PROVIDER}:token-transfers:${tokenAddress}`, TOKEN_TRANSFERS_CACHE_TTL_MS, async () => {
+  const cacheKey = `${PROVIDER}:token-transfers:${tokenAddress}`;
+  const result = await toProviderResult(PROVIDER, () =>
+    getOrSet(cacheKey, TOKEN_TRANSFERS_CACHE_TTL_MS, async () => {
       assertRateLimit(PROVIDER, RATE_LIMIT);
       const raw = await fetchTokenTransfers(tokenAddress);
       return mapTokenTransfers(raw);
     })
   );
+  return withStaleFallback(PROVIDER, cacheKey, result);
 }
 
 /**
@@ -90,10 +128,18 @@ export async function getTokenTransfers(tokenAddress: string): Promise<ProviderR
  * Unsupported" for a project whose contract Blockscout actually has an
  * answer for. Only a genuine, non-404 failure (network/5xx/timeout) still
  * fails this call — a 404 is treated as the real, meaningful answer it is.
+ *
+ * V1-IMPLEMENT-001 (ADR V1-BLOCKER-001, Phase 1) — same `withStaleFallback`
+ * pattern as `getChainStats`/`getRecentlyVerifiedContract`/`getTokenTransfers`
+ * above. Only ever engages for a genuine failure (network/5xx/timeout) — a
+ * real 404 ("unverified") is already handled above as a successful,
+ * non-thrown result and is never routed through this fallback. No effect on
+ * the healthy path.
  */
 export async function getContractDetail(address: string): Promise<ProviderResult<ContractDetail>> {
-  return toProviderResult(PROVIDER, () =>
-    getOrSet(`${PROVIDER}:contract-detail:${address}`, CACHE_TTL_MS, async () => {
+  const cacheKey = `${PROVIDER}:contract-detail:${address}`;
+  const result = await toProviderResult(PROVIDER, () =>
+    getOrSet(cacheKey, SECURITY_CACHE_TTL_MS, async () => {
       // Two real HTTP requests below (contract-detail + address-info) — one `assertRateLimit` call per request, matching every other multi-fetch service function's convention (e.g. `base.getBaseNetworkStatus`).
       assertRateLimit(PROVIDER, RATE_LIMIT);
       assertRateLimit(PROVIDER, RATE_LIMIT);
@@ -107,36 +153,37 @@ export async function getContractDetail(address: string): Promise<ProviderResult
       return mapContractDetail(contract, addressSettled.value);
     })
   );
+  return withStaleFallback(PROVIDER, cacheKey, result);
 }
 
-export type { ChainStats, ContractDetail, TokenTransfer, VerifiedContract };
+const TOKEN_BALANCES_CACHE_TTL_MS = 30_000;
 
 /**
- * PR-078 FINAL REVIEW — the one shape `page.tsx`'s `contractDetailsPromise`
- * resolves to, previously redefined independently (identically) in four
- * separate `*Async` components (`ProfileContractDetailsAsync`,
- * `ProfileTrustContractsTileAsync`, `ProfileVerifiedContractsStatAsync`,
- * `ProfileSourcesBlockscoutAsync`) — a real, confirmed instance of the
- * "repeated status mapping" this review pass was asked to find and
- * centralize. Every consumer of `contractDetailsPromise` now imports this
- * instead of re-declaring it.
+ * V3-WALLET-002 — every real ERC-20 balance for a connected wallet, in one
+ * call (see `fetchAddressTokenBalances`'s own doc comment for why this is
+ * the actual discovery mechanism, not a hardcoded token list). Per-address,
+ * so the cache key includes the (lowercased) address, same pattern
+ * `base.getEthBalance` uses for the same reason.
  */
-export type ContractDetailEntry = { address: string; result: ProviderResult<ContractDetail> };
-
-/**
- * PR-078 FINAL REVIEW — the one piece of logic every `contractDetailsPromise`
- * consumer independently re-implemented: reshape the resolved entries into
- * an address-keyed map of only the successful lookups. `ClassifyBlockscoutVerification`
- * (`ProfileSources.tsx`) still walks `entries` directly instead of this map —
- * it also needs the *failed* entries' error detail for its own fallback
- * classification, which this map deliberately discards, so that one isn't a
- * duplicate of this, it's genuinely different downstream logic over the same
- * input.
- */
-export function contractDetailsByAddress(entries: ContractDetailEntry[]): Record<string, ContractDetail> {
-  const map: Record<string, ContractDetail> = {};
-  for (const entry of entries) {
-    if (entry.result.ok) map[entry.address] = entry.result.data;
-  }
-  return map;
+export async function getAddressTokenBalances(address: string): Promise<ProviderResult<DiscoveredTokenBalance[]>> {
+  const normalizedAddress = address.toLowerCase();
+  return toProviderResult(PROVIDER, () =>
+    getOrSet(`${PROVIDER}:token-balances:${normalizedAddress}`, TOKEN_BALANCES_CACHE_TTL_MS, async () => {
+      assertRateLimit(PROVIDER, RATE_LIMIT);
+      const raw = await fetchAddressTokenBalances(normalizedAddress);
+      return mapDiscoveredTokenBalances(raw);
+    })
+  );
 }
+
+export type { ChainStats, ContractDetail, DiscoveredTokenBalance, TokenTransfer, VerifiedContract };
+
+/**
+ * Final Production Hardening PR — `contractDetailsByAddress`/
+ * `ContractDetailEntry` moved to `blockscout/contractDetails.ts` (a pure,
+ * no-fetch module) so the three `"use client"` components that need them
+ * can import them without pulling this file's real `fetch()`-calling code
+ * into the client bundle. Re-exported here so every existing server-side
+ * consumer of `"@/lib/providers/blockscout/service"` is unaffected.
+ */
+export { contractDetailsByAddress, type ContractDetailEntry } from "@/lib/providers/blockscout/contractDetails";

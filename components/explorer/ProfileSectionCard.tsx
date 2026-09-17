@@ -3,6 +3,7 @@ import { ExternalLink, type LucideIcon } from "lucide-react";
 
 import { QuickViewSectionLabel } from "@/components/explorer/QuickViewSectionLabel";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { GLASS_SURFACE_STATIC } from "@/components/ui/glassStyles";
 import { cn } from "@/lib/utils";
 
 export type ProfileSectionSourceLink = {
@@ -27,15 +28,18 @@ type ProfileSectionCardProps = {
  * here because PR11.1 needs it in five-plus places (Intelligence rail
  * groups, the AI summary band, the scores band) — a genuine repeated
  * pattern, not a speculative one-off.
+ *
+ * PR-086.02 — upgraded from a fully opaque shell to `GLASS_SURFACE_STATIC`:
+ * every major Project Details section (Health & Trust, Why It Matters,
+ * Community & Developer Activity, Sources, ...) renders inside this one
+ * component, so this is the single highest-leverage place to make the
+ * whole page read as glass, rather than hand-tuning each section.
  */
 export function ProfileSectionCard({ title, icon: Icon, id, children, className, sourceLink }: ProfileSectionCardProps) {
   return (
     <section
       id={id}
-      className={cn(
-        "scroll-mt-28 flex flex-col gap-3 rounded-2xl border border-radar-light-border bg-radar-light-card p-5 shadow-sm transition-shadow duration-200 hover:shadow-md dark:border-white/10 dark:bg-radar-card sm:p-6",
-        className
-      )}
+      className={cn("scroll-mt-28 flex flex-col gap-3 p-5 sm:p-6", GLASS_SURFACE_STATIC, className)}
     >
       {(title || sourceLink) && (
         <div className="flex items-center justify-between gap-2">

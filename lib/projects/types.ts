@@ -17,7 +17,9 @@ import type { Chain, DiscoverySource, ProjectCategory, ProjectStatus, ProjectTag
 import type { DiscoveryEvidence } from "@/lib/discovery/project";
 import type { DiscoveryStatus } from "@/lib/discovery/status";
 import type { RegistryMatchType } from "@/lib/discovery/registryMatch";
-import type { Sources } from "@/lib/intelligence/types";
+import type { AiRatingGrade } from "@/lib/intelligence/scorecard";
+import type { Health, Sources } from "@/lib/intelligence/types";
+import type { RiskContributor, RiskLevel } from "@/lib/intelligence-engine";
 import type { VerificationLevel } from "@/data/projects/enums";
 
 // ---------------------------------------------------------------------------
@@ -34,12 +36,37 @@ export type LiveProjectIdentity = {
   /** PR-072 — every other real, lower-priority logo candidate `logoUrl` didn't win, in the same priority order, for `ProjectLogo` to retry if `logoUrl`'s URL turns out to be broken (a 404, not just absent) — never attempted before `logoUrl`, and this app's UI never needs to reach further than this list before falling back to initials. Empty when no lower-priority candidate exists. */
   logoUrlFallbacks: string[];
   websiteUrl: string | null;
+  /**
+   * PR-085.03 — the real social handles this project has, reusing the exact
+   * same `SocialLinks` field set the registry (`data/projects/types.ts`) and
+   * `Community.socials` (`lib/intelligence/types.ts`) already use — never a
+   * new vocabulary. A discovery-only project only ever has
+   * `twitter`/`discord`/`telegram`/`farcaster` populated (the only fields
+   * `DiscoveryProject.socials` carries); every other key is `null`, never
+   * guessed.
+   */
+  socials: {
+    twitter: string | null;
+    discord: string | null;
+    telegram: string | null;
+    farcaster: string | null;
+    docs: string | null;
+    blog: string | null;
+    forum: string | null;
+    medium: string | null;
+    mirror: string | null;
+    linkedin: string | null;
+  };
 };
 
 export type MarketSummary = {
   available: boolean;
   priceUsd: number | null;
   changePct24h: number | null;
+  /** PR-085.02A — already fetched by CoinGecko's bulk markets call (`price_change_percentage=24h,7d,30d`) and already parsed by the provider mapper; this field just threads the existing value onto `LiveProject` for the first time. `null` for discovery-only projects, whose enrichment path doesn't compute a 7d figure — never fabricated. */
+  changePct7d: number | null;
+  /** PR-086.03 — same already-fetched/already-parsed CoinGecko bulk call as `changePct7d` above (`mapCoinMarket()`, `lib/providers/coingecko/mapper.ts`); this just threads the 30d figure through too, for the Explorer's inline 24H/7D/30D performance switch. `null` for discovery-only projects, same reasoning as `changePct7d`. */
+  changePct30d: number | null;
   marketCapUsd: number | null;
   fdvUsd: number | null;
   volume24hUsd: number | null;
@@ -156,6 +183,45 @@ export type LiveProject = {
   engineering: EngineeringSummary;
   governance: GovernanceSummary;
   contracts: ContractSummary;
+  /**
+   * Universal Project Card, PR-1 — the engine's already-computed `Health`
+   * (`lib/intelligence/scoring.ts`'s `computeHealth`, run every batch
+   * already; previously computed but never threaded onto this type).
+   * `null` for a discovery-only project — no `ProjectIntelligence` exists
+   * for it, so no Health was ever computed, never a guessed value.
+   */
+  health: Health | null;
+  /**
+   * Universal Project Card, PR-1 — a pure blend of `health.score` and
+   * `confidence.score` (`lib/intelligence/scorecard.ts`'s
+   * `computeAiRatingGrade`, the same computation the AI Intelligence
+   * Report's Scorecard tile already uses). `null` whenever `health` is
+   * `null` — the blend has nothing real to blend for a discovery-only
+   * project, so it is never estimated from confidence alone.
+   */
+  aiRating: AiRatingGrade | null;
+  /**
+   * Universal Project Card, PR-1 — the engine's already-computed overall
+   * risk level (`ProjectIntelligence.risk.level`, from
+   * `lib/intelligence-engine`'s `generateRiskAnalysis`, run every batch
+   * already). `null` for a discovery-only project (no `Risk` was ever
+   * computed for it). Note this is the real, 4-value engine vocabulary
+   * (`"low"|"moderate"|"elevated"|"high"`) — how a card-facing Risk Badge
+   * collapses "elevated" is a presentation decision for whichever PR
+   * implements that badge, not decided here.
+   */
+  riskLevel: RiskLevel | null;
+  /**
+   * UX Polish, Phase 5 ("Explain Why") — the same `RiskAnalysisOutput.contributors`
+   * that produced `riskLevel` above (`generateRiskAnalysis`, run once per
+   * project already; nothing new is computed here, just no longer
+   * discarded at this mapping step). Real per-factor `label`/`detail`/
+   * `severity` (TVL stability, liquidity, contract verification, developer
+   * activity, governance) for a Risk Badge tooltip to explain *why* a risk
+   * level is what it is. Empty array for a discovery-only project — never
+   * fabricated factors for a risk level that was never computed.
+   */
+  riskContributors: RiskContributor[];
   /** ISO timestamp — the intelligence record's `metadata.generatedAt` for a registry project, or the discovery project's `discoveredAt` for a discovery-only one. */
   lastUpdated: string;
   /**

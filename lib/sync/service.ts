@@ -14,7 +14,7 @@
  */
 
 import { addConflict, listConflicts, resolveConflict as resolveConflictRecord } from "@/lib/sync/conflicts";
-import { runSyncAttempt } from "@/lib/sync/engine";
+import { runPullAttempt, runSyncAttempt } from "@/lib/sync/engine";
 import * as operations from "@/lib/sync/operations";
 import { deriveState, readIsOffline, readPersistedStatus, writePersistedStatus, type SyncPhase } from "@/lib/sync/status";
 import type { ConflictRecord, SyncEntity, SyncOperation, SyncStatus } from "@/lib/sync/types";
@@ -120,6 +120,22 @@ export function clearQueue(): void {
  * honestly succeeds trivially; a non-empty queue honestly ends in
  * "error", with every operation's retry count bumped, never silently
  * cleared as if it had synced.
+ *
+ * Bug fix (Guest + Sign Out follow-up — profile not restored on re-sign-in)
+ * — a `"success"` operation used to stay in the queue exactly like a
+ * `"pending"` one (nothing here ever dequeued it), so it got resent on
+ * every later `performSync()` — including the very next sign-in — for no
+ * reason: the work it represented was already done. Confirmed live as a
+ * real, reachable failure mode, not just wasted requests: a real backend
+ * (`accountSync.ts`/`searchSync.ts`) logs each applied operation id under a
+ * `PRIMARY KEY`, so replaying an already-`"success"` id threw there and
+ * came back as a false per-operation `"error"` — which then permanently
+ * blocked `performPull()`'s reconciliation from ever applying real cloud
+ * data for that entity again. A completed operation is dropped from the
+ * queue the moment it succeeds, the same way `dequeueOperation()` already
+ * drops one on request — nothing reads a `"success"` entry out of this
+ * queue for any real purpose (`getPendingOperations()` backs the Sync
+ * Queue dialog's "still pending" list, not a completed-work log).
  */
 export async function performSync(): Promise<void> {
   if (isOffline) return;
@@ -127,7 +143,7 @@ export async function performSync(): Promise<void> {
   refresh();
 
   const result = await runSyncAttempt(queue);
-  queue = operations.replaceAll(result.operations);
+  queue = operations.replaceAll(result.operations.filter((operation) => operation.status !== "success"));
   phase = result.outcome;
 
   if (result.outcome === "success") {
@@ -141,6 +157,56 @@ export async function performSync(): Promise<void> {
 /** An alias for `performSync()` — a retry is just another sync attempt. */
 export async function retrySync(): Promise<void> {
   return performSync();
+}
+
+/**
+ * PR-093.06 (Ongoing Cloud Sync) — fetches the current remote state via
+ * whichever connector is active and reconciles it against this device's
+ * own pending queue, entity+entityId by entity+entityId (the same keying
+ * `ConflictRecord` already uses). An entity with a real, not-yet-synced
+ * local change is never silently overwritten — it's recorded as a real
+ * conflict (via the existing `recordConflict()`/`addConflict()` seam,
+ * using the queued operation's own real payload as the local version) and
+ * left for the caller to leave alone; only an entity with no conflicting
+ * local change is reported safe to apply.
+ *
+ * Deliberately does not apply anything to Account/Watchlist/Preferences
+ * storage itself — `payload` stays opaque here exactly as it does
+ * everywhere else in this file (see the top-of-file doc comment); the
+ * caller (`lib/hooks/useCloudSyncActivation.ts`, which already knows about
+ * both Sync and Account) is responsible for deserializing `applied`
+ * operations through the right entity adapter and writing them to the
+ * right local store.
+ */
+export type PullReconciliationResult = {
+  applied: SyncOperation[];
+  conflicted: SyncOperation[];
+};
+
+export async function performPull(): Promise<PullReconciliationResult> {
+  if (isOffline) return { applied: [], conflicted: [] };
+
+  const result = await runPullAttempt();
+  const applied: SyncOperation[] = [];
+  const conflicted: SyncOperation[] = [];
+
+  for (const remoteOperation of result.operations) {
+    const conflictingLocalOperation = queue.find(
+      (op) => op.entity === remoteOperation.entity && op.entityId === remoteOperation.entityId && op.status !== "success"
+    );
+    if (conflictingLocalOperation) {
+      recordConflict(remoteOperation.entity, remoteOperation.entityId, conflictingLocalOperation.payload, remoteOperation.payload);
+      conflicted.push(remoteOperation);
+    } else {
+      applied.push(remoteOperation);
+    }
+  }
+
+  persisted = { ...persisted, lastSyncAt: new Date().toISOString() };
+  writePersistedStatus(persisted);
+  refresh();
+
+  return { applied, conflicted };
 }
 
 /** Foundation seam — records a conflict between a local and remote version of an entity. Nothing calls this automatically yet, since there is no remote version to ever compare against without a backend. */

@@ -10,10 +10,13 @@ type Section = { id: string; label: string };
 /** Matches the landing page's actual section order in `app/page.tsx` — every id here must exist on the page or its dot silently never activates. */
 const SECTIONS: Section[] = [
   { id: "hero", label: "Hero" },
+  { id: "product-proof", label: "Product" },
+  { id: "intelligence-engine", label: "Engine" },
+  { id: "ai-command-center", label: "AI Command Center" },
   { id: "projects", label: "Projects" },
-  { id: "ai", label: "AI Intelligence" },
-  { id: "why", label: "Why Base Radar" },
-  { id: "roadmap", label: "Roadmap" },
+  { id: "wallet-portfolio", label: "Wallet" },
+  { id: "how-it-works", label: "How It Works" },
+  { id: "trusted-data", label: "Data Sources" },
   { id: "features", label: "Features" },
   { id: "site-footer", label: "Footer" },
 ];

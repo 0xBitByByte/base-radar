@@ -1,8 +1,10 @@
 import { IntelligenceCard } from "@/components/alerts/IntelligenceCard";
 import type { IntelligenceAlert } from "@/lib/alerts/intelligence/types";
+import type { ProjectLogoEntry } from "@/lib/branding/resolveProjectLogos";
 
 type IntelligenceListProps = {
   alerts: IntelligenceAlert[];
+  logoMap: Record<string, ProjectLogoEntry>;
   /**
    * Overrides the default "No meaningful intelligence detected." message —
    * `AlertsPageClient` passes a search- or filter-specific message when
@@ -31,7 +33,7 @@ const DEFAULT_EMPTY_MESSAGE = "No meaningful intelligence detected.";
  * produced. Skipped when `preserveOrder` is set, so an explicit user sort
  * choice (PR15.3 Part 3) always wins.
  */
-export function IntelligenceList({ alerts, emptyMessage, preserveOrder }: IntelligenceListProps) {
+export function IntelligenceList({ alerts, emptyMessage, preserveOrder, logoMap }: IntelligenceListProps) {
   if (alerts.length === 0) {
     return (
       <p className="py-2 text-xs text-radar-light-muted dark:text-radar-muted">
@@ -47,7 +49,7 @@ export function IntelligenceList({ alerts, emptyMessage, preserveOrder }: Intell
   return (
     <ul className="flex flex-col gap-2">
       {ordered.map((alert) => (
-        <IntelligenceCard key={alert.id} alert={alert} />
+        <IntelligenceCard key={alert.id} alert={alert} logoMap={logoMap} />
       ))}
     </ul>
   );

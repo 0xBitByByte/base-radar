@@ -196,7 +196,7 @@ function buildRiskContributors(input: RiskAnalysisInput): RiskContributor[] {
     contributors.push({
       label: "Smart Contract Risk",
       detail: input.hasRegisteredContracts
-        ? "Verification status couldn't be confirmed for this project's contracts through this check — see the Contracts section below for real per-contract verification detail."
+        ? "Verification status could not be confirmed for this project's contracts through this check — see the Contracts section for real per-contract verification detail."
         : "No contracts registered for this project yet.",
       severity: "unknown",
     });

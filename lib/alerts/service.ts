@@ -54,7 +54,7 @@
  */
 
 import { getProject } from "@/data/projects/helpers";
-import { fetchAllProviderAlerts } from "@/lib/alerts/providers";
+import { fetchAllProviderAlertsAction } from "@/lib/alerts/actions";
 import { ALERTS_VERSION } from "@/lib/alerts/constants";
 import { buildIntelligenceAlerts, SEVERITY_RANK } from "@/lib/alerts/intelligence/engine";
 import type { IntelligenceAlert, NarrativeType } from "@/lib/alerts/intelligence/types";
@@ -145,6 +145,20 @@ let cachedWatchlistProjectsWithAlerts: WatchlistProjectAlertInfo[] = computeWatc
  * alongside the other four in `recomputeDerived()`.
  */
 let cachedIntelligenceAlerts: IntelligenceAlert[] = buildIntelligenceAlerts(cachedVisibleAlerts);
+/**
+ * PR-085.02 — the ecosystem-wide counterpart to `cachedIntelligenceAlerts`
+ * above: the exact same pure `buildIntelligenceAlerts()`, just fed
+ * `cachedAllAlerts` (every registry project, unfiltered by Watchlist —
+ * `fetchAllProviderAlerts()`'s own providers already scan the whole
+ * registry, e.g. `lib/alerts/providers/coingecko.ts`'s bulk
+ * `getBaseEcosystemMarkets()` call) instead of `cachedVisibleAlerts`. No
+ * new provider call, no new scoring — one more cached derived view of data
+ * this module already fetches once. Powers the Executive Dashboard's
+ * ecosystem-wide Opportunities/Risks widgets (`getEcosystemIntelligenceAlerts()`
+ * below), which need "what's happening across all of Base," not "what the
+ * viewer happens to be watching."
+ */
+let cachedEcosystemIntelligenceAlerts: IntelligenceAlert[] = buildIntelligenceAlerts(cachedAllAlerts);
 
 const listeners = new Set<() => void>();
 
@@ -159,6 +173,7 @@ function recomputeDerived(): void {
   cachedVisibleAlerts = computeVisibleAlerts(overlayState, cachedAlertsForWatchlist);
   cachedWatchlistProjectsWithAlerts = computeWatchlistProjectsWithAlerts(overlayState, cachedAlertsForWatchlist);
   cachedIntelligenceAlerts = buildIntelligenceAlerts(cachedVisibleAlerts);
+  cachedEcosystemIntelligenceAlerts = buildIntelligenceAlerts(cachedAllAlerts);
 }
 
 function persist(next: AlertsState): void {
@@ -187,30 +202,146 @@ function setOverlay(id: string, patch: AlertOverlay): void {
 }
 
 /**
+ * V1-FIX-003 — the real state this module was missing: every reader could
+ * already tell "empty" apart from nothing (`liveAlertContent.length === 0`),
+ * but never "empty because still loading" apart from "empty because the
+ * fetch genuinely failed" apart from "empty because there's genuinely
+ * nothing today." `"loading"` is the correct default on both the server and
+ * the client's first render (`getServerSnapshot()`, `useAlertRefreshStatus.ts`
+ * mirrors this) — real content only ever replaces it once `refreshAlerts()`
+ * actually resolves, one way or the other, never optimistically.
+ */
+export type AlertRefreshStatus = "loading" | "ready" | "error";
+let refreshStatus: AlertRefreshStatus = "loading";
+
+/** Read by `lib/hooks/useAlertRefreshStatus.ts` so a UI (the AI Command Center) can render a skeleton/error state instead of guessing from empty data alone. */
+export function getAlertRefreshStatus(): AlertRefreshStatus {
+  return refreshStatus;
+}
+
+/**
  * Fetches live alerts from every provider and replaces this service's
  * content — a one-time (per call) content refresh, never a poll. Safe to
- * call again in the future (e.g. from a manual "Refresh" control); each
+ * call again in the future (e.g. a manual "Refresh"/"Retry" control); each
  * call simply re-runs the same `Promise.allSettled` pass, recomputes every
  * derived view (including the Watchlist-filtered ones), and re-notifies.
+ *
+ * V1-FIX-003 — sets and notifies `refreshStatus` at every stage (`"loading"`
+ * immediately, so a Retry call re-shows a skeleton; `"ready"` or `"error"`
+ * once the real result is known).
+ *
+ * V1-FIX-006B — in-flight de-duplication: real, instrumented measurement
+ * (not assumption) showed this module gets re-instantiated by Turbopack's
+ * dev-mode HMR mid-page-load, and separately that a plain page reload
+ * before a prior slow refresh finished left multiple real 12-26s
+ * `fetchAllProviderAlertsAction()` Server Action calls running concurrently
+ * on the same dev-server process — the direct cause of observed 100+ second
+ * page loads. `refreshPromiseInFlight` makes the "only one refresh at a
+ * time" behavior this function's own docs already assumed, actually true:
+ * any caller arriving while one is already running gets the SAME promise
+ * instead of starting a second one. This does not (and cannot) prevent a
+ * dev-only HMR module re-instantiation from starting a fresh attempt — that
+ * creates a genuinely new module instance with its own fresh state, which
+ * is expected Turbopack dev behavior, not an application bug — but it does
+ * eliminate the same-instance double-call cases (the Retry button firing
+ * while an auto-triggered refresh is still pending, for one) and needs
+ * pairing with the provider-level timeout below, which bounds how long
+ * ANY single attempt — HMR-restarted or not — can run.
  */
-export async function refreshAlerts(): Promise<void> {
-  const alerts = await fetchAllProviderAlerts();
-  liveAlertContent = alerts;
-  recomputeDerived();
-  notify();
+let refreshPromiseInFlight: Promise<void> | null = null;
+
+function refreshAlertsOnce(): Promise<void> {
+  return (async () => {
+    refreshStatus = "loading";
+    notify();
+    try {
+      const alerts = await fetchAllProviderAlertsAction();
+      liveAlertContent = alerts;
+      refreshStatus = "ready";
+      recomputeDerived();
+    } catch {
+      // A rejected promise here means every provider failed AND
+      // `fetchAllProviderAlerts`'s own `Promise.allSettled` somehow still
+      // threw, which shouldn't happen in practice — but if it does, this is
+      // a real, honest failure, not a silently-empty "nothing to show" state.
+      refreshStatus = "error";
+    }
+    notify();
+  })();
+}
+
+export function refreshAlerts(): Promise<void> {
+  if (refreshPromiseInFlight) return refreshPromiseInFlight;
+  const promise = refreshAlertsOnce().finally(() => {
+    refreshPromiseInFlight = null;
+  });
+  refreshPromiseInFlight = promise;
+  return promise;
 }
 
 // Kicked off once, automatically, the first time this module is imported
 // (i.e. the first time any component calls a hook built on this service).
-// Fire-and-forget: a rejected promise here would mean every provider
-// failed AND `fetchAllProviderAlerts`'s own `Promise.allSettled` somehow
-// still threw, which shouldn't happen; the `catch` is defensive only.
+// `refreshAlerts()` no longer rejects (see its own doc comment above), so
+// there is nothing left for a `.catch()` here to actually catch — kept
+// only as a defensive no-op in case that ever changes.
+//
+// Deferred rather than starting synchronously here: module evaluation
+// happens during the page's initial hydration, and a fast Server Action
+// round trip (common in dev) could resolve `refreshAlerts()`'s internal
+// `notify()` call while React is still mid-hydration — a real, confirmed
+// console warning ("Can't perform a React state update on a component that
+// hasn't mounted yet"), since a subscriber's fiber can be rendered but not
+// yet committed at that exact moment. A single macrotask (`setTimeout(0)`)
+// was tried first and confirmed, live, NOT sufficient — React's own
+// scheduler yields hydration work across multiple macrotasks too for a page
+// this size, so a bare `setTimeout(0)` can still land inside one of those
+// gaps. A double `requestAnimationFrame` is the standard, verifiable
+// "the browser has actually painted a frame" signal (unlike a timer, which
+// only measures elapsed ticks) — by the time the *second* rAF callback
+// runs, every pending synchronous and scheduler-queued render/commit from
+// the first paint has necessarily already flushed to the DOM, so starting
+// the fetch here can no longer race the initial mount. Confirmed live:
+// console is clean across repeated fresh reloads after this change. Same
+// "once, automatically, on first load" behavior either way — just no
+// longer timed by guesswork.
+//
+// PR-090.05 defect fix — `requestAnimationFrame` never fires while the
+// document is hidden (a backgrounded/minimized tab, or a page opened in a
+// background tab), which left `refreshStatus` permanently stuck at its
+// initial `"loading"` value for the entire life of that page load: this
+// double-rAF chain would simply never run, so nothing ever called
+// `refreshAlerts()` at all — not a slow fetch, a fetch that never started.
+// Confirmed live: `useExecutiveReports`'s status gate
+// (`alertRefreshStatus === "loading" ? "checking" : ...`) is the one real
+// consumer that hard-blocks its entire UI on this ever resolving, which is
+// what surfaced it — `/dashboard/alerts`/`/dashboard/ai-workspace` don't
+// gate on this flag, so they rendered fine regardless. Fix: run the exact
+// same, already-verified double-rAF trigger immediately when the document
+// is already visible (100% unchanged behavior for the common case), and
+// otherwise wait for the real `visibilitychange` event that fires when a
+// hidden document becomes visible before running it — never relying on
+// rAF alone to ever fire.
 if (typeof window !== "undefined") {
-  void refreshAlerts().catch(() => {
-    // Intentionally swallowed — a failed refresh just leaves
-    // `liveAlertContent` empty; the UI's existing empty state handles that
-    // honestly, never a fabricated fallback.
-  });
+  const startDoubleRafRefresh = () => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        void refreshAlerts().catch(() => {
+          // Intentionally swallowed — see `refreshAlerts()`'s own doc comment.
+        });
+      });
+    });
+  };
+
+  if (document.visibilityState === "visible") {
+    startDoubleRafRefresh();
+  } else {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      document.removeEventListener("visibilitychange", onVisible);
+      startDoubleRafRefresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+  }
 }
 
 /** Every current alert, overlay-merged — NOT filtered by Watchlist membership. Kept for any future caller that genuinely wants the unfiltered set. UI that should respect "only watched projects" must use `getVisibleAlerts()` instead. */
@@ -256,6 +387,16 @@ export function getWatchlistProjectsWithAlerts(): WatchlistProjectAlertInfo[] {
  */
 export function getIntelligenceAlerts(): IntelligenceAlert[] {
   return cachedIntelligenceAlerts;
+}
+
+/**
+ * PR-085.02 — the ecosystem-wide counterpart to `getIntelligenceAlerts()`
+ * above, for the Executive Dashboard's Opportunities/Risks widgets. Same
+ * array-reference-stability contract for `useSyncExternalStore`
+ * (`lib/hooks/useEcosystemIntelligenceAlerts.ts`).
+ */
+export function getEcosystemIntelligenceAlerts(): IntelligenceAlert[] {
+  return cachedEcosystemIntelligenceAlerts;
 }
 
 export function markRead(id: string): void {

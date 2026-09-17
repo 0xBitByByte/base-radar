@@ -7,7 +7,7 @@
 
 import type { ProviderErrorInfo, ProviderName } from "@/lib/providers/common/types";
 
-export type ProviderErrorCode = "http_error" | "timeout" | "rate_limited" | "parse_error" | "network_error";
+export type ProviderErrorCode = "http_error" | "timeout" | "rate_limited" | "parse_error" | "network_error" | "circuit_open";
 
 export class ProviderError extends Error implements ProviderErrorInfo {
   readonly provider: ProviderName;
@@ -51,6 +51,21 @@ export class ProviderParseError extends ProviderError {
   constructor(provider: ProviderName, message = "Failed to parse provider response", cause?: unknown) {
     super(provider, "parse_error", message, cause);
     this.name = "ProviderParseError";
+  }
+}
+
+/**
+ * V1-PHASE-2 (ADR V1-BLOCKER-001) — thrown by `fetchJson()` when this
+ * provider's circuit breaker is currently open, before any network attempt
+ * is made. Deliberately a distinct code from every existing failure mode
+ * (never `network_error`/`timeout`/`http_error`) so a caller inspecting
+ * `ProviderResult.error.code` can tell "the provider itself failed" apart
+ * from "we chose not to ask it this time."
+ */
+export class ProviderCircuitOpenError extends ProviderError {
+  constructor(provider: ProviderName, message = "Provider temporarily unavailable (circuit breaker open)", cause?: unknown) {
+    super(provider, "circuit_open", message, cause);
+    this.name = "ProviderCircuitOpenError";
   }
 }
 

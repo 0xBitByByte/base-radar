@@ -8,6 +8,7 @@
 
 import type { Project, SocialLinks } from "@/data/projects/types";
 import type { ProjectIntelligence } from "@/lib/intelligence/types";
+import { computeAiRatingGrade } from "@/lib/intelligence/scorecard";
 import type { DiscoveryProject } from "@/lib/discovery/project";
 import type {
   CommunitySummary,
@@ -30,7 +31,7 @@ import type {
  * lower-priority source if the winner's URL turns out to be broken (a 404)
  * rather than jumping straight to initials.
  */
-function resolveLogoUrl(candidates: (string | null)[]): { logoUrl: string | null; logoUrlFallbacks: string[] } {
+export function resolveLogoUrl(candidates: (string | null)[]): { logoUrl: string | null; logoUrlFallbacks: string[] } {
   const real = candidates.filter((url): url is string => Boolean(url));
   return { logoUrl: real[0] ?? null, logoUrlFallbacks: real.slice(1) };
 }
@@ -60,7 +61,7 @@ export function buildLiveProjectFromIntelligence(
   intelligence: ProjectIntelligence,
   matchedDiscovery: DiscoveryProject | null
 ): LiveProject {
-  const { identity, market, trading, tvl, contracts, github, chain, community, confidence, governance, sources, metadata } = intelligence;
+  const { identity, market, trading, tvl, contracts, github, chain, community, confidence, governance, sources, metadata, health, risk } = intelligence;
 
   const socialLinkCount = SOCIAL_LINK_FIELDS.filter((field) => Boolean(project.social[field])).length;
 
@@ -68,6 +69,8 @@ export function buildLiveProjectFromIntelligence(
     available: market.available,
     priceUsd: market.priceUsd,
     changePct24h: market.changePct24h,
+    changePct7d: market.changePct7d,
+    changePct30d: market.changePct30d,
     marketCapUsd: market.marketCapUsd,
     fdvUsd: market.fullyDilutedValuationUsd,
     volume24hUsd: trading.volume24hUsd,
@@ -136,6 +139,18 @@ export function buildLiveProjectFromIntelligence(
       logoUrl,
       logoUrlFallbacks,
       websiteUrl: identity.websiteUrl,
+      socials: {
+        twitter: project.social.twitter ?? null,
+        discord: project.social.discord ?? null,
+        telegram: project.social.telegram ?? null,
+        farcaster: project.social.farcaster ?? null,
+        docs: project.social.docs ?? null,
+        blog: project.social.blog ?? null,
+        forum: project.social.forum ?? null,
+        medium: project.social.medium ?? null,
+        mirror: project.social.mirror ?? null,
+        linkedin: project.social.linkedin ?? null,
+      },
     },
     category: identity.categories[0] ?? "other",
     subcategories: identity.tags,
@@ -156,6 +171,10 @@ export function buildLiveProjectFromIntelligence(
     engineering: engineeringSummary,
     governance: governanceSummary,
     contracts: contractSummary,
+    health,
+    aiRating: computeAiRatingGrade(health.score, confidence.score),
+    riskLevel: risk.level,
+    riskContributors: risk.contributors,
     lastUpdated: metadata.generatedAt,
     registryUpdatedAt: project.lifecycle?.updatedAt ?? null,
     discoveryMetadata: matchedDiscovery
@@ -182,13 +201,15 @@ export function buildLiveProjectFromDiscovery(discoveryProject: DiscoveryProject
   const { evidence } = discoveryProject;
   const { enrichment } = evidence;
 
-  const chains = Array.from(new Set(discoveryProject.contracts.map((contract) => contract.chain)));
   const socialLinkCount = DISCOVERY_SOCIAL_LINK_FIELDS.filter((field) => Boolean(discoveryProject.socials[field])).length;
 
   const marketSummary: MarketSummary = {
     available: enrichment.hasLiveMarketData,
     priceUsd: null,
     changePct24h: enrichment.changePct24h,
+    // Discovery enrichment has no 7d/30d figure or price series — honestly null/empty, never fabricated.
+    changePct7d: null,
+    changePct30d: null,
     marketCapUsd: null,
     fdvUsd: null,
     volume24hUsd: enrichment.volume24hUsd,
@@ -245,10 +266,30 @@ export function buildLiveProjectFromDiscovery(discoveryProject: DiscoveryProject
       logoUrl: discoveryProject.logoUrl ?? null,
       logoUrlFallbacks: [],
       websiteUrl: discoveryProject.website ?? null,
+      // `DiscoveryProject.socials` (`CandidateSocials`) only ever carries
+      // these four fields — every other social key genuinely doesn't exist
+      // for a discovery-only project, never guessed.
+      socials: {
+        twitter: discoveryProject.socials.twitter ?? null,
+        discord: discoveryProject.socials.discord ?? null,
+        telegram: discoveryProject.socials.telegram ?? null,
+        farcaster: discoveryProject.socials.farcaster ?? null,
+        docs: null,
+        blog: null,
+        forum: null,
+        medium: null,
+        mirror: null,
+        linkedin: null,
+      },
     },
     category: discoveryProject.category,
     subcategories: discoveryProject.tags,
-    chains,
+    // PR-085.13B — `discoveryProject.chains` is now the single, already-
+    // merged source of truth (real contract evidence + provider-owned
+    // `knownChains`, unioned across every contributing candidate — see
+    // `deriveChains` in `lib/discovery/project.ts`). No re-derivation, no
+    // fallback here.
+    chains: discoveryProject.chains,
     status: null,
     discoveryStatus: discoveryProject.status,
     verification: { status: null, level: null, verifiedAt: null },
@@ -261,6 +302,13 @@ export function buildLiveProjectFromDiscovery(discoveryProject: DiscoveryProject
     engineering: engineeringSummary,
     governance: governanceSummary,
     contracts: contractSummary,
+    // No `ProjectIntelligence` exists for a discovery-only project, so
+    // none of Health/AI Rating/Risk was ever computed for it — `null`,
+    // never guessed from the thinner discovery-confidence signal alone.
+    health: null,
+    aiRating: null,
+    riskLevel: null,
+    riskContributors: [],
     lastUpdated: discoveryProject.discoveredAt,
     registryUpdatedAt: null,
     discoveryMetadata: {

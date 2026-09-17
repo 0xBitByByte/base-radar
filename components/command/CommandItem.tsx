@@ -3,18 +3,33 @@
 import { ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { SearchProjectRow } from "@/components/command/SearchProjectRow";
 import type { SearchableItem } from "@/lib/search/types";
+import type { LiveProject } from "@/lib/projects/types";
 
 type CommandItemProps = {
   item: SearchableItem;
   active: boolean;
   onSelect: (item: SearchableItem) => void;
   onHover: () => void;
+  /** Universal Project Card, PR-8 — populated only once `CommandResultsAsync`'s `liveProjectsPromise` resolves; `undefined` (or a miss) falls back to the generic row below, never fabricated. */
+  liveProjectById?: Map<string, LiveProject>;
 };
 
-/** One row in the palette's results list — a Command, Project, Timeline event, Notification, Automation result, Portfolio, or Daily Brief entry, all sharing the same `SearchableItem` shape (PR21 Part 2). `role="option"`/`aria-selected` pair with `CommandResults`' `role="listbox"` and the input's `aria-activedescendant`. */
-export function CommandItem({ item, active, onSelect, onHover }: CommandItemProps) {
+/**
+ * One row in the palette's results list — a Command, Project, Timeline
+ * event, Notification, Automation result, Portfolio, or Daily Brief entry,
+ * all sharing the same `SearchableItem` shape (PR21 Part 2). `role="option"`/
+ * `aria-selected` pair with `CommandResults`' `role="listbox"` and the
+ * input's `aria-activedescendant`. This component owns all interaction
+ * (role, keyboard handling via the parent's `onSelect`/`onHover`,
+ * navigation) for every result type, including projects — PR-8's
+ * `SearchProjectRow` is pure presentation, rendered inside this same
+ * button, never a second interactive element.
+ */
+export function CommandItem({ item, active, onSelect, onHover, liveProjectById }: CommandItemProps) {
   const Icon = item.icon;
+  const liveProject = item.type === "project" ? liveProjectById?.get(item.id.slice("project:".length)) : undefined;
 
   return (
     <button
@@ -32,11 +47,17 @@ export function CommandItem({ item, active, onSelect, onHover }: CommandItemProp
           : "hover:bg-radar-light-surface dark:hover:bg-white/5"
       )}
     >
-      <Icon className="size-4 shrink-0 text-radar-primary dark:text-radar-accent" aria-hidden="true" />
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate font-medium">{item.title}</span>
-        <span className="truncate text-xs text-radar-light-muted dark:text-radar-muted">{item.description}</span>
-      </span>
+      {liveProject ? (
+        <SearchProjectRow project={liveProject} />
+      ) : (
+        <>
+          <Icon className="size-4 shrink-0 text-radar-primary dark:text-radar-accent" aria-hidden="true" />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate font-medium">{item.title}</span>
+            <span className="truncate text-xs text-radar-light-muted dark:text-radar-muted">{item.description}</span>
+          </span>
+        </>
+      )}
       <ChevronRight className="size-3.5 shrink-0 opacity-40" aria-hidden="true" />
     </button>
   );

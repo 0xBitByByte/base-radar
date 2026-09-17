@@ -4,11 +4,10 @@
  * `SeverityBadge`, `AlertCard`, and `AlertFilters` never duplicate a
  * mapping. Colors reuse the existing 3-tier semantic palette
  * (`radar-success`/`radar-warning`/`radar-danger`, the same convention
- * `components/explorer/ScoreBadge.tsx` already uses) plus
- * `radar-primary`/`radar-accent` for the one severity ("info") that
- * palette doesn't cover — this codebase has no dedicated "info" CSS
- * variable, so the existing brand-blue token stands in rather than
- * inventing a new one.
+ * `RiskBadge`/`ProjectStatusBadge` already use) plus `radar-primary`/
+ * `radar-accent` for the one severity ("info") that palette doesn't
+ * cover — this codebase has no dedicated "info" CSS variable, so the
+ * existing brand-blue token stands in rather than inventing a new one.
  */
 
 import {

@@ -7,7 +7,6 @@ import { CopyButton } from "@/components/ui/CopyButton";
 import { GlowBadge } from "@/components/ui/GlowBadge";
 import { CHAIN_BRANDING } from "@/lib/branding/chains";
 import { shortenAddress } from "@/lib/data/format";
-import { cn } from "@/lib/utils";
 
 type ContractCardProps = {
   card: ContractCardData;
@@ -32,7 +31,11 @@ export function ContractCard({ card }: ContractCardProps) {
   const attention = needsAttention(card);
 
   return (
-    <li className="flex flex-col gap-2 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 dark:border-white/10 dark:bg-white/[0.02]">
+    // PR-084.07 integration pass — the same shared hover formula every other
+    // Market Intelligence card (`PairCard`, `SourceCard`, `ScorecardCardView`,
+    // `TrustTileView`) already uses; this card and `ContractsList.tsx`'s own
+    // row were the two confirmed to be missing it.
+    <li className="group flex flex-col gap-2 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 transition-[transform,box-shadow,border-color,background-color] duration-300 ease-out hover:-translate-y-0.5 hover:border-radar-primary/30 hover:bg-radar-light-card hover:shadow-[0_8px_24px_-12px_rgba(var(--color-radar-primary-rgb),0.18)] motion-reduce:hover:translate-y-0 dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-radar-border-hover dark:hover:bg-white/[0.04]">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -60,15 +63,18 @@ export function ContractCard({ card }: ContractCardProps) {
             </p>
           )}
         </div>
-        <span
-          className={cn(
-            "flex shrink-0 items-center gap-1 text-xs font-medium",
-            status.label === "Verified" ? "text-radar-success" : "text-radar-light-muted dark:text-radar-muted"
-          )}
-        >
+        {/* PR-084.07 integration pass — the primary Verified/Not Verified
+            indicator now goes through the shared `GlowBadge` component
+            (previously a raw `<span>`, the one status pill on this card
+            that didn't), matching every other card's status pill on this
+            page (`PairCard`, `GovernanceCard`, `WhaleCard`). The compiler/
+            optimization/license/proxy/creator chips below stay plain tags —
+            they're metadata, not a status verdict, so `GlowBadge` isn't the
+            right fit for them. */}
+        <GlowBadge color={status.label === "Verified" ? "success" : "muted"} className="shrink-0 gap-1 px-2 py-0.5 text-[11px]">
           {status.label === "Verified" ? <CircleCheck className="size-3.5" aria-hidden="true" /> : <CircleHelp className="size-3.5" aria-hidden="true" />}
           {status.label === "Verified" ? "Verified" : status.label === "Not Verified" ? "Not Verified" : "Not Verified Yet"}
-        </span>
+        </GlowBadge>
       </div>
 
       {card.detail?.verified && (

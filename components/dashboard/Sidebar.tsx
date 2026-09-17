@@ -136,7 +136,7 @@ export function SidebarNav({ onNavigate, className }: SidebarNavProps) {
 
 export function Sidebar() {
   return (
-    <aside className="sticky top-0 hidden h-dvh w-[264px] shrink-0 border-r border-radar-light-border bg-radar-light-card/80 px-4 py-6 backdrop-blur-xl lg:flex dark:border-white/10 dark:bg-radar-bg/60">
+    <aside className="sticky top-0 hidden h-dvh w-[264px] shrink-0 border-r border-radar-primary/[0.18] bg-radar-light-card/45 px-4 py-6 shadow-[8px_0_24px_-16px_rgba(16,34,58,0.35)] backdrop-blur-2xl lg:flex dark:border-white/10 dark:bg-radar-bg/45 dark:shadow-[8px_0_24px_-16px_rgba(0,0,0,0.6)]">
       <SidebarNav className="w-full" />
     </aside>
   );

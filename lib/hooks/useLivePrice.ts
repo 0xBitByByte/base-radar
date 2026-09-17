@@ -4,10 +4,16 @@
  * Client-poll refresh for a single project's numeric market stats on the
  * Project Profile page (PR12.2) — same "UI -> Hooks -> Services ->
  * Providers" shape as `useLiveNetworkStatus`/`useLiveTvl`, built on
- * `usePolling`. Wraps CoinGecko's bulk `getBaseEcosystemMarkets(250)` (the
- * same call `sources.ts`'s `matchMarket()` already makes for this page's
- * first paint) and matches by `id === coingeckoId`, exactly like
- * `matchMarket` does.
+ * `usePolling`. Each poll calls `pollLivePrice` (`lib/hooks/liveActions.ts`),
+ * a Server Action wrapping CoinGecko's bulk `getBaseEcosystemMarkets(250)`
+ * (the same call `sources.ts`'s `matchMarket()` already makes for this
+ * page's first paint) and matching by `id === coingeckoId`, exactly like
+ * `matchMarket` does — run server-side (Final Production Readiness PR),
+ * not imported into this `"use client"` hook directly: CoinGecko's REST API
+ * doesn't permit cross-origin browser requests, so the previous direct
+ * import meant every poll failed silently in the browser (confirmed live
+ * via a CORS console error) and this page's live price never actually
+ * refreshed past its first SSR paint.
  *
  * Scoped to the fields CoinGecko's bulk list actually carries and this page
  * treats as "live market data" — price, market cap/rank/FDV, 24h/7d/30d
@@ -17,7 +23,7 @@
  * this onto its existing `Market` object rather than replacing it.
  */
 
-import * as coingecko from "@/lib/providers/coingecko/service";
+import { pollLivePrice } from "@/lib/hooks/liveActions";
 import { usePolling } from "@/lib/hooks/usePolling";
 import type { Market } from "@/lib/intelligence/types";
 
@@ -49,9 +55,7 @@ export function useLivePrice(coingeckoId: string | null, pollMs: number = DEFAUL
   const { data, updatedAt } = usePolling<LivePrice>(
     async () => {
       if (!coingeckoId) return null;
-      const result = await coingecko.getBaseEcosystemMarkets(250);
-      if (!result.ok) return null;
-      const match = result.data.find((m) => m.id === coingeckoId);
+      const match = await pollLivePrice(coingeckoId);
       if (!match) return null;
       return {
         priceUsd: match.priceUsd,

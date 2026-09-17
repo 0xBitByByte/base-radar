@@ -15,7 +15,9 @@ import type { LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { GlowBadge } from "@/components/ui/GlowBadge";
+import { GLASS_SURFACE_STATIC } from "@/components/ui/glassStyles";
 import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
+import { useWallet } from "@/lib/hooks/useWallet";
 import { useWatchlists } from "@/lib/hooks/useWatchlists";
 
 type OnboardingItem = {
@@ -35,20 +37,18 @@ type OnboardingItem = {
  * localStorage key, no preference, no dismiss state. "Explore Projects" has
  * no corresponding real state to check (this app has no page-visit
  * tracking) — it renders as always-available rather than a fabricated
- * checkmark. "Connect Wallet" and "Create Automation" stay Coming Soon
- * forever, since neither feature is real yet; they're excluded from the
- * completion signal below for the same reason.
+ * checkmark. "Create Automation" stays Coming Soon forever, since that
+ * feature isn't real yet; it's excluded from the completion signal below
+ * for the same reason. "Connect Wallet" (V3-WALLET-001) is real now — its
+ * `done` reads `useWallet().isConnected` like every other real item here.
  */
 export function GettingStartedCard() {
   const { activeWatchlist } = useWatchlists();
   const { hasNotifications } = usePersonalizedDashboard();
+  const { isConnected: isWalletConnected } = useWallet();
 
   const hasWatchlistProjects = (activeWatchlist?.projectIds.length ?? 0) > 0;
 
-  // "Not yet begun using core dashboard features" — this app has no real
-  // wallet connection, so that half of the example condition is always
-  // true; the only real, existing signal is whether the Watchlist has
-  // anything in it yet.
   if (hasWatchlistProjects) return null;
 
   const items: OnboardingItem[] = [
@@ -70,8 +70,7 @@ export function GettingStartedCard() {
       key: "wallet",
       icon: Wallet,
       label: "Connect Wallet",
-      done: false,
-      comingSoon: true,
+      done: isWalletConnected,
     },
     {
       key: "notifications",
@@ -91,7 +90,7 @@ export function GettingStartedCard() {
   ];
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-radar-light-border bg-gradient-to-b from-radar-light-card/90 to-radar-light-surface/70 p-5 backdrop-blur-xl dark:border-radar-border dark:bg-gradient-to-b dark:from-radar-elevated/60 dark:to-radar-card/70">
+    <div className={cn("flex flex-col gap-3 p-5", GLASS_SURFACE_STATIC)}>
       <div>
         <h2 className="text-sm font-semibold text-radar-light-text dark:text-radar-white">Getting Started</h2>
         <p className="text-xs text-radar-light-muted dark:text-radar-muted">

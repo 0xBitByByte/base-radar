@@ -33,6 +33,7 @@ export function buildGuestAccount(): Account {
     username: "guest",
     email: null,
     avatar: null,
+    bio: null,
     createdAt: now,
     updatedAt: now,
     lastActiveAt: now,
@@ -61,6 +62,7 @@ function sanitizeAccount(value: unknown, fallback: Account): Account {
   if (typeof candidate.username === "string" && candidate.username.trim() !== "") sanitized.username = candidate.username;
   if (typeof candidate.email === "string" || candidate.email === null) sanitized.email = candidate.email as string | null;
   if (typeof candidate.avatar === "string" || candidate.avatar === null) sanitized.avatar = candidate.avatar as string | null;
+  if (typeof candidate.bio === "string" || candidate.bio === null) sanitized.bio = candidate.bio as string | null;
   if (typeof candidate.createdAt === "string" && !Number.isNaN(Date.parse(candidate.createdAt))) {
     sanitized.createdAt = candidate.createdAt;
   }

@@ -65,8 +65,8 @@ export type DashboardEvidenceSummaryItem = {
   count: number;
 };
 
-/** Plain-language label per `EvidenceKind` — matches the brief's own example wording ("Registry Update", "Provider Signal"). */
-const EVIDENCE_KIND_LABEL: Record<EvidenceKind, string> = {
+/** Plain-language label per `EvidenceKind` — matches the brief's own example wording ("Registry Update", "Provider Signal"). Exported (PR-090.01) so the AI Workspace's own evidence composition reuses this exact wording instead of a second label map. */
+export const EVIDENCE_KIND_LABEL: Record<EvidenceKind, string> = {
   "registry-change": "Registry Update",
   "intelligence-signal": "Intelligence Signal",
   "provider-update": "Provider Signal",

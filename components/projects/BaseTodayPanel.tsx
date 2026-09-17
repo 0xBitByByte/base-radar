@@ -7,6 +7,14 @@
  * inline; it's just one place that also enforces the "hide, never fabricate"
  * rule per insight. An insight with no real backing data (e.g. no project
  * anywhere has tracked TVL) is simply omitted, never shown as `$0` or `—`.
+ *
+ * PR-085.02C — takes the already-aggregated counts/highest-projects
+ * directly (from `loadProjectsData.ts`'s lightweight, single-traversal
+ * `getProjectsHeroSnapshot()`) instead of the full `LiveProject[]` +
+ * `LiveProjectCollections` + `ProjectsLeaderboards` it used to recompute
+ * these same numbers from — this panel no longer needs, and no longer
+ * receives, the expensive collection-building pipeline's output at all.
+ * Every rendered value and rule below is unchanged.
  */
 
 import Link from "next/link";
@@ -16,13 +24,20 @@ import { ProjectLogo } from "@/components/branding/ProjectLogo";
 import { PROJECTS_PATH } from "@/components/projects/queryState";
 import { PROJECTS_VIEW_META } from "@/components/projects/viewMeta";
 import { formatCompactCurrency, formatCompactNumber, formatNumber } from "@/lib/data/format";
-import type { LiveProject, LiveProjectCollections } from "@/lib/projects/types";
-import type { ProjectsLeaderboards } from "@/components/projects/loadProjectsData";
+import type { LiveProject } from "@/lib/projects/types";
 
 type BaseTodayPanelProps = {
-  projects: LiveProject[];
-  collections: LiveProjectCollections;
-  leaderboards: ProjectsLeaderboards;
+  totalTvlUsd: number;
+  hasAnyTvl: boolean;
+  activeProposalCount: number;
+  governanceConfiguredCount: number;
+  newCount: number;
+  recentlyDiscoveredCount: number;
+  recentlyUpdatedCount: number;
+  needsReviewCount: number;
+  highestTvl: LiveProject | undefined;
+  highestVolume: LiveProject | undefined;
+  highestActivity: LiveProject | undefined;
 };
 
 type StatTile = { key: string; label: string; value: string; icon: LucideIcon; href: string };
@@ -68,16 +83,19 @@ function SpotlightCard({
   );
 }
 
-export function BaseTodayPanel({ projects, collections, leaderboards }: BaseTodayPanelProps) {
-  const totalTvlUsd = projects.reduce((sum, project) => sum + (project.market.tvlUsd ?? 0), 0);
-  const hasAnyTvl = projects.some((project) => project.market.tvlUsd !== null);
-
-  const activeProposalCount = projects.reduce((sum, project) => sum + (project.governance.activeProposalCount ?? 0), 0);
-  const governanceConfiguredCount = projects.filter((project) => project.governance.configured).length;
-
-  const highestTvl = leaderboards.topTvl[0];
-  const highestActivity = leaderboards.topActivity[0];
-
+export function BaseTodayPanel({
+  totalTvlUsd,
+  hasAnyTvl,
+  activeProposalCount,
+  governanceConfiguredCount,
+  newCount,
+  recentlyDiscoveredCount,
+  recentlyUpdatedCount,
+  needsReviewCount,
+  highestTvl,
+  highestVolume,
+  highestActivity,
+}: BaseTodayPanelProps) {
   const stats: StatTile[] = [
     hasAnyTvl && {
       key: "tvl",
@@ -89,14 +107,14 @@ export function BaseTodayPanel({ projects, collections, leaderboards }: BaseToda
     {
       key: "new",
       label: "New Listings",
-      value: formatNumber(collections.new.length),
+      value: formatNumber(newCount),
       icon: Rocket,
       href: `${PROJECTS_PATH}/${PROJECTS_VIEW_META.new.slug}`,
     },
     {
       key: "recentlyDiscovered",
       label: "Recently Discovered",
-      value: formatNumber(collections.recentlyDiscovered.length),
+      value: formatNumber(recentlyDiscoveredCount),
       icon: Compass,
       href: `${PROJECTS_PATH}/${PROJECTS_VIEW_META.recentlyDiscovered.slug}`,
     },
@@ -109,17 +127,17 @@ export function BaseTodayPanel({ projects, collections, leaderboards }: BaseToda
     // Matches the reviewer's own instruction: hide rather than waste a
     // permanently-zero tile's space; it reappears the moment any registry
     // project's `lifecycle.updatedAt` is actually set.
-    collections.recentlyUpdated.length > 0 && {
+    recentlyUpdatedCount > 0 && {
       key: "recentlyUpdated",
       label: "Recently Updated",
-      value: formatNumber(collections.recentlyUpdated.length),
+      value: formatNumber(recentlyUpdatedCount),
       icon: RefreshCw,
       href: `${PROJECTS_PATH}/${PROJECTS_VIEW_META.recentlyUpdated.slug}`,
     },
     {
       key: "needsReview",
       label: "Needs Review",
-      value: formatNumber(collections.needsReview.length),
+      value: formatNumber(needsReviewCount),
       icon: ShieldAlert,
       href: `${PROJECTS_PATH}/${PROJECTS_VIEW_META.needsReview.slug}`,
     },
@@ -136,13 +154,12 @@ export function BaseTodayPanel({ projects, collections, leaderboards }: BaseToda
     },
   ].filter((tile): tile is StatTile => Boolean(tile));
 
-  // PR-074 — `topVolume` (the third real leaderboard `loadProjectsData.ts`
-  // already computes) was never rendered here, so a project page with only
-  // one of the two original spotlights populated left the sibling grid
-  // column genuinely blank. All three spotlights now render through the
-  // same `flex flex-wrap` row (via `SpotlightCard`, `flex-1` children) so
-  // any count from 1 to 3 fills the row evenly — no reserved, empty column.
-  const highestVolume = leaderboards.topVolume[0];
+  // PR-074 — `topVolume` (the third real leaderboard) was never rendered
+  // here, so a project page with only one of the two original spotlights
+  // populated left the sibling grid column genuinely blank. All three
+  // spotlights now render through the same `flex flex-wrap` row (via
+  // `SpotlightCard`, `flex-1` children) so any count from 1 to 3 fills the
+  // row evenly — no reserved, empty column.
   const spotlights = [
     highestTvl && {
       key: "tvl",

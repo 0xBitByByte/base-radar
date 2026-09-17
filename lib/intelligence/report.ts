@@ -39,7 +39,7 @@
  * `RECOMMENDATION_FOR_RISK` comment) was written to avoid.
  */
 
-import { buildDeveloperEvidenceTile, type ScorecardSeverity, type ScorecardTile } from "@/lib/intelligence/scorecard";
+import type { ScorecardSeverity, ScorecardTile } from "@/lib/intelligence/scorecard";
 import type {
   ChainInfo,
   Community,
@@ -60,6 +60,7 @@ import type { RiskLevel } from "@/lib/intelligence-engine";
 import type { ProviderName } from "@/lib/providers/common/types";
 import { CHAIN_BRANDING } from "@/lib/branding/chains";
 import { formatCompactCurrency, formatDate, formatRelativeTime } from "@/lib/data/format";
+import { VERIFICATION_STATUS_LABEL } from "@/lib/intelligence/helpers";
 
 /** "dex" -> "Dex", "real-yield" -> "Real Yield" — same cosmetic transform as `components/explorer/format.ts`'s `formatLabel`, duplicated locally since `lib/intelligence` shouldn't import from the components layer. */
 function formatCategoryLabel(value: string): string {
@@ -149,7 +150,8 @@ export type IntelligenceReport = {
   sourcesUsed: SourceLink[];
 };
 
-const RECOMMENDATION_FOR_RISK: Record<RiskLevel, string> = {
+/** Exported for Universal Project Card PR-2A (§11, AI Recommendation) to reuse verbatim — the same non-advice, research-workflow phrasing this file's own doc comment explains, never re-authored for the card. */
+export const RECOMMENDATION_FOR_RISK: Record<RiskLevel, string> = {
   low: "Suitable for Deeper Research",
   moderate: "Monitor Closely",
   elevated: "Monitor Closely",
@@ -160,13 +162,6 @@ const CONFIDENCE_LABEL: Record<Confidence["level"], "High" | "Medium" | "Low"> =
   high: "High",
   medium: "Medium",
   low: "Low",
-};
-
-const VERIFICATION_LABEL: Record<VerificationStatus, string> = {
-  verified: "Verified",
-  community: "Community-Reviewed",
-  unverified: "Unverified",
-  flagged: "Flagged",
 };
 
 export type IntelligenceReportInput = {
@@ -234,26 +229,6 @@ const DEVELOPER_MEANING: Record<ScorecardSeverity, string> = {
   weak: "Development activity has slowed significantly in the recent period.",
   unknown: "No GitHub activity data was available at report time.",
 };
-
-/**
- * The Developer row in Key Metrics Explained needs real evidence (commits/
- * contributors/releases) to satisfy this goal's own worked example — but
- * that data only resolves via the same extended/streamed GitHub calls the
- * Scorecard's Developer tile already uses (`buildDeveloperEvidenceTile`,
- * `lib/intelligence/scorecard.ts`). This is a thin wrapper reused by
- * `ProfileMetricsExplainedDeveloperAsync`, never a new derivation — the fast-path
- * fallback tile (`scorecardTiles.find(t => t.id === "developer")`) is what
- * renders before the Suspense boundary resolves.
- */
-export function buildDeveloperMetricExplanation(
-  commitsLast90d: number | null,
-  contributorCount: number | null,
-  releaseCount: number | null,
-  fallbackTile: ScorecardTile
-): MetricExplanation {
-  const tile = buildDeveloperEvidenceTile(commitsLast90d, contributorCount, releaseCount, fallbackTile);
-  return tileExplanation(tile, DEVELOPER_MEANING[tile.severity]);
-}
 
 const HEALTH_MEANING: Record<Health["label"], string> = {
   excellent: "Strong, well-rounded fundamentals across TVL, development, and market activity.",
@@ -341,7 +316,7 @@ function buildMetricsExplained(input: IntelligenceReportInput): MetricExplanatio
   explanations.push({
     id: "verification",
     label: "Verification",
-    scoreLabel: VERIFICATION_LABEL[input.verificationStatus],
+    scoreLabel: VERIFICATION_STATUS_LABEL[input.verificationStatus],
     ratingLabel: "Registry status",
     evidence: "Base Radar's own editorial review — see docs/PROJECT_REGISTRY.md.",
     meaning: VERIFICATION_MEANING[input.verificationStatus],
@@ -509,7 +484,7 @@ export function buildIntelligenceReport(input: IntelligenceReportInput): Intelli
   if (input.verificationStatus === "verified") {
     strengths.push("Verified in the Base Radar registry.");
   } else if (input.verificationStatus === "unverified" || input.verificationStatus === "flagged") {
-    weaknesses.push(`${VERIFICATION_LABEL[input.verificationStatus]} — not yet reviewed and verified by Base Radar.`);
+    weaknesses.push(`${VERIFICATION_STATUS_LABEL[input.verificationStatus]} — not yet reviewed and verified by Base Radar.`);
   }
 
   if (input.risk.level === "low") {
@@ -640,8 +615,13 @@ export function buildIntelligenceReport(input: IntelligenceReportInput): Intelli
     .slice(0, 5)
     .map((c) => ({ category: c.category, date: formatDevelopmentDate(c.timestamp), headline: c.headline, detail: c.detail }));
 
+  // PR-085.04 — soonest-starting first, so the most time-sensitive catalyst
+  // reads first rather than whatever order `input.governance` happened to
+  // arrive in. Reuses `event.start` (already read below for the same
+  // event) — no new field, no new ranking model.
   const upcomingCatalysts = (input.governance ?? [])
     .filter((event) => event.status === "pending")
+    .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
     .map((event) => `${event.title} — starts ${formatRelativeTime(event.start)}.`);
 
   const watchClosely: string[] = [];

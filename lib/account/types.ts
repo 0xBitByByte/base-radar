@@ -15,6 +15,8 @@ export type Account = {
   email: string | null;
   /** A URL, or `null` to fall back to initials derived from `name`. */
   avatar: string | null;
+  /** `null` — bio is optional, unlike name/username. */
+  bio: string | null;
   createdAt: string;
   updatedAt: string;
   /** Stamped once per session at load time — not on every render, to avoid unnecessary storage writes. */
@@ -29,6 +31,10 @@ export type ProfileInput = {
   username: string;
   email: string;
   avatar: string;
+  bio: string;
 };
 
-export type ProfileValidationError = "empty-name" | "empty-username" | "invalid-username" | "invalid-email" | "duplicate-username";
+export type ProfileValidationError = "empty-name" | "empty-username" | "invalid-username" | "invalid-email" | "duplicate-username" | "bio-too-long";
+
+/** Bio's real, enforced character cap — matches the character counter shown next to the field. */
+export const BIO_MAX_LENGTH = 160;

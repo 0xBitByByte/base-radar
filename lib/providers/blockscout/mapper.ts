@@ -5,6 +5,7 @@ import type {
   RawChainStats,
   RawContractDetail,
   RawSmartContractsResponse,
+  RawTokenBalance,
   RawTokenTransfersResponse,
 } from "@/lib/providers/blockscout/client";
 
@@ -108,7 +109,7 @@ export type ContractDetail = {
  * this with `contract: null` after confirming the failure really was a 404).
  */
 export function mapContractDetail(contract: RawContractDetail | null, address: RawAddressInfo): ContractDetail {
-  const implementation = contract?.implementations[0] ?? null;
+  const implementation = contract?.implementations?.[0] ?? null;
   return {
     verified: contract ? contract.is_verified : address.is_verified,
     isContract: contract !== null ? true : address.is_contract,
@@ -123,6 +124,41 @@ export function mapContractDetail(contract: RawContractDetail | null, address: R
     creatorAddress: address.creator_address_hash,
     creationTxHash: address.creation_transaction_hash,
   };
+}
+
+/** One ERC-20 holding, balance kept as `bigint` — see `lib/providers/base/mapper.ts`'s `mapEthBalance` for why a raw on-chain balance never becomes a `Number` before it's been decimal-adjusted. */
+export type DiscoveredTokenBalance = {
+  address: string;
+  symbol: string;
+  name: string;
+  decimals: number;
+  balance: bigint;
+  /** Real, Blockscout-computed USD price for this token — `null` when Blockscout doesn't have one (never fabricated; the portfolio pricing layer treats this as "try a fallback source next," not as zero). */
+  usdPrice: number | null;
+  logo: string | null;
+};
+
+/**
+ * V3-WALLET-002 — filters to ERC-20 only (Blockscout's token-balances
+ * endpoint also returns ERC-721/ERC-1155 through the same array; NFT
+ * position discovery is explicitly out of scope, see `lib/portfolio/`'s own
+ * doc comment) and drops zero balances (a wallet that has ever received and
+ * fully sent away a token still gets a `RawTokenBalance` entry for it, worth
+ * $0 and not worth rendering as a "holding").
+ */
+export function mapDiscoveredTokenBalances(raw: RawTokenBalance[]): DiscoveredTokenBalance[] {
+  return raw
+    .filter((item) => item.token.type === "ERC-20")
+    .map((item) => ({
+      address: item.token.address_hash,
+      symbol: item.token.symbol,
+      name: item.token.name,
+      decimals: Number(item.token.decimals),
+      balance: BigInt(item.value),
+      usdPrice: item.token.exchange_rate ? Number(item.token.exchange_rate) : null,
+      logo: item.token.icon_url ?? null,
+    }))
+    .filter((holding) => holding.balance > BigInt(0));
 }
 
 export function mapTokenTransfers(raw: RawTokenTransfersResponse): TokenTransfer[] {

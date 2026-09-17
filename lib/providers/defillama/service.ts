@@ -16,30 +16,40 @@ import {
 } from "@/lib/providers/defillama/mapper";
 import { getOrSet } from "@/lib/providers/common/cache";
 import { ProviderParseError } from "@/lib/providers/common/errors";
-import { assertRateLimit, getRateLimitStatus as getSharedRateLimitStatus, type RateLimitConfig } from "@/lib/providers/common/rate-limit";
+import { assertRateLimit, type RateLimitConfig } from "@/lib/providers/common/rate-limit";
 import type { ProviderResult } from "@/lib/providers/common/types";
-import { nowIso, toProviderResult } from "@/lib/providers/common/utilities";
+import { nowIso, toProviderResult, withStaleFallback } from "@/lib/providers/common/utilities";
 import type { SparklinePoint } from "@/lib/data/types";
 
 const PROVIDER = "defillama" as const;
 const CHAIN = "Base";
-const CACHE_TTL_MS = 120_000; // matches the window documented in docs/API.md
+// PR-098.07 — was 2min; retuned into the "TVL" freshness class (10-15min,
+// `lib/intelligence/freshness.ts`) — protocol TVL genuinely moves on the
+// order of hours, not seconds; 2min was needlessly aggressive for the
+// signal's real volatility. Matches docs/API.md's updated window.
+const CACHE_TTL_MS = 720_000;
 const RATE_LIMIT: RateLimitConfig = { limit: 30, windowMs: 60_000 };
 
 /**
- * PR-074 REVIEW #8 — real-time read of this provider's own app-enforced
- * rate-limit budget (see `common/rate-limit.ts`'s `getRateLimitStatus`),
- * exposed for the Evidence & Sources panel to report exact remaining/
- * limit/reset numbers instead of a generic "try again later" — the same
- * pattern already built for GitHub's response-header-based tracker.
+ * Final Production Hardening PR — moved to `defillama/rateLimitStatus.ts`
+ * (a pure module with no `client.ts`/fetch import), re-exported here so
+ * every existing server-side consumer of `"@/lib/providers/defillama/service"`
+ * is unaffected.
  */
-export function getRateLimitStatus() {
-  return getSharedRateLimitStatus(PROVIDER, RATE_LIMIT);
-}
+export { getRateLimitStatus } from "@/lib/providers/defillama/rateLimitStatus";
 
+/**
+ * Final Production Readiness PR — feeds the Dashboard's headline TVL stat
+ * and the topbar ticker, both prominent, high-traffic reads. A transient
+ * DefiLlama failure now degrades to the last real, successfully-fetched
+ * value (`withStaleFallback`, honestly tagged `stale: true`) instead of
+ * blanking the figure entirely — the same pattern already proven for
+ * GitHub's `getRepoStats`/CoinGecko's logo resolution.
+ */
 export async function getBaseChainTvl(): Promise<ProviderResult<ChainTvl>> {
-  return toProviderResult(PROVIDER, () =>
-    getOrSet(`${PROVIDER}:chain-tvl:${CHAIN}`, CACHE_TTL_MS, async () => {
+  const cacheKey = `${PROVIDER}:chain-tvl:${CHAIN}`;
+  const result = await toProviderResult(PROVIDER, () =>
+    getOrSet(cacheKey, CACHE_TTL_MS, async () => {
       assertRateLimit(PROVIDER, RATE_LIMIT);
       const raw = await fetchHistoricalChainTvl(CHAIN);
       const mapped = mapChainTvl(raw);
@@ -47,6 +57,7 @@ export async function getBaseChainTvl(): Promise<ProviderResult<ChainTvl>> {
       return mapped;
     })
   );
+  return withStaleFallback(PROVIDER, cacheKey, result);
 }
 
 export async function getBaseStablecoinMcap(): Promise<ProviderResult<number>> {
@@ -61,14 +72,26 @@ export async function getBaseStablecoinMcap(): Promise<ProviderResult<number>> {
   );
 }
 
+/**
+ * PR-098.06 — the real, most heavily depended-on DefiLlama call in this
+ * codebase (every project's TVL, across the whole app, ultimately reads
+ * this one bulk list) had no `withStaleFallback` at all, unlike its
+ * sibling `getBaseChainTvl` right above — a transient DefiLlama outage
+ * blanked every project's TVL to unavailable instead of degrading to the
+ * last real, successfully-fetched list. A genuine gap this audit found
+ * while building a "stale cache" test for the Featured Intelligence
+ * refresh cycle. Fixed to match the same established pattern.
+ */
 export async function getBaseProtocols(): Promise<ProviderResult<Protocol[]>> {
-  return toProviderResult(PROVIDER, () =>
-    getOrSet(`${PROVIDER}:protocols:${CHAIN}`, CACHE_TTL_MS, async () => {
+  const cacheKey = `${PROVIDER}:protocols:${CHAIN}`;
+  const result = await toProviderResult(PROVIDER, () =>
+    getOrSet(cacheKey, CACHE_TTL_MS, async () => {
       assertRateLimit(PROVIDER, RATE_LIMIT);
       const raw = await fetchAllProtocols();
       return mapChainProtocols(raw, CHAIN);
     })
   );
+  return withStaleFallback(PROVIDER, cacheKey, result);
 }
 
 /** Delegates to `getBaseProtocols` — no independent cache/rate-limit/network call of its own. */
@@ -82,12 +105,6 @@ export async function getTopBaseProtocol(): Promise<ProviderResult<Protocol>> {
   return { ok: true, data: top, source: PROVIDER, fetchedAt: nowIso() };
 }
 
-/** Delegates to `getBaseProtocols` — no independent cache/rate-limit/network call of its own. */
-export async function getBaseProjectCount(): Promise<ProviderResult<number>> {
-  const protocols = await getBaseProtocols();
-  if (!protocols.ok) return protocols;
-  return { ok: true, data: protocols.data.length, source: PROVIDER, fetchedAt: nowIso() };
-}
 
 /** For the Project Profile's TVL chart (PR11 Part 5) — real per-protocol historical TVL, keyed by DefiLlama slug. */
 export async function getProtocolTvlHistory(slug: string): Promise<ProviderResult<SparklinePoint[]>> {

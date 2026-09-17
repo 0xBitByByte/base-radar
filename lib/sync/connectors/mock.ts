@@ -19,11 +19,14 @@ export type MockConnectorConfig = {
 export type MockConnector = SyncConnector & {
   setScenario(scenario: MockConnectorScenario): void;
   setDelay(delayMs: number): void;
+  /** PR-093.06 — configures what `pull()` returns, for testing pull reconciliation against specific real remote operations rather than always the honest-but-untestable empty default. */
+  setPullOperations(operations: SyncOperation[]): void;
 };
 
 export function createMockConnector(config: MockConnectorConfig = {}): MockConnector {
   let scenario = config.scenario ?? "success";
   let delayMs = config.delayMs ?? 0;
+  let pullOperations: SyncOperation[] = [];
 
   async function delay(): Promise<void> {
     if (delayMs > 0) {
@@ -71,7 +74,7 @@ export function createMockConnector(config: MockConnectorConfig = {}): MockConne
 
   async function pull(): Promise<ConnectorPullResult> {
     await delay();
-    return { operations: [] };
+    return { operations: pullOperations };
   }
 
   return {
@@ -100,6 +103,9 @@ export function createMockConnector(config: MockConnectorConfig = {}): MockConne
     },
     setDelay(next: number) {
       delayMs = next;
+    },
+    setPullOperations(next: SyncOperation[]) {
+      pullOperations = next;
     },
   };
 }

@@ -7,8 +7,7 @@ import { NarrativeBadge } from "@/components/alerts/NarrativeBadge";
 import { PortfolioHealthBadge } from "@/components/portfolio/PortfolioHealthBadge";
 import { PortfolioMetric } from "@/components/portfolio/PortfolioMetric";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
-import { ManageWatchlistAction } from "@/components/dashboard/ManageWatchlistAction";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { WatchlistEmptyNotice } from "@/components/dashboard/WatchlistEmptyNotice";
 import { getProject } from "@/data/projects/helpers";
 import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
 
@@ -42,19 +41,18 @@ export function PortfolioWidget() {
       lastUpdated={portfolio?.generatedAt}
     >
       {!portfolio || portfolio.projectCount === 0 ? (
-        <EmptyState
-          icon={LayoutGrid}
-          title="No portfolio to summarize yet."
-          description="Portfolio Intelligence rolls up your Watchlist's health, top performers, and risks into one score. Add a project and it'll build itself."
-          action={<ManageWatchlistAction />}
-        />
+        <WatchlistEmptyNotice icon={LayoutGrid} label="A rolled-up health score, top performers, and risks appear here" />
       ) : (
         <div className="flex flex-col gap-3.5">
+          {/* V2-UX-003 — `portfolio.headline` is always the literal string
+              "Portfolio Intelligence" (`buildPortfolioHeadline()`, static
+              by design) — identical to this widget's own title directly
+              above, every time. Confirmed live: the two lines read as the
+              same text repeated. Dropped the redundant line; the health
+              badge (a real, varying signal) now leads on its own line,
+              with the summary sentence beneath it. */}
           <div className="flex flex-col gap-1">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <p className="text-sm font-semibold text-radar-light-text dark:text-radar-white">{portfolio.headline}</p>
-              <PortfolioHealthBadge health={portfolio.overallHealth} />
-            </div>
+            <PortfolioHealthBadge health={portfolio.overallHealth} />
             <p className="line-clamp-2 text-xs leading-relaxed text-radar-light-muted dark:text-radar-muted">
               {portfolio.summary}
             </p>

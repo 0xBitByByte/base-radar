@@ -51,15 +51,6 @@ export function recordProviderFailure(provider: ProviderName, errorMessage: stri
   health.set(provider, entry);
 }
 
-/** A provider is "healthy" if its most recent outcome (by timestamp) was a success, or it has never been called yet. */
-export function isProviderHealthy(provider: ProviderName): boolean {
-  const entry = health.get(provider);
-  if (!entry || (entry.successCount === 0 && entry.failureCount === 0)) return true;
-  if (!entry.lastFailureAt) return true;
-  if (!entry.lastSuccessAt) return false;
-  return entry.lastSuccessAt > entry.lastFailureAt;
-}
-
 export function getProviderHealth(provider: ProviderName): ProviderHealthStatus {
   return { ...(health.get(provider) ?? createEmptyStatus(provider)) };
 }

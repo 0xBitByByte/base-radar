@@ -3,9 +3,9 @@ import { CircleCheck, CircleHelp, ExternalLink } from "lucide-react";
 import { ChainBadge } from "@/components/branding/ChainBadge";
 import { formatLabel } from "@/components/explorer/format";
 import { CopyButton } from "@/components/ui/CopyButton";
+import { GlowBadge } from "@/components/ui/GlowBadge";
 import { CHAIN_BRANDING } from "@/lib/branding/chains";
 import { shortenAddress } from "@/lib/data/format";
-import { cn } from "@/lib/utils";
 import type { ContractInfo, Contracts } from "@/lib/intelligence/types";
 import type { ContractDetail } from "@/lib/providers/blockscout/service";
 
@@ -110,7 +110,10 @@ export function ContractsList({ contracts, detailsByAddress = {} }: ContractsLis
               return (
                 <li
                   key={`${contract.chain}-${contract.address}`}
-                  className="flex flex-col gap-2 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 dark:border-white/10 dark:bg-white/[0.02]"
+                  // PR-084.07 integration pass — the same shared hover
+                  // formula every other Market Intelligence card already
+                  // uses (see `ContractCard.tsx`'s identical fix).
+                  className="group flex flex-col gap-2 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 transition-[transform,box-shadow,border-color,background-color] duration-300 ease-out hover:-translate-y-0.5 hover:border-radar-primary/30 hover:bg-radar-light-card hover:shadow-[0_8px_24px_-12px_rgba(var(--color-radar-primary-rgb),0.18)] motion-reduce:hover:translate-y-0 dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-radar-border-hover dark:hover:bg-white/[0.04]"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
@@ -141,15 +144,11 @@ export function ContractsList({ contracts, detailsByAddress = {} }: ContractsLis
                         </p>
                       )}
                     </div>
-                    <span
-                      className={cn(
-                        "flex shrink-0 items-center gap-1 text-xs font-medium",
-                        verified ? "text-radar-success" : "text-radar-light-muted dark:text-radar-muted"
-                      )}
-                    >
+                    {/* PR-084.07 integration pass — same `GlowBadge` conversion as `ContractCard.tsx`'s identical status pill. */}
+                    <GlowBadge color={verified ? "success" : "muted"} className="shrink-0 gap-1 px-2 py-0.5 text-[11px]">
                       {verified ? <CircleCheck className="size-3.5" aria-hidden="true" /> : <CircleHelp className="size-3.5" aria-hidden="true" />}
                       {verified ? "Verified" : "Not Verified Yet"}
-                    </span>
+                    </GlowBadge>
                   </div>
 
                   {detail?.verified && (

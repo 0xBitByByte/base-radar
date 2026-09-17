@@ -21,8 +21,40 @@ import type { Project } from "@/data/projects/types";
 export const REGISTRY_MATCH_TYPES = ["new", "duplicate", "updated", "renamed", "alias", "needs-review"] as const;
 export type RegistryMatchType = (typeof REGISTRY_MATCH_TYPES)[number];
 
-/** A unique-identifier signal — essentially never a coincidence when it matches (an address, a CoinGecko id, a specific GitHub repo). Distinct from a "secondary" signal (website/Twitter), which two related-but-distinct entities (e.g. a DAO and its foundation) can legitimately share. */
-const UNIQUE_IDENTIFIER_FIELDS: DuplicateMatchField[] = ["contract", "coingeckoId", "github"];
+/**
+ * A unique-identifier signal — essentially never a coincidence when it
+ * matches (an address, a CoinGecko id, a specific GitHub repo, a DefiLlama
+ * slug). Distinct from a "secondary" signal (website/Twitter), which two
+ * related-but-distinct entities (e.g. a DAO and its foundation) can
+ * legitimately share.
+ *
+ * Final UI/UX Consistency PR, Phase 3 — `defillamaSlug` moved here from the
+ * secondary tier. Confirmed live: DefiLlama reports a chain deployment's
+ * *version-qualified* protocol name ("Aave V3", "Compound V3", "Curve DEX",
+ * "Balancer V2"), never the registry's own shorter canonical name ("Aave",
+ * "Compound", ...), so `nameMatches` below is always false for these — a
+ * `defillamaSlug`-only match could therefore never classify higher than
+ * `"alias"`, which `lib/projects/service.ts`'s `FOLDED_MATCH_TYPES` never
+ * folds into the registry project. The result was a permanent, unfixable
+ * ghost duplicate: "Aave V3" rendered as its own discovery-only card,
+ * reporting the exact same TVL as the real "Aave" card while carrying none
+ * of its verification/risk/recommendation — reproduced live for both Aave
+ * and Compound before this fix. `matchesDefillamaSlug` (`duplicates.ts`)
+ * already compares by *exact string equality* against the registry's own
+ * curated `providerIds.defillamaSlug` (never a fuzzy/substring match) — the
+ * "fuzzy" risk this field's own doc comment used to warn about is entirely
+ * in `defillamaDiscoveryProvider`'s `slugify(candidate's own display name)`
+ * approximating DefiLlama's real slug from a name, not in this comparison.
+ * Given every registry `defillamaSlug` here is a deliberately curated,
+ * per-project identifier (not name-derived guesswork), an exact match
+ * against it is as trustworthy as a CoinGecko id. With this promotion, a
+ * `defillamaSlug`-only match against a differently-named candidate now
+ * classifies as `"renamed"` (unique identifier confirmed, display name
+ * differs) rather than `"alias"` — `"renamed"` was already in
+ * `FOLDED_MATCH_TYPES`, so no second file needed to change for the fold to
+ * take effect.
+ */
+const UNIQUE_IDENTIFIER_FIELDS: DuplicateMatchField[] = ["contract", "coingeckoId", "github", "defillamaSlug"];
 
 export type RegistryMatch = {
   type: RegistryMatchType;
@@ -40,9 +72,9 @@ function hasUniqueIdentifierMatch(match: DuplicateMatch): boolean {
   return match.matchedOn.some((field) => UNIQUE_IDENTIFIER_FIELDS.includes(field));
 }
 
-/** A weaker-but-real secondary signal (website or a fuzzy DefiLlama slug) without any unique identifier alongside it. */
+/** A weaker-but-real secondary signal (website or Twitter) without any unique identifier alongside it. */
 function hasOnlySecondarySignal(match: DuplicateMatch): boolean {
-  const hasSecondary = match.matchedOn.some((field) => field === "website" || field === "defillamaSlug" || field === "twitter");
+  const hasSecondary = match.matchedOn.some((field) => field === "website" || field === "twitter");
   return hasSecondary && !hasUniqueIdentifierMatch(match);
 }
 

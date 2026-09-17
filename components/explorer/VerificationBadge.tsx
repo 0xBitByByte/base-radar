@@ -76,7 +76,14 @@ export function VerificationBadge({ status, compact, hideAlternates, className }
 
         if (!isActive) {
           return (
-            <Tooltip key={candidate} content={tooltipContent}>
+            // V1-FIX-022 — Accessibility & Reading Order. `pointer-events-auto`
+            // restores reachability when this renders under `LiveProjectCard`'s
+            // `pointer-events-none` content wrapper (confirmed live: neither
+            // hover nor keyboard focus opened this tooltip there before this
+            // fix) — a no-op everywhere else this component renders, since
+            // `auto` is already the CSS default without a `pointer-events-none`
+            // ancestor to override.
+            <Tooltip key={candidate} content={tooltipContent} className="pointer-events-auto">
               <span
                 role="img"
                 aria-label={label}
@@ -93,7 +100,10 @@ export function VerificationBadge({ status, compact, hideAlternates, className }
         }
 
         return (
-          <Tooltip key={candidate} content={tooltipContent}>
+          // V1-FIX-022 — same reachability fix as the dimmed-alternate
+          // branch above; see that branch's own comment for the full
+          // rationale.
+          <Tooltip key={candidate} content={tooltipContent} className="pointer-events-auto">
             <GlowBadge
               color={color}
               tabIndex={0}

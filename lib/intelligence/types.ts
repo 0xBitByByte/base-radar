@@ -31,7 +31,7 @@ import type { CoinMarket } from "@/lib/providers/coingecko/service";
 import type { Pair } from "@/lib/providers/dexscreener/service";
 import type { Protocol } from "@/lib/providers/defillama/service";
 import type { VerifiedContract } from "@/lib/providers/blockscout/service";
-import type { RepoStats } from "@/lib/providers/github/service";
+import type { DeveloperCadence, RepoStats } from "@/lib/providers/github/service";
 import type { NetworkStatus } from "@/lib/providers/base/service";
 import type { ProviderName } from "@/lib/providers/common/types";
 import type { NarrativeSignal, RiskContributor, RiskLevel } from "@/lib/intelligence-engine";
@@ -79,6 +79,17 @@ export type Market = {
   marketCapUsd: number | null;
   marketCapRank: number | null;
   fullyDilutedValuationUsd: number | null;
+  /**
+   * PR-098.02 — the project's own token USD price change over the last 24
+   * hours, sourced exclusively from CoinGecko (`sources.market`, never
+   * merged/substituted with DefiLlama's TVL-change, DexScreener's
+   * pair-level `priceChangePct24h`, or any other metric — see
+   * `mergeMarket`). `null` whenever a real value isn't available: no
+   * verified `coingeckoId` on this project, no CoinGecko match, the
+   * provider unavailable, or a malformed raw value — never a fabricated or
+   * substituted number. UI should render "—", never fall back to a
+   * different metric, when this is `null`.
+   */
   changePct24h: number | null;
   changePct7d: number | null;
   changePct30d: number | null;
@@ -94,6 +105,8 @@ export type Market = {
   genesisDate: string | null;
   /** PR-050 provider-resolution — how `priceUsd` above was resolved: CoinGecko first, DexScreener's own pair price as a real fallback when CoinGecko has no listing. See `lib/intelligence/resolution.ts`. */
   priceResolution: MetricResolution<number>;
+  /** PR-098.02 — `true` when this section's fields (including `changePct24h`) are real but stale (CoinGecko's live API just failed) rather than freshly fetched, mirroring `GithubIntel.stale`. */
+  stale: boolean;
 };
 
 export type TradingPool = {
@@ -103,8 +116,12 @@ export type TradingPool = {
   pairCreatedAt: number | null;
   /** DexScreener's `baseToken.symbol` — already produced by the mapper, just not previously carried through `mergeTrading` (PR13.7 Goal 9). */
   baseTokenSymbol: string | null;
+  /** Token Logo System — the base token's own on-chain contract address, present on the mapper's `Pair.baseToken.address` but previously dropped before reaching this type. Powers address-first token logo resolution. */
+  baseTokenAddress: string | null;
   /** PR-084 — DexScreener's `quoteToken.symbol`, e.g. `"USDC"`; `null` when unavailable. Powers Token Pair Intelligence's "Pair" display (`"{base}/{quote}"`, falling back to base-only when this is null — never fabricated). */
   quoteTokenSymbol: string | null;
+  /** Token Logo System — the quote token's own on-chain contract address; `null` when DexScreener didn't return one. Powers address-first token logo resolution for the pair's secondary token, which otherwise has no logo source anywhere in this codebase's data model. */
+  quoteTokenAddress: string | null;
   /** PR-084.01 — the pool's own on-chain contract address, live-verified on DexScreener's response; `null` when unavailable. Powers the "Copy Pool Address" action — never falls back to a token address, since that would misrepresent which contract is being copied. */
   pairAddress: string | null;
   /** PR-084.01 — the pair's real DexScreener page URL; `null` when unavailable. Powers the "View on DexScreener" action. */
@@ -132,14 +149,37 @@ export type Trading = {
 };
 
 export type Tvl = {
+  /**
+   * PR-102 — `true` only when a matched protocol also has a real
+   * Base-specific TVL figure (`tvlUsd !== null`). A protocol matched by
+   * name/slug but with no Base breakdown on DefiLlama is honestly
+   * `available: false`, not silently treated as available via its global
+   * total.
+   */
   available: boolean;
+  /**
+   * PR-102 — Base Radar's CANONICAL TVL: this protocol's Base-chain-
+   * specific TVL (DefiLlama's real `chainTvls.Base`), never its global
+   * total. `null` whenever DefiLlama has no Base-specific breakdown for a
+   * matched protocol — NEVER silently substituted with `globalTvlUsd`
+   * (see that field's own doc comment for the real, live-verified
+   * magnitude of why this distinction matters).
+   */
   tvlUsd: number | null;
+  /**
+   * PR-102 — this protocol's TOTAL, cross-chain TVL — real, available
+   * secondary context, kept (never deleted) alongside the canonical
+   * Base-specific `tvlUsd` above. Any surface that shows this MUST label
+   * it explicitly as global/cross-chain — never presented under a bare
+   * "TVL" label, which is reserved for `tvlUsd`.
+   */
+  globalTvlUsd: number | null;
   changePct24h: number | null;
   /** `null` when fewer than 7/30 days of history are available in `getProtocolTvlHistory`. */
   changePct7d: number | null;
   changePct30d: number | null;
   defillamaCategory: string | null;
-  /** PR-050 provider-resolution — DefiLlama is the only protocol-TVL provider this Engine integrates (CoinGecko's API doesn't expose per-protocol TVL, and no on-chain TVL aggregator is implemented). Formalized into the same resolution shape for a consistent UI contract. */
+  /** PR-050 provider-resolution — DefiLlama is the only protocol-TVL provider this Engine integrates (CoinGecko's API doesn't expose per-protocol TVL, and no on-chain TVL aggregator is implemented). Formalized into the same resolution shape for a consistent UI contract. PR-102 — resolves the canonical Base-specific value, not global. */
   tvlResolution: MetricResolution<number>;
   /** PR-072 — DefiLlama's own protocol logo, a real third-priority logo candidate (behind the registry and CoinGecko) — `null` when DefiLlama has none on record for this protocol. */
   imageUrl: string | null;
@@ -177,6 +217,8 @@ export type GithubIntel = {
   commitsLast7d: number | null;
   commitsPrev7d: number | null;
   commitTrendPct: number | null;
+  /** PR-102 — 26-week sustained development cadence (see `DeveloperCadence`'s own doc comment, `github/mapper.ts`). `null` under the same "not ready yet"/not-fetched conditions as the commit fields above — never fabricated. */
+  developerCadence: DeveloperCadence | null;
   /** PR-072 — the repo owner's real avatar, the last-resort logo candidate behind the registry, CoinGecko, and DefiLlama. `null` when GitHub isn't available for this project at all. */
   avatarUrl: string | null;
   /** PR-075 — `true` when the fields above are real but stale (GitHub's live API just failed, usually rate-limited) rather than freshly fetched. */

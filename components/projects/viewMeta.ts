@@ -11,7 +11,7 @@
  */
 
 import type { Metadata } from "next";
-import { AlertTriangle, BadgeCheck, BarChart3, Compass, Flame, Gem, GitBranch, Landmark, RefreshCw, Sparkles, Zap, type LucideIcon } from "lucide-react";
+import { AlertTriangle, BadgeCheck, BarChart3, Compass, Flame, Gem, GitBranch, Landmark, LayoutGrid, RefreshCw, Sparkles, Zap, type LucideIcon } from "lucide-react";
 
 import type { ProjectsView } from "@/components/projects/queryState";
 
@@ -31,7 +31,26 @@ export type ProjectsViewMeta = {
   emptyDescription: string;
 };
 
-export const PROJECTS_VIEW_META: Record<Exclude<ProjectsView, "all">, ProjectsViewMeta> = {
+/**
+ * PR-085.04 — widened from `Exclude<ProjectsView, "all">` to the full
+ * `ProjectsView` now that "all" has its own dedicated route
+ * (`/dashboard/projects/all`) and is rendered by the same
+ * `ProjectsCollectionPage` every other view already uses. No existing
+ * entry's copy changed.
+ */
+export const PROJECTS_VIEW_META: Record<ProjectsView, ProjectsViewMeta> = {
+  all: {
+    slug: "all",
+    title: "All Projects",
+    description: "The complete Base ecosystem registry — search, filter, and sort every tracked project.",
+    icon: LayoutGrid,
+    accent: "primary",
+    // Never rendered as a curated rail (excluded from `dedupeCuratedRails` in
+    // `page.tsx`) — required by the shared type, not read for this view.
+    maxCards: 0,
+    emptyTitle: "No projects tracked yet",
+    emptyDescription: "Projects will appear here as the registry and Discovery pipeline populate.",
+  },
   verified: {
     slug: "verified",
     title: "Verified Projects",
@@ -175,7 +194,7 @@ export function viewForSlug(slug: string): Exclude<ProjectsView, "all"> | null {
  * without it, `?search=...`/`?sort=...` variants would each look like a
  * distinct, duplicate page to a crawler.
  */
-export function buildViewMetadata(view: Exclude<ProjectsView, "all">): Metadata {
+export function buildViewMetadata(view: ProjectsView): Metadata {
   const meta = PROJECTS_VIEW_META[view];
   return {
     title: `${meta.title} | Projects`,

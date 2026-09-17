@@ -15,6 +15,7 @@ export type AccountValidationIssue =
   | "missing-username"
   | "invalid-email-type"
   | "invalid-avatar-type"
+  | "invalid-bio-type"
   | "corrupted-created-at"
   | "corrupted-updated-at"
   | "corrupted-last-active-at"
@@ -43,6 +44,7 @@ export function validateAccountRecord(value: unknown): AccountValidationResult {
   if (typeof account.username !== "string" || account.username.trim() === "") issues.push("missing-username");
   if (!(typeof account.email === "string" || account.email === null)) issues.push("invalid-email-type");
   if (!(typeof account.avatar === "string" || account.avatar === null)) issues.push("invalid-avatar-type");
+  if (!(typeof account.bio === "string" || account.bio === null)) issues.push("invalid-bio-type");
   if (!isValidTimestamp(account.createdAt)) issues.push("corrupted-created-at");
   if (!isValidTimestamp(account.updatedAt)) issues.push("corrupted-updated-at");
   if (!isValidTimestamp(account.lastActiveAt)) issues.push("corrupted-last-active-at");

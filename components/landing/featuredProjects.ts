@@ -2,6 +2,9 @@ import type { MetricResolution, ProjectIntelligence, Health, Confidence, Sources
 import type { Chain, ProjectCategory, ProjectTag, VerificationStatus } from "@/data/projects/enums";
 import type { ProviderName } from "@/lib/providers/common/types";
 import { buildNarrativeSignals, buildProjectSummary, buildRiskAnalysis } from "@/lib/intelligence-engine";
+import { getProject } from "@/data/projects/helpers";
+import type { FeaturedIntelligenceSnapshot } from "@/lib/data/featuredIntelligenceSnapshot";
+import { radarScoreToHealthLabel } from "@/lib/intelligence/radarScore";
 
 /** This landing page never calls the real Provider Layer (see the module comment below), so there's no real resolution path to report — an empty, honest "no provider configured" resolution for every illustrative numeric field. */
 function emptyResolution<T>(): MetricResolution<T> {
@@ -14,6 +17,30 @@ function emptyResolution<T>(): MetricResolution<T> {
     confidence: null,
     failureReason: "This marketing preview doesn't call the live Provider Layer.",
   };
+}
+
+/**
+ * PR-098.02 — Featured Ecosystem 24H% semantics audit. This tile's "24H"
+ * stat purports to be THE PROJECT'S OWN TOKEN USD PRICE CHANGE — a claim
+ * about a specific real-world quantity, unlike `health`/`confidence`
+ * (generic illustrative scores that apply to any project regardless of
+ * whether it has a token at all). Showing a number here for a project with
+ * no real, verified token mapping would be a fabricated fact, not just an
+ * "illustrative" one — so this cross-checks the canonical registry
+ * (`data/projects/seed/`, the same source of truth PR-098.01 established
+ * real provider mappings in) and nulls out any spec-provided
+ * `changePct24h` for a project with no verified `providerIds.coingeckoId`,
+ * regardless of what the spec array below says. This makes the "only
+ * show a value when the project has a verified token" rule an enforced
+ * invariant rather than a one-time hand-edit that could silently drift out
+ * of sync with the registry again. Also guards against a non-finite
+ * illustrative value (defensive, mirrors the same guard added to the real
+ * pipeline's `coingecko/mapper.ts`).
+ */
+function resolveTokenChangePct24h(projectId: string, illustrativeValue: number | null | undefined): number | null {
+  if (illustrativeValue == null || !Number.isFinite(illustrativeValue)) return null;
+  const hasVerifiedToken = Boolean(getProject(projectId)?.providerIds.coingeckoId);
+  return hasVerifiedToken ? illustrativeValue : null;
 }
 
 /**
@@ -41,8 +68,34 @@ type FeaturedProjectSpec = {
   confidence: Pick<Confidence, "score" | "level">;
   tvlUsd?: number | null;
   githubStars?: number | null;
-  /** Illustrative 24h price change, same rationale as `health`/`confidence` above — drives the marquee tile's "24H" stat and, via `market.changePct24h`, Quick View's own change display. */
+  /**
+   * PR-098.02 — UNLIKE `health`/`confidence` above, this is NOT freely
+   * illustrative: it purports to be this project's own real token USD
+   * price change over 24h, so `buildFeaturedProject()` runs it through
+   * `resolveTokenChangePct24h()` and nulls it out for any project with no
+   * verified `providerIds.coingeckoId` in the registry, regardless of what
+   * value is set here. Drives the marquee tile's "Token 24H" stat (the
+   * Quick View drawer this used to also feed was removed in PR13.5 —
+   * tiles now navigate straight to the real Project Profile page).
+   */
   changePct24h?: number | null;
+  /**
+   * Real, static logo URL — the project's real `providerIds.coingeckoId`
+   * (`data/projects/seed/`) resolved once, by hand, against CoinGecko's own
+   * public `/coins/{id}` endpoint (its stable `image.small` CDN URL), or a
+   * project's real GitHub org avatar (`github.com/{owner}.png`) when no
+   * coingeckoId is on record. This is a plain static asset reference, not a
+   * live runtime provider call — the landing page still makes zero network
+   * calls to build itself. `undefined`/omitted for the handful of fixture
+   * entries with no real coingeckoId or GitHub org on file (`oku`,
+   * `clanker` — see PR-098.01's audit report for why each of these still
+   * has none) — those honestly fall back to initials rather than a guessed
+   * URL. `hydrex`/`spark` gained real ones in PR-098.01, once real
+   * registry mappings existed. (`based-agents`/`superchain-eco` were
+   * removed entirely in PR-100 — see that PR's report for why neither
+   * could ever have a real logo, or any other real provider data.)
+   */
+  logoUrl?: string | null;
 };
 
 const PROVIDER_NAMES: ProviderName[] = ["coingecko", "dexscreener", "defillama", "blockscout", "github", "base"];
@@ -59,6 +112,13 @@ function emptySources(): Sources {
 function buildFeaturedProject(spec: FeaturedProjectSpec): ProjectIntelligence {
   const now = new Date().toISOString();
 
+  // PR-098.02 — computed once, fed into every downstream consumer of "this
+  // project's token 24h change" below (the numeric stat, the generated
+  // summary prose, and the narrative signal) so a project with no verified
+  // token mapping can't end up with a fabricated number in one place and
+  // fabricated PROSE describing a price move in another.
+  const tokenChangePct24h = resolveTokenChangePct24h(spec.id, spec.changePct24h);
+
   // Reuses the exact same rule-based generation logic the real Intelligence
   // Engine runs for a live project (`lib/intelligence-engine`'s pure
   // functions) — fed this fixture's illustrative numbers, same as
@@ -71,16 +131,16 @@ function buildFeaturedProject(spec: FeaturedProjectSpec): ProjectIntelligence {
     confidenceScore: spec.confidence.score,
     confidenceLevel: spec.confidence.level,
     verificationStatus: spec.verificationStatus,
-    changePct24h: spec.changePct24h ?? null,
+    changePct24h: tokenChangePct24h,
     tvlUsd: spec.tvlUsd ?? null,
     tvlChangePct24h: null,
     githubStars: spec.githubStars ?? null,
   });
 
   const narrative =
-    spec.changePct24h != null
+    tokenChangePct24h != null
       ? (buildNarrativeSignals({
-          samples: [{ category: spec.categories[0] ?? "General", changePct24h: spec.changePct24h, volumeUsd: 0 }],
+          samples: [{ category: spec.categories[0] ?? "General", changePct24h: tokenChangePct24h, volumeUsd: 0 }],
         })[0] ?? null)
       : null;
 
@@ -110,21 +170,21 @@ function buildFeaturedProject(spec: FeaturedProjectSpec): ProjectIntelligence {
       name: spec.name,
       shortDescription: spec.shortDescription,
       description: spec.shortDescription,
-      logoUrl: null,
+      logoUrl: spec.logoUrl ?? null,
       websiteUrl: "#",
       categories: spec.categories,
       tags: spec.tags,
       status: "live",
     },
     market: {
-      available: spec.changePct24h != null,
+      available: tokenChangePct24h != null,
       imageUrl: null,
       symbol: null,
       priceUsd: null,
       marketCapUsd: null,
       marketCapRank: null,
       fullyDilutedValuationUsd: null,
-      changePct24h: spec.changePct24h ?? null,
+      changePct24h: tokenChangePct24h,
       changePct7d: null,
       changePct30d: null,
       circulatingSupply: null,
@@ -137,6 +197,7 @@ function buildFeaturedProject(spec: FeaturedProjectSpec): ProjectIntelligence {
       sparkline7d: [],
       genesisDate: null,
       priceResolution: emptyResolution<number>(),
+      stale: false,
     },
     trading: {
       available: false,
@@ -154,6 +215,11 @@ function buildFeaturedProject(spec: FeaturedProjectSpec): ProjectIntelligence {
     tvl: {
       available: spec.tvlUsd != null,
       tvlUsd: spec.tvlUsd ?? null,
+      // PR-102 — this illustrative fixture has no real global/Base
+      // distinction to draw (it's a single hand-authored placeholder
+      // number, never fetched from DefiLlama) — mirrored here so the type
+      // is satisfied without fabricating a second, different number.
+      globalTvlUsd: spec.tvlUsd ?? null,
       changePct24h: null,
       changePct7d: null,
       changePct30d: null,
@@ -178,6 +244,7 @@ function buildFeaturedProject(spec: FeaturedProjectSpec): ProjectIntelligence {
       commitsLast7d: null,
       commitsPrev7d: null,
       commitTrendPct: null,
+      developerCadence: null,
       avatarUrl: null,
       stale: false,
       dataFetchedAt: null,
@@ -219,6 +286,7 @@ const FEATURED_PROJECT_SPECS: FeaturedProjectSpec[] = [
     tvlUsd: 1_450_000_000,
     githubStars: 340,
     changePct24h: 4.2,
+    logoUrl: "https://coin-images.coingecko.com/coins/images/31745/small/token.png?1696530564",
   },
   {
     id: "aave",
@@ -233,6 +301,7 @@ const FEATURED_PROJECT_SPECS: FeaturedProjectSpec[] = [
     tvlUsd: 13_200_000_000,
     githubStars: 1150,
     changePct24h: 1.8,
+    logoUrl: "https://coin-images.coingecko.com/coins/images/12645/small/aave-token-round.png?1720472354",
   },
   {
     id: "morpho",
@@ -247,6 +316,7 @@ const FEATURED_PROJECT_SPECS: FeaturedProjectSpec[] = [
     tvlUsd: 1_800_000_000,
     githubStars: 410,
     changePct24h: 6.5,
+    logoUrl: "https://coin-images.coingecko.com/coins/images/29837/small/Morpho-token-icon.png?1726771230",
   },
   {
     id: "virtuals-protocol",
@@ -261,6 +331,7 @@ const FEATURED_PROJECT_SPECS: FeaturedProjectSpec[] = [
     tvlUsd: null,
     githubStars: null,
     changePct24h: 12.4,
+    logoUrl: "https://coin-images.coingecko.com/coins/images/34057/small/LOGOMARK.png?1708356054",
   },
   {
     id: "zora",
@@ -275,6 +346,7 @@ const FEATURED_PROJECT_SPECS: FeaturedProjectSpec[] = [
     tvlUsd: null,
     githubStars: 210,
     changePct24h: -3.1,
+    logoUrl: "https://coin-images.coingecko.com/coins/images/54693/small/zora.jpg?1741094751",
   },
   {
     id: "farcaster",
@@ -288,7 +360,12 @@ const FEATURED_PROJECT_SPECS: FeaturedProjectSpec[] = [
     confidence: { score: 80, level: "medium" },
     tvlUsd: null,
     githubStars: 560,
-    changePct24h: 2.7,
+    // PR-098.02 — Farcaster has no `coingeckoId` in the registry (no real
+    // FARCASTER token exists), so `resolveTokenChangePct24h` nulls this out
+    // regardless; left `null` here too rather than a fabricated figure a
+    // future reader could mistake for real illustrative intent.
+    changePct24h: null,
+    logoUrl: "https://github.com/farcasterxyz.png",
   },
   {
     id: "moonwell",
@@ -303,13 +380,21 @@ const FEATURED_PROJECT_SPECS: FeaturedProjectSpec[] = [
     tvlUsd: 220_000_000,
     githubStars: 95,
     changePct24h: 3.9,
+    logoUrl: "https://coin-images.coingecko.com/coins/images/26133/small/WELL.png?1696525221",
   },
   {
+    // PR-098.01 — corrected from "Perpetuals and yield trading protocol" /
+    // categories: ["derivatives"], which was never accurate. Hydrex is a
+    // ve(3,3) MetaDEX/AMM (same category of protocol as Aerodrome), now
+    // confirmed via a real registry entry (`data/projects/seed/hydrex.ts`)
+    // with a live-verified CoinGecko id, DexScreener dexId, and DefiLlama
+    // slug. `health`/`confidence`/`tvlUsd`/`changePct24h` remain
+    // illustrative, same as every other entry here.
     id: "hydrex",
     name: "Hydrex",
-    shortDescription: "Perpetuals and yield trading protocol built natively for Base.",
-    categories: ["derivatives"],
-    tags: ["base-native", "perpetuals"],
+    shortDescription: "Liquidity-neutral ve(3,3) MetaDEX purpose-built for Base.",
+    categories: ["dex", "yield"],
+    tags: ["base-native", "real-yield"],
     chains: ["base"],
     verificationStatus: "community",
     health: { score: 74, label: "fair" },
@@ -317,6 +402,7 @@ const FEATURED_PROJECT_SPECS: FeaturedProjectSpec[] = [
     tvlUsd: 42_000_000,
     githubStars: null,
     changePct24h: -5.8,
+    logoUrl: "https://coin-images.coingecko.com/coins/images/69177/small/HYDX_logo_%282%29.png?1757748253",
   },
   {
     id: "basenames",
@@ -330,7 +416,10 @@ const FEATURED_PROJECT_SPECS: FeaturedProjectSpec[] = [
     confidence: { score: 90, level: "high" },
     tvlUsd: null,
     githubStars: null,
-    changePct24h: 0.9,
+    // PR-098.02 — Basenames has no `coingeckoId` (it's a naming service,
+    // not a tokenized protocol) — no real 24h token price change exists.
+    changePct24h: null,
+    logoUrl: "https://github.com/base-org.png",
   },
   {
     id: "clanker",
@@ -344,7 +433,9 @@ const FEATURED_PROJECT_SPECS: FeaturedProjectSpec[] = [
     confidence: { score: 52, level: "low" },
     tvlUsd: null,
     githubStars: null,
-    changePct24h: -8.2,
+    // PR-098.02 — no `coingeckoId` on file for Clanker (no verified
+    // CLANKER-token CoinGecko mapping) — see PR-098.01's audit.
+    changePct24h: null,
   },
   {
     id: "compound",
@@ -359,6 +450,7 @@ const FEATURED_PROJECT_SPECS: FeaturedProjectSpec[] = [
     tvlUsd: 2_650_000_000,
     githubStars: 780,
     changePct24h: 1.1,
+    logoUrl: "https://coin-images.coingecko.com/coins/images/10775/small/COMP.png?1696510737",
   },
   {
     id: "curve-finance",
@@ -373,6 +465,7 @@ const FEATURED_PROJECT_SPECS: FeaturedProjectSpec[] = [
     tvlUsd: 1_950_000_000,
     githubStars: 640,
     changePct24h: 2.3,
+    logoUrl: "https://coin-images.coingecko.com/coins/images/12124/small/Curve.png?1696511967",
   },
   {
     id: "balancer",
@@ -387,6 +480,7 @@ const FEATURED_PROJECT_SPECS: FeaturedProjectSpec[] = [
     tvlUsd: 486_000_000,
     githubStars: 380,
     changePct24h: -1.4,
+    logoUrl: "https://coin-images.coingecko.com/coins/images/11683/small/Balancer.png?1696511572",
   },
   {
     id: "spark",
@@ -401,6 +495,9 @@ const FEATURED_PROJECT_SPECS: FeaturedProjectSpec[] = [
     tvlUsd: 1_100_000_000,
     githubStars: 120,
     changePct24h: 4.6,
+    // PR-098.01 — real CoinGecko id is "spark-2", confirmed live (a naive
+    // "spark" id 404s). See `data/projects/seed/spark.ts`.
+    logoUrl: "https://coin-images.coingecko.com/coins/images/38637/small/Spark-Logomark-RGB.png?1744878896",
   },
   {
     id: "uniswap",
@@ -415,6 +512,7 @@ const FEATURED_PROJECT_SPECS: FeaturedProjectSpec[] = [
     tvlUsd: 4_800_000_000,
     githubStars: 5100,
     changePct24h: 1.6,
+    logoUrl: "https://coin-images.coingecko.com/coins/images/12504/small/uniswap-logo.png?1720676669",
   },
   {
     id: "seamless-protocol",
@@ -429,6 +527,7 @@ const FEATURED_PROJECT_SPECS: FeaturedProjectSpec[] = [
     tvlUsd: 95_000_000,
     githubStars: 60,
     changePct24h: 5.2,
+    logoUrl: "https://coin-images.coingecko.com/coins/images/33480/small/Seamless_Logo_Black_Transparent.png?1702019657",
   },
   {
     id: "extra-finance",
@@ -443,12 +542,17 @@ const FEATURED_PROJECT_SPECS: FeaturedProjectSpec[] = [
     tvlUsd: 58_000_000,
     githubStars: null,
     changePct24h: -2.9,
+    logoUrl: "https://coin-images.coingecko.com/coins/images/30973/small/Ex_logo-white-blue_ring_288x.png?1696529812",
   },
   {
     id: "oku",
     name: "Oku",
-    shortDescription: "Advanced trading interface for concentrated-liquidity DEXs across chains.",
-    categories: ["dex"],
+    shortDescription: "Trading interface / aggregator for concentrated-liquidity DEXs across chains.",
+    // PR-101 — was ["dex"]; Oku doesn't operate a DEX or own liquidity, it's
+    // an interface over Uniswap v3/Morpho's pools — corrected to match the
+    // canonical registry's own category (`data/projects/seed/oku.ts`), and
+    // so this fixture's TVL/token framing can't drift from the real entry.
+    categories: ["infrastructure"],
     tags: ["cross-chain"],
     chains: ["base"],
     verificationStatus: "unverified",
@@ -456,36 +560,75 @@ const FEATURED_PROJECT_SPECS: FeaturedProjectSpec[] = [
     confidence: { score: 55, level: "low" },
     tvlUsd: null,
     githubStars: null,
-    changePct24h: -6.7,
+    // PR-098.02 — Oku has no token of its own (confirmed genuinely
+    // unavailable, not just missing, in PR-098.01's audit).
+    changePct24h: null,
   },
-  {
-    id: "superchain-eco",
-    name: "Superchain Eco",
-    shortDescription: "Interoperability tooling connecting Base to the wider OP Superchain.",
-    categories: ["infrastructure"],
-    tags: ["cross-chain"],
-    chains: ["base", "optimism"],
-    verificationStatus: "community",
-    health: { score: 79, label: "good" },
-    confidence: { score: 70, level: "medium" },
-    tvlUsd: null,
-    githubStars: null,
-    changePct24h: 3.3,
-  },
-  {
-    id: "based-agents",
-    name: "Based Agents",
-    shortDescription: "Framework for deploying autonomous onchain agents native to Base.",
-    categories: ["ai"],
-    tags: ["ai-agents", "base-native"],
-    chains: ["base"],
-    verificationStatus: "unverified",
-    health: { score: 60, label: "fair" },
-    confidence: { score: 48, level: "low" },
-    tvlUsd: null,
-    githubStars: null,
-    changePct24h: -11.5,
-  },
+  // PR-100 — "superchain-eco" and "based-agents" were removed from this
+  // list entirely (not just nulled out). PR-100's independent research
+  // confirmed: Superchain Eco (superchain.eco) is a real entity, but it's
+  // an ecosystem directory/informational site for the whole OP Superchain
+  // (500+ third-party projects, 17 chains) — not itself a protocol with a
+  // token, TVL, Base contracts, or governance, so it structurally cannot
+  // produce the "measurable onchain intelligence" Featured Ecosystem exists
+  // to show; "Based Agents" has no distinct canonical protocol at all — the
+  // only real, verifiable entity anywhere near that name is `Based Agent`
+  // (singular), an individual developer's open-source AI-agent template
+  // (github.com/murrlincoln/Based-Agent, built on Coinbase's AgentKit), not
+  // an organization or protocol with its own token/TVL/contracts/
+  // governance. Neither had a registry entry before this PR (confirmed by
+  // `tests/data/projects/pr098-provider-mapping.test.ts`) and neither gets
+  // one now — no fabricated mapping was created for either. See the
+  // PR-100 report for the full identity research and the replacement
+  // candidate shortlist (a pending product decision, not resolved here).
 ];
 
 export const FEATURED_PROJECTS: ProjectIntelligence[] = FEATURED_PROJECT_SPECS.map(buildFeaturedProject);
+
+/** Every real Featured Ecosystem project id, in display order — the exact set `getFeaturedIntelligenceSnapshot()` (PR-098.05) should fetch live data for. */
+export const FEATURED_PROJECT_IDS: string[] = FEATURED_PROJECT_SPECS.map((spec) => spec.id);
+
+/**
+ * PR-098.05 — Landing Page Intelligence Delivery Architecture. Overlays a
+ * real, live `FeaturedIntelligenceSnapshot` (TVL + Token 24H Change) on top
+ * of the illustrative fixture above, for whichever projects the snapshot
+ * has real data for. `resolveTokenChangePct24h`'s registry cross-check
+ * (PR-098.02) still applies to the live value exactly as it does to the
+ * illustrative one — a live 24h% for a project with no verified
+ * `coingeckoId` is still nulled out, never shown.
+ *
+ * Falls back to the illustrative spec value (not to "—") when the live
+ * snapshot has nothing for a given project — a transient provider hiccup
+ * during one regeneration cycle degrades to the same number visitors were
+ * already seeing, not a visible regression. This is a genuinely different
+ * case from PR-098.02's "never fabricate a number for a tokenless
+ * project" rule: this project DOES have a verified mapping (the whole
+ * reason it's in the snapshot at all) — falling back to the last-known
+ * illustrative baseline during a hiccup is closer in spirit to this
+ * engine's existing `stale`-data pattern than to fabrication.
+ *
+ * PR-099 — Live Radar Score & Intelligence Normalization. Same fallback
+ * discipline now applies to `health` too: when `live.radarScore.score` is
+ * a real number (the live methodology cleared its own minimum-evidence
+ * bar — PR-098.04, unchanged), it overrides the illustrative
+ * `spec.health` entirely. When it's `null` (insufficient live evidence —
+ * NOT the same thing as "no snapshot at all"), `spec.health` stays
+ * illustrative, exactly as before PR-099 — never a fabricated live-looking
+ * score for a project the real methodology genuinely can't score yet.
+ */
+export function buildFeaturedProjectsWithSnapshot(snapshot: FeaturedIntelligenceSnapshot | null): ProjectIntelligence[] {
+  if (!snapshot) return FEATURED_PROJECTS;
+  const liveById = new Map(snapshot.entries.map((entry) => [entry.id, entry]));
+
+  return FEATURED_PROJECT_SPECS.map((spec) => {
+    const live = liveById.get(spec.id);
+    if (!live || !live.available) return buildFeaturedProject(spec);
+    const liveScore = live.radarScore?.score ?? null;
+    return buildFeaturedProject({
+      ...spec,
+      tvlUsd: live.tvlUsd ?? spec.tvlUsd,
+      changePct24h: live.tokenChangePct24h ?? spec.changePct24h,
+      health: liveScore !== null ? { score: liveScore, label: radarScoreToHealthLabel(liveScore) } : spec.health,
+    });
+  });
+}

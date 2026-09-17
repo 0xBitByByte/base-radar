@@ -135,7 +135,15 @@ export function ProfileCommunityMetrics({
   return (
     <ProfileSectionCard
       id="intelligence"
-      title="Project Intelligence"
+      // PR-085.01 — renamed from "Project Intelligence": that exact text
+      // was also `ProfileIntelligencePanel`'s own heading (a genuinely
+      // different section, AI-generated briefing content vs. this
+      // component's real community/developer-activity data) — two
+      // sections with the identical on-page heading was confirmed
+      // confusing during the Executive Dashboard audit. The `id` stays
+      // "intelligence" (unchanged — `ProfileSectionNav`'s own SECTIONS
+      // entry still targets it), only the visible label changes.
+      title="Community & Developer Activity"
       icon={Users}
       sourceLink={github.available && github.fullName ? { href: `https://github.com/${github.fullName}`, label: "GitHub" } : undefined}
     >

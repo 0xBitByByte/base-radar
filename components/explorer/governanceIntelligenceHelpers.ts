@@ -1,6 +1,45 @@
 /** Pure helpers for the Governance Intelligence section. No JSX, no I/O. */
 
-import type { GovernanceEvent } from "@/lib/governance";
+import type { GlowBadgeColor } from "@/components/ui/GlowBadge";
+import type { GovernanceEvent, GovernanceStatus } from "@/lib/governance";
+
+/**
+ * PR-084.07 integration pass — consolidated from two byte-identical private
+ * copies (`GovernanceCard.tsx`, `GovernanceList.tsx`) found during a
+ * duplication audit. Both now import this instead of maintaining their own.
+ */
+export const GOVERNANCE_STATUS_COLOR: Record<GovernanceStatus, GlowBadgeColor> = {
+  active: "accent",
+  passed: "success",
+  failed: "danger",
+  pending: "muted",
+};
+
+/**
+ * PR-084.07 integration pass — consolidated from two byte-identical private
+ * copies (`ProfileGovernance.tsx` and `app/dashboard/projects/[slug]/governance/page.tsx`,
+ * the latter explicitly commented "kept in sync deliberately") found during a
+ * duplication audit. Both now import this instead of maintaining their own.
+ */
+export const GOVERNANCE_TYPE_EMPTY_STATE: Record<"on-chain" | "forum" | "none", { title: string; description: string; badge: string }> = {
+  "on-chain": {
+    title: "Governance uses on-chain voting",
+    description:
+      "This project doesn't use Snapshot for governance — real decisions are made through on-chain voting instead, which Base Radar doesn't currently track. This isn't a missing registry entry; it's how this project actually governs itself.",
+    badge: "Governance Uses On-chain Voting",
+  },
+  forum: {
+    title: "Governance uses forum discussion",
+    description:
+      "This project doesn't use Snapshot for governance — real decisions are made through forum discussion and signaling instead, which Base Radar doesn't currently track. This isn't a missing registry entry; it's how this project actually governs itself.",
+    badge: "Governance Uses Forum Discussion",
+  },
+  none: {
+    title: "No governance mechanism",
+    description: "This project is confirmed to have no governance mechanism — no token vote, on-chain process, or forum. There is nothing for this section to track.",
+    badge: "No Governance",
+  },
+};
 
 const CLOSED_STATUSES = new Set<GovernanceEvent["status"]>(["passed", "failed"]);
 
@@ -49,13 +88,16 @@ function closedByEndDesc(events: GovernanceEvent[]): GovernanceEvent[] {
 const RECENT_LIMIT = 5;
 
 /**
- * Same text-cleaning `GovernanceList.tsx`'s `ProposalRow` already applies to
- * `event.description` (Snapshot's raw markdown `body`, sometimes carrying a
- * leading YAML frontmatter block Snapshot's own UI never renders). Kept as
- * an independent copy here rather than importing from `GovernanceList.tsx`
- * — this PR's own brief scopes the existing Governance section to exactly
- * one change (its new "View All Governance" link), the same precedent
- * `ContractCard.tsx` set by not refactoring `ContractsList.tsx`.
+ * Text-cleaning for `event.description` (Snapshot's raw markdown `body`,
+ * sometimes carrying a leading YAML frontmatter block Snapshot's own UI
+ * never renders).
+ *
+ * PR-084.07 integration pass — `GovernanceList.tsx`'s `ProposalRow`
+ * previously kept its own byte-identical copy of this function (a
+ * deliberate scope-discipline choice at the time, per that PR's own now-
+ * removed comment); consolidated here since both now import it, closing a
+ * confirmed real duplication found during the Market Intelligence
+ * integration audit.
  */
 export function cleanProposalDescription(description: string): string {
   let text = description;

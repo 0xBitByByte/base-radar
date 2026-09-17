@@ -3,7 +3,7 @@
 import { use } from "react";
 
 import { ProfileIconLink } from "@/components/explorer/ProfileHeader";
-import { contractDetailsByAddress, type ContractDetailEntry } from "@/lib/providers/blockscout/service";
+import { contractDetailsByAddress, type ContractDetailEntry } from "@/lib/providers/blockscout/contractDetails";
 import type { Contracts } from "@/lib/intelligence/types";
 
 type ProfileHeaderExplorerTooltipAsyncProps = {

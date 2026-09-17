@@ -18,6 +18,7 @@ import { useCallback, useSyncExternalStore } from "react";
 
 import * as accountService from "@/lib/account/service";
 import type { Account, ProfileInput } from "@/lib/account/types";
+import { useAuthSession } from "@/lib/hooks/useAuthSession";
 
 const SERVER_SNAPSHOT_ACCOUNT: Account = {
   id: "guest",
@@ -25,6 +26,7 @@ const SERVER_SNAPSHOT_ACCOUNT: Account = {
   username: "guest",
   email: null,
   avatar: null,
+  bio: null,
   createdAt: "2025-01-01T00:00:00.000Z",
   updatedAt: "2025-01-01T00:00:00.000Z",
   lastActiveAt: "2025-01-01T00:00:00.000Z",
@@ -37,10 +39,17 @@ function getServerSnapshot(): Account {
 
 export function useAccount() {
   const account = useSyncExternalStore(accountService.subscribe, accountService.getAccount, getServerSnapshot);
+  // PR-093.06 (Ongoing Cloud Sync) — the one real bridge between the local
+  // Account store and the real authenticated session: `updateProfile`
+  // passes the session's own real account id through so `updateAccount()`
+  // can enqueue a real Sync operation for it. `useAccount()` itself still
+  // owns no auth logic beyond reading this one id.
+  const auth = useAuthSession();
 
   const updateProfile = useCallback(
-    (patch: Partial<Pick<Account, "name" | "username" | "email" | "avatar">>) => accountService.updateAccount(patch),
-    []
+    (patch: Partial<Pick<Account, "name" | "username" | "email" | "avatar" | "bio">>) =>
+      accountService.updateAccount(patch, auth.account?.id),
+    [auth.account?.id]
   );
 
   const validateProfile = useCallback(

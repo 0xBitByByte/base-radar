@@ -4,7 +4,7 @@ import { use } from "react";
 
 import { ContractsList } from "@/components/explorer/ContractsList";
 import type { Contracts } from "@/lib/intelligence/types";
-import { contractDetailsByAddress, type ContractDetailEntry } from "@/lib/providers/blockscout/service";
+import { contractDetailsByAddress, type ContractDetailEntry } from "@/lib/providers/blockscout/contractDetails";
 
 type ProfileContractDetailsAsyncProps = {
   contracts: Contracts;

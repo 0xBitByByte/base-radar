@@ -19,6 +19,10 @@ const SIZE_CLASSES = {
   sm: "size-7 text-[10px]",
   md: "size-9 text-xs",
   lg: "size-16 text-xl",
+  /** V3-PROFILE-001 — the Profile dialog's own hero avatar; not used by `AccountMenu`'s trigger/preview, which stay at `md`/`sm`. */
+  xl: "size-24 text-3xl",
+  /** V3-PROFILE-002 — the dedicated `/dashboard/profile` page's header hero, a genuinely larger canvas than the modal it replaces ("Large Avatar" per spec) that `xl` doesn't cover. */
+  "2xl": "size-32 text-4xl",
 } as const;
 
 type AccountAvatarProps = {

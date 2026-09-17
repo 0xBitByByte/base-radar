@@ -1,25 +1,42 @@
 import type { Metadata } from "next";
-import { Fish, ArrowLeft, ChevronRight } from "lucide-react";
-import Link from "next/link";
+import { Fish } from "lucide-react";
 
 import { getProject } from "@/data/projects/helpers";
+import { ProjectSubpageBreadcrumb } from "@/components/explorer/ProjectSubpageBreadcrumb";
 import { getRawWhaleEvents } from "@/lib/data/aggregate";
 import { CHAIN_BRANDING } from "@/lib/branding/chains";
+import { paginateLiveProjects } from "@/lib/projects/pagination";
 import { WhaleCategoryTabs } from "@/components/explorer/WhaleCategoryTabs";
 import { WhaleExplorerFilterBar } from "@/components/explorer/WhaleExplorerFilterBar";
 import { WhaleExplorerList } from "@/components/explorer/WhaleExplorerList";
+import { WhaleExplorerPagination } from "@/components/explorer/WhaleExplorerPagination";
 import { WhaleExplorerSortSelect } from "@/components/explorer/WhaleExplorerSortSelect";
 import { WHALE_CATEGORIES, getWhaleEventsForCategory, type WhaleCategoryId } from "@/components/explorer/whaleIntelligenceHelpers";
 import { MetricItem } from "@/components/explorer/MetricItem";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatCompactCurrency } from "@/lib/data/format";
 import { parseWhaleQueryState, type RawSearchParams } from "@/lib/whale/queryState";
+import { PAGE_HEADER_GROUP_CLASS, PAGE_HEADER_TITLE_CLASS, PAGE_HEADER_SUBTITLE_CLASS } from "@/components/dashboard/pageHeaderStyles";
 import type { WhaleEvent } from "@/lib/whale";
 
 type WhaleExplorerPageProps = {
   params: Promise<{ slug: string }>;
   searchParams: Promise<RawSearchParams>;
 };
+
+/**
+ * PR-097.01 (Performance — C1) — `docs/PERFORMANCE_AUDIT.md`'s C1 finding:
+ * this page rendered every real matching transfer in one unbounded list,
+ * with "no pagination and no virtualization." A watched project's transfer
+ * feed genuinely grows without bound over its real lifetime — the one
+ * Explorer sub-page of the four (Governance/Whale/Contracts/Pools) most
+ * likely to actually reach a real, large count in production, so it's the
+ * first fixed. Same real, already-tested `paginateLiveProjects()`
+ * (`lib/projects/pagination.ts`) the main Projects Directory already
+ * uses — it's fully generic over `T`, not Projects-specific despite its
+ * name, so this reuses it rather than writing a second implementation.
+ */
+const WHALE_PAGE_SIZE = 25;
 
 export async function generateMetadata({ params }: WhaleExplorerPageProps): Promise<Metadata> {
   const { slug } = await params;
@@ -43,48 +60,7 @@ export default async function WhaleExplorerPage({ params, searchParams }: WhaleE
   const project = getProject(slug);
 
   const projectHref = `/dashboard/projects/${slug}`;
-  const breadcrumb = (
-    <div className="flex flex-col gap-2">
-      <nav aria-label="Breadcrumb">
-        <ol className="flex flex-wrap items-center gap-1.5 text-xs text-radar-light-muted dark:text-radar-muted">
-          <li>
-            <Link href="/dashboard" className="rounded-md font-medium outline-none transition-colors hover:text-radar-light-text focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:hover:text-radar-white">
-              Dashboard
-            </Link>
-          </li>
-          <li aria-hidden="true">
-            <ChevronRight className="size-3.5" />
-          </li>
-          <li>
-            <Link href="/dashboard/projects" className="rounded-md font-medium outline-none transition-colors hover:text-radar-light-text focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:hover:text-radar-white">
-              Projects
-            </Link>
-          </li>
-          <li aria-hidden="true">
-            <ChevronRight className="size-3.5" />
-          </li>
-          <li>
-            <Link href={projectHref} className="rounded-md font-medium outline-none transition-colors hover:text-radar-light-text focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:hover:text-radar-white">
-              {project?.name ?? "Project"}
-            </Link>
-          </li>
-          <li aria-hidden="true">
-            <ChevronRight className="size-3.5" />
-          </li>
-          <li aria-current="page" className="truncate font-semibold text-radar-light-text dark:text-radar-white">
-            Whale Activity
-          </li>
-        </ol>
-      </nav>
-      <Link
-        href={projectHref}
-        className="group inline-flex w-fit items-center gap-1.5 rounded-lg text-xs font-medium text-radar-light-muted outline-none transition-colors hover:text-radar-light-text focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:text-radar-muted dark:hover:text-radar-white"
-      >
-        <ArrowLeft className="size-3.5 shrink-0 transition-transform duration-200 group-hover:-translate-x-0.5" aria-hidden="true" />
-        Back to {project?.name ?? "Project"}
-      </Link>
-    </div>
-  );
+  const breadcrumb = <ProjectSubpageBreadcrumb projectName={project?.name ?? null} projectHref={projectHref} currentPageLabel="Whale Activity" />;
 
   if (!project) {
     return (
@@ -107,7 +83,7 @@ export default async function WhaleExplorerPage({ params, searchParams }: WhaleE
     return (
       <div className="flex flex-col gap-6">
         {breadcrumb}
-        <h1 className="text-xl font-bold text-radar-light-text dark:text-radar-white">{project.name} Whale Activity</h1>
+        <h1 className={PAGE_HEADER_TITLE_CLASS}>{project.name} Whale Activity</h1>
         <EmptyState
           icon={Fish}
           title="Whale detection isn't available for this project"
@@ -129,7 +105,7 @@ export default async function WhaleExplorerPage({ params, searchParams }: WhaleE
     return (
       <div className="flex flex-col gap-6">
         {breadcrumb}
-        <h1 className="text-xl font-bold text-radar-light-text dark:text-radar-white">{project.name} Whale Activity</h1>
+        <h1 className={PAGE_HEADER_TITLE_CLASS}>{project.name} Whale Activity</h1>
         <EmptyState
           icon={Fish}
           title="No large transfers detected right now"
@@ -177,15 +153,16 @@ export default async function WhaleExplorerPage({ params, searchParams }: WhaleE
     });
   }
 
+  const paginated = paginateLiveProjects(displayEvents, { page: state.page, pageSize: WHALE_PAGE_SIZE });
   const explorerUrl = CHAIN_BRANDING.base?.explorerUrl ?? null;
 
   return (
     <div className="flex flex-col gap-6">
       {breadcrumb}
 
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-bold text-radar-light-text dark:text-radar-white">{project.name} Whale Activity</h1>
-        <p className="text-sm text-radar-light-muted dark:text-radar-muted">
+      <div className={PAGE_HEADER_GROUP_CLASS}>
+        <h1 className={PAGE_HEADER_TITLE_CLASS}>{project.name} Whale Activity</h1>
+        <p className={PAGE_HEADER_SUBTITLE_CLASS}>
           Every large transfer Base Radar has detected for {project.name} — a real Blockscout ERC-20 transfer scan, not a raw explorer mirror.
         </p>
       </div>
@@ -206,7 +183,15 @@ export default async function WhaleExplorerPage({ params, searchParams }: WhaleE
         <WhaleExplorerSortSelect state={state} />
       </div>
 
-      <WhaleExplorerList events={displayEvents} explorerUrl={explorerUrl} />
+      <WhaleExplorerList events={paginated.items} explorerUrl={explorerUrl} />
+      <WhaleExplorerPagination
+        basePath={`${projectHref}/whale`}
+        state={state}
+        currentPage={paginated.page}
+        totalPages={paginated.totalPages}
+        hasPreviousPage={paginated.hasPreviousPage}
+        hasNextPage={paginated.hasNextPage}
+      />
     </div>
   );
 }

@@ -31,7 +31,12 @@ export function PoolCategoryTabs({ state, counts }: PoolCategoryTabsProps) {
   }
 
   return (
-    <div className={cn("flex items-center gap-1.5 overflow-x-auto pb-1", isPending && "opacity-70")}>
+    // PR-086 — `scroll-smooth` + `snap-x`/`snap-start` on each pill (same
+    // treatment as `ProfileSectionNav`'s identical horizontal-scroll nav)
+    // so dragging/swiping through the category row settles on a pill
+    // instead of stopping mid-scroll — real behavior improvement, not a
+    // new scroll mechanism.
+    <div className={cn("scroll-smooth flex snap-x items-center gap-1.5 overflow-x-auto pb-1", isPending && "opacity-70")}>
       {POOL_CATEGORIES.map((category) => {
         const active = state.category === category.id;
         const count = counts[category.id] ?? 0;
@@ -43,10 +48,10 @@ export function PoolCategoryTabs({ state, counts }: PoolCategoryTabsProps) {
               disabled={count === 0}
               aria-current={active ? "true" : undefined}
               className={cn(
-                "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                "flex shrink-0 snap-start items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-[color,background-color,border-color,transform] duration-200 disabled:cursor-not-allowed disabled:opacity-40",
                 active
                   ? "border-radar-primary/40 bg-radar-primary/10 text-radar-primary dark:border-radar-accent/40 dark:bg-radar-accent/10 dark:text-radar-accent"
-                  : "border-radar-light-border text-radar-light-muted hover:bg-radar-light-surface dark:border-white/10 dark:text-radar-muted dark:hover:bg-white/5"
+                  : "border-radar-light-border text-radar-light-muted hover:-translate-y-0.5 hover:bg-radar-light-surface dark:border-white/10 dark:text-radar-muted dark:hover:bg-white/5"
               )}
             >
               <span aria-hidden="true">{category.emoji}</span>

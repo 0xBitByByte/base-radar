@@ -20,7 +20,8 @@ export function isVerified(project: LiveProject): boolean {
   return project.verification.status === "verified" || project.discoveryStatus === "verified";
 }
 
-function isNew(project: LiveProject): boolean {
+/** PR-085.02C — exported so the lightweight Hero projection (`loadProjectsData.ts`'s `getProjectsHeroSnapshot`) reuses this exact rule instead of redefining it, the same precedent `isVerified` above already established. */
+export function isNew(project: LiveProject): boolean {
   return project.discoveryStatus === "new";
 }
 
@@ -41,7 +42,8 @@ function isNew(project: LiveProject): boolean {
  */
 const RECENTLY_UPDATED_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
-function isRecentlyUpdated(project: LiveProject): boolean {
+/** PR-085.02C — exported for the same reason as `isNew` above. */
+export function isRecentlyUpdated(project: LiveProject): boolean {
   if (!project.registryUpdatedAt) return false;
   const updatedAtMs = Date.parse(project.registryUpdatedAt);
   if (Number.isNaN(updatedAtMs)) return false;
@@ -54,7 +56,8 @@ function isRecentlyUpdated(project: LiveProject): boolean {
  * "has discovery evidence from this run" rather than a true recency window.
  * Same limitation PR-053 itself documented for an equivalent gap.
  */
-function isRecentlyDiscovered(project: LiveProject): boolean {
+/** PR-085.02C — exported for the same reason as `isNew` above. */
+export function isRecentlyDiscovered(project: LiveProject): boolean {
   return project.discoveryMetadata !== null;
 }
 
@@ -81,11 +84,13 @@ function isUpcoming(project: LiveProject): boolean {
   return project.discoveryStatus === "upcoming" || project.discoveryStatus === "announced";
 }
 
-function isHighConfidence(project: LiveProject): boolean {
+/** PR-085.02C — exported for the same reason as `isNew` above. */
+export function isHighConfidence(project: LiveProject): boolean {
   return project.confidence.level === "high";
 }
 
-function isNeedsReview(project: LiveProject): boolean {
+/** PR-085.02C — exported for the same reason as `isNew` above. */
+export function isNeedsReview(project: LiveProject): boolean {
   return project.discoveryStatus === "needs-review" || project.confidence.level === "low";
 }
 

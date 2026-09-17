@@ -38,6 +38,13 @@ export type GovernanceQueryState = {
   sortOrder: SortOrder;
   /** `true` when the URL itself named a sort — lets the page keep the category's own natural order otherwise. */
   sortExplicit: boolean;
+  /**
+   * PR-097.01 (Performance — C1) — 1-indexed, mirroring the Whale
+   * Explorer's own `WhaleQueryState.page` (`lib/whale/queryState.ts`),
+   * itself mirroring `ProjectsQueryState.page`. Bounds the per-render
+   * proposal count the same way.
+   */
+  page: number;
 };
 
 export const DEFAULT_GOVERNANCE_QUERY_STATE: GovernanceQueryState = {
@@ -46,7 +53,11 @@ export const DEFAULT_GOVERNANCE_QUERY_STATE: GovernanceQueryState = {
   sortField: "end",
   sortOrder: "desc",
   sortExplicit: false,
+  page: 1,
 };
+
+/** Query params whose change should reset `page` back to 1 — anything that changes what set of proposals is being paginated through. Mirrors `lib/whale/queryState.ts`'s `PAGE_RESETTING_KEYS` exactly. */
+const PAGE_RESETTING_KEYS: (keyof GovernanceQueryState)[] = ["category", "search", "sortField", "sortOrder"];
 
 /** Parses Next's raw `searchParams` into typed state — an unrecognized or malformed value always falls back to its default rather than throwing. */
 export function parseGovernanceQueryState(searchParams: RawSearchParams): GovernanceQueryState {
@@ -59,22 +70,34 @@ export function parseGovernanceQueryState(searchParams: RawSearchParams): Govern
   const sortField = sortExplicit ? (rawSortField as GovernanceSortField) : DEFAULT_GOVERNANCE_QUERY_STATE.sortField;
   const sortOrder = rawSortOrder === "asc" || rawSortOrder === "desc" ? rawSortOrder : DEFAULT_GOVERNANCE_QUERY_STATE.sortOrder;
 
+  const rawPage = Number(first(searchParams.page));
+  const page = Number.isInteger(rawPage) && rawPage > 0 ? rawPage : DEFAULT_GOVERNANCE_QUERY_STATE.page;
+
   return {
     category,
     search: (first(searchParams.search) ?? "").trim(),
     sortField,
     sortOrder,
     sortExplicit,
+    page,
   };
 }
 
 /**
  * Builds the query string for `state` merged with `overrides` — the single
  * function every control on the Governance Explorer uses to navigate.
- * Returns a `?`-prefixed string, or `""` when every value is default.
+ * Returns a `?`-prefixed string, or `""` when every value is default. Any
+ * real change to what's being paginated through (category/search/sort)
+ * resets `page` back to 1, unless the caller explicitly overrides `page`
+ * itself.
  */
 export function buildGovernanceQuery(state: GovernanceQueryState, overrides: Partial<GovernanceQueryState> = {}): string {
   const next: GovernanceQueryState = { ...state, ...overrides };
+
+  const scopeChanged = PAGE_RESETTING_KEYS.some((key) => overrides[key] !== undefined && overrides[key] !== state[key]);
+  if (scopeChanged && overrides.page === undefined) {
+    next.page = 1;
+  }
 
   const params = new URLSearchParams();
   if (next.category !== DEFAULT_GOVERNANCE_QUERY_STATE.category) params.set("category", next.category);
@@ -83,6 +106,7 @@ export function buildGovernanceQuery(state: GovernanceQueryState, overrides: Par
     params.set("sortField", next.sortField);
     params.set("sortOrder", next.sortOrder);
   }
+  if (next.page > 1) params.set("page", String(next.page));
 
   const query = params.toString();
   return query ? `?${query}` : "";

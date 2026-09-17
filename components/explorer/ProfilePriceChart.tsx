@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 
-import { ProfileChart } from "@/components/explorer/ProfileChart";
+import { ProfileChart } from "@/components/explorer/LazyProfileChart";
 import { getProjectPriceHistory, getProjectVolumeHistory, type PricePeriod } from "@/app/dashboard/projects/[slug]/actions";
 import { formatCompactCurrency } from "@/lib/data/format";
 import { cn } from "@/lib/utils";
@@ -40,19 +40,29 @@ export function ProfilePriceChart({ coingeckoId, initialData }: ProfilePriceChar
   const [notice, setNotice] = useState<string | null>(null);
   const [averageVolumeUsd, setAverageVolumeUsd] = useState<number | null>(null);
   const [isPending, startTransition] = useTransition();
+  // Guards against a slower earlier click's response landing after a faster
+  // later one: only the click whose id still matches this ref when its
+  // promise resolves is allowed to touch state. Without this, clicking 30D
+  // then 90D before 30D's fetch resolves could let 30D's data silently
+  // overwrite 90D's already-rendered chart (or, if 30D fails, revert the
+  // pill to 90D's *previous* period instead of leaving 90D's result alone).
+  const latestRequestId = useRef(0);
 
   function handlePeriodClick(next: PricePeriod) {
     if (next === period || !coingeckoId || failedPeriods.has(next)) return;
     setNotice(null);
     const previous = period;
+    const requestId = ++latestRequestId.current;
     setPeriod(next);
     startTransition(async () => {
       const history = await getProjectPriceHistory(coingeckoId, next);
+      if (latestRequestId.current !== requestId) return;
       if (history && history.length > 1) {
         setData(history);
         // Goal 9 — same cached `market_chart` fetch `getProjectPriceHistory`
         // just made for this id+period; a cache hit, not a new request.
         const volumeHistory = await getProjectVolumeHistory(coingeckoId, next);
+        if (latestRequestId.current !== requestId) return;
         setAverageVolumeUsd(
           volumeHistory && volumeHistory.length > 0
             ? volumeHistory.reduce((sum, point) => sum + point.v, 0) / volumeHistory.length

@@ -1,6 +1,6 @@
 export type SyncOperationType = "create" | "update" | "delete";
 
-export type SyncEntity = "watchlist" | "preferences" | "account";
+export type SyncEntity = "watchlist" | "preferences" | "account" | "search" | "savedSearch";
 
 export type SyncOperationStatus = "pending" | "syncing" | "error" | "success";
 

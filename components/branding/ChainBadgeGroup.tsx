@@ -36,7 +36,15 @@ export function ChainBadgeGroup({ chains, size = "default", max, className }: Ch
         <ChainBadge key={chain} chain={chain} size={size} />
       ))}
       {hidden.length > 0 && (
+        // V1-FIX-022 — Accessibility & Reading Order. `pointer-events-auto`
+        // restores reachability when this renders under `LiveProjectCard`'s
+        // `pointer-events-none` content wrapper (confirmed live: neither
+        // hover nor keyboard focus opened this tooltip there before this
+        // fix) — a no-op everywhere else this component renders, since
+        // `auto` is already the CSS default without a `pointer-events-none`
+        // ancestor to override.
         <Tooltip
+          className="pointer-events-auto"
           content={
             <RichTooltip variant="list" title="Supported Chains">
               <ChainListTooltip chains={all} />

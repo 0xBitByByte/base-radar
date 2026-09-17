@@ -31,3 +31,21 @@ export async function runSyncAttempt(operations: SyncOperation[]): Promise<SyncA
   const result = await connector.push(operations);
   return { outcome: result.outcome, operations: result.operations };
 }
+
+/**
+ * PR-093.06 (Ongoing Cloud Sync) — the pull counterpart to
+ * `runSyncAttempt()` above, same "delegate to whichever connector is
+ * active, never import a backend client directly" shape.
+ * `localConnector.pull()` already honestly returns no operations (no real
+ * remote counterpart exists for it); `backendConnector.pull()` returns the
+ * real current cloud state once active.
+ */
+export type PullAttemptResult = {
+  operations: SyncOperation[];
+};
+
+export async function runPullAttempt(): Promise<PullAttemptResult> {
+  const connector = activeConnector();
+  const result = await connector.pull();
+  return { operations: result.operations };
+}

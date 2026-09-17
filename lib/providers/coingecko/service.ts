@@ -1,9 +1,10 @@
 /** Public API for the CoinGecko provider — cache- and rate-limit-guarded. */
 
-import { fetchBaseEcosystemMarkets, fetchCoinDetail, fetchMarketChart, fetchMarketsByIds, fetchSimplePrice } from "@/lib/providers/coingecko/client";
+import { fetchBaseEcosystemMarkets, fetchCoinByContractAddress, fetchCoinDetail, fetchCoinMarketByContractAddress, fetchMarketChart, fetchMarketsByIds, fetchSimplePrice } from "@/lib/providers/coingecko/client";
 import {
-  mapAssetPrice,
   mapCoinMarkets,
+  mapContractImageUrl,
+  mapContractPrice,
   mapGenesisDate,
   mapMajorPrices,
   mapMarketChart,
@@ -12,29 +13,29 @@ import {
   type CoinMarket,
   type MajorPrices,
 } from "@/lib/providers/coingecko/mapper";
-import { getOrSet } from "@/lib/providers/common/cache";
+import { getOrSet, getStale } from "@/lib/providers/common/cache";
 import { ProviderParseError } from "@/lib/providers/common/errors";
-import { assertRateLimit, getRateLimitStatus as getSharedRateLimitStatus, type RateLimitConfig } from "@/lib/providers/common/rate-limit";
+import { assertRateLimit, type RateLimitConfig } from "@/lib/providers/common/rate-limit";
 import type { ProviderResult } from "@/lib/providers/common/types";
-import { toProviderResult } from "@/lib/providers/common/utilities";
+import { toProviderResult, withStaleFallback } from "@/lib/providers/common/utilities";
 import type { SparklinePoint } from "@/lib/data/types";
 
 const PROVIDER = "coingecko" as const;
-const CACHE_TTL_MS = 90_000; // matches the window documented in docs/API.md
+// PR-098.07 — was 90s; retuned to the floor of the "Token Price / Token
+// 24H" freshness class (2-5min, `lib/intelligence/freshness.ts`'s
+// `FRESHNESS_CLASSES.tokenPrice`) — matches docs/API.md's updated window.
+const CACHE_TTL_MS = 120_000;
 // CoinGecko's free tier commonly documents ~30 req/min; this is a
 // conservative in-process budget, not an authoritative published limit.
 const RATE_LIMIT: RateLimitConfig = { limit: 30, windowMs: 60_000 };
 
 /**
- * PR-074 REVIEW #8 — real-time read of this provider's own app-enforced
- * rate-limit budget (see `common/rate-limit.ts`'s `getRateLimitStatus`),
- * exposed for the Evidence & Sources panel to report exact remaining/
- * limit/reset numbers instead of a generic "try again later" — the same
- * pattern already built for GitHub's response-header-based tracker.
+ * Final Production Hardening PR — moved to `coingecko/rateLimitStatus.ts`
+ * (a pure module with no `client.ts`/fetch import), re-exported here so
+ * every existing server-side consumer of `"@/lib/providers/coingecko/service"`
+ * is unaffected.
  */
-export function getRateLimitStatus() {
-  return getSharedRateLimitStatus(PROVIDER, RATE_LIMIT);
-}
+export { getRateLimitStatus } from "@/lib/providers/coingecko/rateLimitStatus";
 
 /**
  * PR-054 — the real page size `lib/intelligence/sources.ts`'s
@@ -49,14 +50,29 @@ export function getRateLimitStatus() {
  */
 export const BASE_ECOSYSTEM_MARKETS_PAGE_SIZE = 250;
 
+/**
+ * PR-098.02 — feeds every project's `market` slice (price, 24h/7d/30d
+ * change, market cap, ...) via `sources.ts`'s `matchMarket`, the sole
+ * source `mergeMarket` reads `changePct24h` from. Previously had no
+ * `withStaleFallback` at all — unlike DefiLlama's `getBaseChainTvl`,
+ * Blockscout's verified-contract lookups, and GitHub's repo stats, a
+ * transient CoinGecko failure blanked every project's price/24h-change
+ * straight to unavailable instead of degrading to the last real,
+ * successfully-fetched value. Wired in now, matching that same established
+ * pattern exactly — CoinGecko is the preferred, and for 24h token price
+ * change the ONLY, real source this engine has, so it's the one provider
+ * where this gap mattered most.
+ */
 export async function getBaseEcosystemMarkets(perPage = 20): Promise<ProviderResult<CoinMarket[]>> {
-  return toProviderResult(PROVIDER, () =>
-    getOrSet(`${PROVIDER}:markets:${perPage}`, CACHE_TTL_MS, async () => {
+  const cacheKey = `${PROVIDER}:markets:${perPage}`;
+  const result = await toProviderResult(PROVIDER, () =>
+    getOrSet(cacheKey, CACHE_TTL_MS, async () => {
       assertRateLimit(PROVIDER, RATE_LIMIT);
       const raw = await fetchBaseEcosystemMarkets(perPage);
       return mapCoinMarkets(raw);
     })
   );
+  return withStaleFallback(PROVIDER, cacheKey, result);
 }
 
 /**
@@ -74,13 +90,19 @@ export async function getMarketsByIds(ids: string[]): Promise<ProviderResult<Coi
     return { ok: true, data: [], source: PROVIDER, fetchedAt: new Date().toISOString() };
   }
   const sortedIds = [...ids].sort();
-  return toProviderResult(PROVIDER, () =>
-    getOrSet(`${PROVIDER}:markets:by-id:${sortedIds.join(",")}`, CACHE_TTL_MS, async () => {
+  // PR-098.02 — same `withStaleFallback` gap as `getBaseEcosystemMarkets`
+  // above; this is the id-based backfill `mergeMarketResults` (sources.ts)
+  // relies on for every registry project CoinGecko's category tagging
+  // misses (e.g. Uniswap), so it needs the same resilience.
+  const cacheKey = `${PROVIDER}:markets:by-id:${sortedIds.join(",")}`;
+  const result = await toProviderResult(PROVIDER, () =>
+    getOrSet(cacheKey, CACHE_TTL_MS, async () => {
       assertRateLimit(PROVIDER, RATE_LIMIT);
       const raw = await fetchMarketsByIds(sortedIds);
       return mapCoinMarkets(raw);
     })
   );
+  return withStaleFallback(PROVIDER, cacheKey, result);
 }
 
 export async function getMajorPrices(): Promise<ProviderResult<MajorPrices>> {
@@ -95,18 +117,6 @@ export async function getMajorPrices(): Promise<ProviderResult<MajorPrices>> {
   );
 }
 
-export async function getEthPrice(): Promise<ProviderResult<AssetPrice>> {
-  return toProviderResult(PROVIDER, () =>
-    getOrSet(`${PROVIDER}:eth-price`, CACHE_TTL_MS, async () => {
-      assertRateLimit(PROVIDER, RATE_LIMIT);
-      const raw = await fetchSimplePrice(["ethereum"]);
-      const mapped = mapAssetPrice(raw, "ethereum");
-      if (!mapped) throw new ProviderParseError(PROVIDER, "Missing ETH price data in response");
-      return mapped;
-    })
-  );
-}
-
 /** Genesis/launch date for a single coin — heavier per-coin endpoint, only called on the Project Profile page. */
 export async function getCoinDetail(id: string): Promise<ProviderResult<string | null>> {
   return toProviderResult(PROVIDER, () =>
@@ -116,6 +126,66 @@ export async function getCoinDetail(id: string): Promise<ProviderResult<string |
       return mapGenesisDate(raw);
     })
   );
+}
+
+// Token Logo System — a contract's real logo never changes, unlike price
+// data, so this cache lives far longer than `CACHE_TTL_MS`'s 90s: reduces
+// both outbound request volume and exposure to the rate limiting already
+// observed live against this provider under normal use.
+const LOGO_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+
+/**
+ * Token Logo System, tier 1 — resolves a token's real logo directly by
+ * on-chain contract address, the most collision-safe identifier (unlike a
+ * symbol, which many real, unrelated tokens can share). Used for tokens
+ * this app has no other identifier for, e.g. a pool's quote/secondary
+ * token. Returns `null` — never throws up to the caller — both when
+ * CoinGecko genuinely has no listing for this address (a common, expected
+ * outcome, not a failure) and on any other fetch/parse error; a caller
+ * getting `null` simply falls through to the next resolution tier.
+ *
+ * A live failure (rate limit, network error) falls back to `getStale()` —
+ * the last real, successfully-resolved image for this exact address, even
+ * past its 24h TTL — before giving up. A contract's logo is effectively
+ * permanent, so serving an hours-old cached image under rate-limit pressure
+ * is strictly better than an unnecessary trip to the generic initials
+ * badge for a token this process has already resolved once before.
+ */
+export async function getTokenLogoByAddress(address: string): Promise<string | null> {
+  const cacheKey = `${PROVIDER}:token-logo-by-address:base:${address.toLowerCase()}`;
+  const result = await toProviderResult(PROVIDER, () =>
+    getOrSet(cacheKey, LOGO_CACHE_TTL_MS, async () => {
+      assertRateLimit(PROVIDER, RATE_LIMIT);
+      const raw = await fetchCoinByContractAddress("base", address);
+      return mapContractImageUrl(raw);
+    })
+  );
+  if (result.ok) return result.data;
+  return getStale<string | null>(cacheKey)?.value ?? null;
+}
+
+/**
+ * V3-WALLET-002 — portfolio pricing fallback tier: only ever called for a
+ * token Blockscout's own `exchange_rate` came back `null` for (see
+ * `lib/portfolio/pricing.ts`). Same address-keyed cache pattern as
+ * `getTokenLogoByAddress`, same graceful-degrade-to-last-known-value on a
+ * live failure — a slightly stale real price is still more honest than
+ * silently showing no price at all for a token whose value genuinely is
+ * known, just not reachable this instant. Uses the provider's own standard
+ * `CACHE_TTL_MS` (90s), not the logo tier's 24h cache — a price changes
+ * constantly; a logo doesn't.
+ */
+export async function getTokenPriceByAddress(address: string): Promise<number | null> {
+  const cacheKey = `${PROVIDER}:token-price-by-address:base:${address.toLowerCase()}`;
+  const result = await toProviderResult(PROVIDER, () =>
+    getOrSet(cacheKey, CACHE_TTL_MS, async () => {
+      assertRateLimit(PROVIDER, RATE_LIMIT);
+      const raw = await fetchCoinMarketByContractAddress("base", address);
+      return mapContractPrice(raw);
+    })
+  );
+  if (result.ok) return result.data;
+  return getStale<number | null>(cacheKey)?.value ?? null;
 }
 
 export type MarketChart = {

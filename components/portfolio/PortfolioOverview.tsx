@@ -1,12 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { Activity, AlertTriangle, Code2, Gauge, ListChecks, ShieldAlert, Target, Vote } from "lucide-react";
 
-import { NarrativeBadge } from "@/components/alerts/NarrativeBadge";
-import { SeverityBadge } from "@/components/alerts/SeverityBadge";
-import { ProjectLogo } from "@/components/branding/ProjectLogo";
 import {
   filterHighlights,
   filterNarrativeTrends,
@@ -21,11 +17,12 @@ import { PortfolioCard } from "@/components/portfolio/PortfolioCard";
 import { PortfolioFilters } from "@/components/portfolio/PortfolioFilters";
 import { PORTFOLIO_HEALTH_DESCRIPTION, PortfolioHealthBadge } from "@/components/portfolio/PortfolioHealthBadge";
 import { PortfolioSection } from "@/components/portfolio/PortfolioSection";
+import { ProjectHighlightCard } from "@/components/brief/ProjectHighlightCard";
+import { ProjectOpportunityCard } from "@/components/brief/ProjectOpportunityCard";
 import { RecommendationCard } from "@/components/portfolio/RecommendationCard";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { getProject } from "@/data/projects/helpers";
 import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
-import type { BriefHighlight, BriefOpportunity } from "@/lib/brief/types";
+import type { ProjectLogoEntry } from "@/lib/branding/resolveProjectLogos";
 
 const DEFAULT_SEARCH = "";
 const DEFAULT_SECTION_FILTER: SectionFilterValue = "all";
@@ -41,79 +38,6 @@ const FILTER_SECTION_ID: Partial<Record<SectionFilterValue, string>> = {
   narratives: "dominant-narratives",
   recommendations: "recommendations",
 };
-
-function PerformerRow({ performer }: { performer: BriefOpportunity }) {
-  const project = getProject(performer.projectId);
-
-  return (
-    <li className="group relative flex h-full flex-col gap-2 rounded-xl border border-radar-light-border bg-radar-light-card p-4 transition-colors hover:bg-radar-light-surface dark:border-white/10 dark:bg-white/[0.02] dark:hover:bg-white/[0.05]">
-      {project && (
-        <Link
-          href={`/dashboard/projects/${project.slug}`}
-          aria-label={`${performer.headline}. View ${performer.projectName}'s Project Profile.`}
-          className="absolute inset-0 z-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-radar-primary/50"
-        />
-      )}
-
-      <div className="relative z-[1] flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <span className="flex max-w-[160px] items-center gap-1.5 rounded-full border border-radar-light-border bg-radar-light-surface px-2 py-0.5 text-[10.5px] font-medium text-radar-light-text dark:border-white/10 dark:bg-white/[0.03] dark:text-radar-white">
-            <ProjectLogo logoUrl={project?.logoUrl} name={performer.projectName} size={14} />
-            <span className="truncate">{performer.projectName}</span>
-          </span>
-          <NarrativeBadge narrative={performer.narrative} />
-        </div>
-        <span className="shrink-0 text-[10.5px] font-medium text-radar-light-muted dark:text-radar-muted">
-          {performer.confidence}% confidence
-        </span>
-      </div>
-
-      <div className="relative z-[1] flex flex-1 flex-col gap-1">
-        <p className="line-clamp-1 text-sm font-semibold text-radar-light-text dark:text-radar-white">
-          {performer.headline}
-        </p>
-        <p className="line-clamp-2 text-xs leading-relaxed text-radar-light-muted dark:text-radar-muted">
-          {performer.reason}
-        </p>
-      </div>
-
-      <div className="relative z-[1] flex items-center justify-end gap-1.5 text-[10.5px] text-radar-light-muted dark:text-radar-muted">
-        Score <span className="font-semibold text-radar-light-text dark:text-radar-white">{performer.score}</span>
-      </div>
-    </li>
-  );
-}
-
-function HighlightRow({ highlight }: { highlight: BriefHighlight }) {
-  const project = getProject(highlight.projectId);
-
-  return (
-    <li className="group relative flex h-full flex-col gap-1.5 rounded-xl border border-radar-light-border bg-radar-light-card p-4 transition-colors hover:bg-radar-light-surface dark:border-white/10 dark:bg-white/[0.02] dark:hover:bg-white/[0.05]">
-      {project && (
-        <Link
-          href={`/dashboard/projects/${project.slug}`}
-          aria-label={`${highlight.headline}. View ${highlight.projectName}'s Project Profile.`}
-          className="absolute inset-0 z-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-radar-primary/50"
-        />
-      )}
-
-      <div className="relative z-[1] flex min-w-0 flex-wrap items-center gap-1.5">
-        <span className="flex max-w-[160px] items-center gap-1.5 rounded-full border border-radar-light-border bg-radar-light-surface px-2 py-0.5 text-[10.5px] font-medium text-radar-light-text dark:border-white/10 dark:bg-white/[0.03] dark:text-radar-white">
-          <ProjectLogo logoUrl={project?.logoUrl} name={highlight.projectName} size={14} />
-          <span className="truncate">{highlight.projectName}</span>
-        </span>
-        <SeverityBadge severity={highlight.severity} />
-      </div>
-
-      <p className="line-clamp-1 text-sm font-semibold text-radar-light-text dark:text-radar-white">
-        {highlight.headline}
-      </p>
-      <p className="line-clamp-2 flex-1 text-xs leading-relaxed text-radar-light-muted dark:text-radar-muted">
-        {highlight.detail}
-      </p>
-    </li>
-  );
-}
 
 const CARD_GRID_CLASS = "grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2";
 
@@ -131,7 +55,7 @@ const CARD_GRID_CLASS = "grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2";
  * stay read off the raw engine output — never recomputed for a filtered
  * subset.
  */
-export function PortfolioOverview() {
+export function PortfolioOverview({ logoMap }: { logoMap: Record<string, ProjectLogoEntry> }) {
   const { portfolio, isPersonalized, activeWatchlist } = usePersonalizedDashboard();
 
   const [search, setSearch] = useState(DEFAULT_SEARCH);
@@ -232,7 +156,7 @@ export function PortfolioOverview() {
             <PortfolioSection id="top-performers" title="Top Performers" icon={Target}>
               <ul className={CARD_GRID_CLASS}>
                 {sections.topPerformers.map((performer) => (
-                  <PerformerRow key={performer.projectId} performer={performer} />
+                  <ProjectOpportunityCard key={performer.projectId} opportunity={performer} logoMap={logoMap} />
                 ))}
               </ul>
             </PortfolioSection>
@@ -242,7 +166,7 @@ export function PortfolioOverview() {
             <PortfolioSection id="projects-needing-attention" title="Projects Needing Attention" icon={AlertTriangle}>
               <ul className={CARD_GRID_CLASS}>
                 {sections.projectsNeedingAttention.map((highlight) => (
-                  <HighlightRow key={highlight.projectId} highlight={highlight} />
+                  <ProjectHighlightCard key={highlight.projectId} highlight={highlight} logoMap={logoMap} />
                 ))}
               </ul>
             </PortfolioSection>
@@ -252,7 +176,7 @@ export function PortfolioOverview() {
             <PortfolioSection id="security-risks" title="Security Risks" icon={ShieldAlert}>
               <ul className={CARD_GRID_CLASS}>
                 {sections.securityRisks.map((highlight) => (
-                  <HighlightRow key={highlight.projectId} highlight={highlight} />
+                  <ProjectHighlightCard key={highlight.projectId} highlight={highlight} logoMap={logoMap} />
                 ))}
               </ul>
             </PortfolioSection>
@@ -262,7 +186,7 @@ export function PortfolioOverview() {
             <PortfolioSection id="governance-watch" title="Governance Watch" icon={Vote}>
               <ul className={CARD_GRID_CLASS}>
                 {sections.governanceWatch.map((highlight) => (
-                  <HighlightRow key={highlight.projectId} highlight={highlight} />
+                  <ProjectHighlightCard key={highlight.projectId} highlight={highlight} logoMap={logoMap} />
                 ))}
               </ul>
             </PortfolioSection>
@@ -272,7 +196,7 @@ export function PortfolioOverview() {
             <PortfolioSection id="development-momentum" title="Development Momentum" icon={Code2}>
               <ul className={CARD_GRID_CLASS}>
                 {sections.developmentMomentum.map((highlight) => (
-                  <HighlightRow key={highlight.projectId} highlight={highlight} />
+                  <ProjectHighlightCard key={highlight.projectId} highlight={highlight} logoMap={logoMap} />
                 ))}
               </ul>
             </PortfolioSection>

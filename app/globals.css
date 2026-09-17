@@ -15,6 +15,19 @@
   initial-value: 0deg;
 }
 
+/* PR-085.03 — Executive Project Card's hover-only rainbow border ring
+   (`LiveProjectCard.tsx`, `detailed` only). Same masked-conic-gradient
+   technique as `AIHubRing` above, its own angle property so the two never
+   fight over one shared value; only ever animates while a card is actually
+   hovered (see the `hover:[animation:...]` utility at the call site), so
+   the other ~19 unhovered cards in the grid never pay for a running
+   animation. */
+@property --card-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -33,6 +46,19 @@
 }
 
 @theme {
+  /* PR-085.xx — a real, named breakpoint at this page's own actual content-
+     width plateau (`DashboardLayout`'s outer `max-w-[1600px]`): past this
+     viewport width the main content column has genuinely stopped growing,
+     confirmed live (1206px at both 1600px and 1920px viewport). A named
+     `--breakpoint-*` token gets Tailwind's guaranteed ascending cascade
+     order against `sm:`/`lg:`/etc — an arbitrary `min-[1600px]:` variant
+     does not (confirmed live: it can compile *before* `sm:` in the
+     generated stylesheet, silently losing the cascade at wider viewports
+     than `sm:`'s own). Only Featured Pools uses `3xl:` today; safe for any
+     future consumer that needs this exact same real width.
+   */
+  --breakpoint-3xl: 1600px;
+
   /* Midnight Sapphire — dark theme surfaces. */
   --color-radar-bg: #071321;
   --color-radar-bg-secondary: #0f1b2e;
@@ -150,27 +176,59 @@
    actually caused by. Duration nudged 200ms → 240ms with a standard
    ease-in-out curve (matching the easing most design systems use for this
    exact kind of ambient repaint) for a slightly less snappy, more settled
-   feel, still well under the 300ms ceiling from previous rounds. */
+   feel, still well under the 300ms ceiling from previous rounds.
+
+   Theme-toggle smoothness fix — confirmed live (frame-by-frame screen
+   recording) that this rule, even fully correct, still produces a visibly
+   muddy gray wash partway through the crossfade: dozens of elements
+   independently interpolate raw RGB color values at once, and adjacent
+   cards' borders/fills passing through similar intermediate grays at the
+   same moment makes their boundaries briefly merge into one flat blob.
+   That's an artifact inherent to animating raw colors across many elements
+   simultaneously, not a timing bug — no duration/easing value fixes it,
+   which is exactly why two prior tuning passes on this same rule didn't
+   (see above). `components/ui/ThemeToggle.tsx` now drives the toggle via
+   `document.startViewTransition()` where supported — a real pixel-snapshot
+   crossfade with no per-element color interpolation, so the muddy midpoint
+   never occurs. This rule stays as its fallback for browsers without View
+   Transitions support (gated below, not removed) and for the initial
+   system-theme-detection paint, which isn't routed through the toggle. */
 @media (prefers-reduced-motion: no-preference) {
-  body,
-  div,
-  section,
-  header,
-  footer,
-  nav,
-  aside,
-  main,
-  button,
-  a,
-  span,
-  input,
-  textarea,
-  svg,
-  path {
-    transition-property: background-color, background-image, border-color, color, box-shadow, fill, stroke;
-    transition-duration: 240ms;
-    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  @supports not (view-transition-name: none) {
+    body,
+    div,
+    section,
+    header,
+    footer,
+    nav,
+    aside,
+    main,
+    button,
+    a,
+    span,
+    input,
+    textarea,
+    svg,
+    path {
+      transition-property: background-color, background-image, border-color, color, box-shadow, fill, stroke;
+      transition-duration: 240ms;
+      transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    }
   }
+}
+
+/* Theme-toggle smoothness fix, continued — tunes the browser's native
+   view-transition crossfade (see `ThemeToggle.tsx`'s `setThemeSmoothly`) to
+   this app's existing 240ms/cubic-bezier(0.4,0,0.2,1) motion token instead
+   of the View Transitions API's own default (0.25s ease), so a toggle feels
+   identical in timing to every other themed repaint on the page — only the
+   underlying mechanism changed, not the app's motion language. `root`
+   targets the whole-page snapshot pair the API creates by default, since no
+   individual element is tagged with its own `view-transition-name`. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 240ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Dashboard's critical-widget block (PR9.5 §4) — once every critical
@@ -211,6 +269,18 @@
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* PR-085.03 — `--card-angle`'s rotation, driving `LiveProjectCard`'s
+   hover-only rainbow ring (see the `@property --card-angle` registration
+   above for why this animates smoothly instead of snapping). */
+@keyframes br-card-rainbow-spin {
+  from {
+    --card-angle: 0deg;
+  }
+  to {
+    --card-angle: 360deg;
   }
 }
 
@@ -258,6 +328,20 @@
   }
 }
 
+/* PR-089 — `MetricItem`'s live-update crossfade: a live-polled value (Price,
+   Market Cap, TVL, 7D/24H change — see `useLivePrice`/`useLiveTvl`) swapping
+   in over its previous render dips briefly before settling back to full
+   opacity, instead of instantly replacing the old digits. Opacity only, so
+   it never affects layout/reflow. */
+@keyframes br-metric-fade {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* The splash screen's bottom loading bar — an indeterminate gradient chunk
    sliding across its track, looping. `transform`-only. */
 @keyframes br-loading-bar {
@@ -295,30 +379,54 @@
   }
 }
 
-/* Trusted Data Sources' "Base Radar AI" hub (PR9.5.1 §2) — a rounded-rect
-   gradient border that sweeps once every 4s, timed to the same period as
-   the six converging provider particles and the single verified-output
-   particle (see `ProviderConvergence`/`VerifiedOutputConnector` in
-   TrustedDataSources.tsx): particles travel during the first ~40% of the
-   cycle, this ring is visible for the middle ~50% ("processing"), then
-   fades out as the output particle travels during the final ~20%. Opacity
-   eases in/out at both ends so the ring never snaps on/off ("no
-   flashing"). */
+/* NOTE ON DIRECTION (visual refinement pass) — confirmed, carefully, by
+   tracking one named pill's actual pixel position across real screenshots
+   (`getAnimations()`/computed-style polling reads as frozen while the tab
+   is backgrounded in this environment and produced false readings earlier
+   — screenshots force a real paint and are the only reliable check here):
+   `br-ticker`'s own default direction (`translateX(0)` → `translateX(-50%)`)
+   runs RIGHT-TO-LEFT — new items enter on the right, exit on the left.
+   `KeyMetrics.tsx`'s ticker uses that default and that's fine there (never
+   flagged). `TrustedDataSources.tsx`'s "Sources" row needs the opposite
+   (asked for explicitly, twice), so it uses `br-ticker-ltr` below —
+   `br-ticker`'s exact keyframe with `from`/`to` swapped. */
+@keyframes br-ticker-ltr {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Trusted Data Sources' "Base Radar AI" hub and Intelligence Engine's "AI
+   Analysis" hub (PR9.5.1 §2; visual refinement pass) — a rounded-rect
+   gradient border that continuously rotates, read as "running lights"
+   always circling the hub card, not just during the convergence particles'
+   own 4s cycle. Previously faded in/out to only appear mid-cycle; kept
+   always visible per visual review ("running lights around AI Analysis"),
+   angle-only now — `HubRing`'s own opacity stays constant. */
 @keyframes tds-ai-sweep {
-  0%,
-  34% {
-    opacity: 0;
+  from {
     --tds-angle: 0deg;
   }
-  35% {
-    opacity: 1;
-  }
-  85% {
-    opacity: 1;
+  to {
     --tds-angle: 360deg;
   }
+}
+
+/* Hub circuit backdrop's via-dots (`HubCircuitBackground` in
+   PipelineFlow.tsx) — a gentle opacity pulse, staggered per dot so they
+   don't all breathe in sync. Deliberately not a traveling particle: this
+   is the "mild animation" for an otherwise-static backdrop, not another
+   moving element competing with the convergence particles above it. */
+@keyframes br-circuit-pulse {
+  0%,
   100% {
-    opacity: 0;
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
   }
 }
 

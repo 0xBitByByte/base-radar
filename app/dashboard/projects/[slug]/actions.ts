@@ -11,6 +11,7 @@
  */
 
 import * as coingecko from "@/lib/providers/coingecko/service";
+import { downsampleSparkline } from "@/lib/data/downsample";
 import type { SparklinePoint } from "@/lib/data/types";
 
 export type PricePeriod = "24H" | "7D" | "30D" | "90D" | "1Y" | "ALL";
@@ -24,13 +25,22 @@ const PERIOD_DAYS: Record<PricePeriod, number | "max"> = {
   ALL: "max",
 };
 
+/**
+ * PR-097.01 (Performance — H2) — a multi-year "ALL"/"1Y" period can return
+ * several hundred to ~1,000+ raw provider points; bounded here before
+ * `ProfileChart.tsx` (a `recharts` `AreaChart`) ever sees them, rather
+ * than in the chart component itself. 300 is comfortably above what any
+ * real chart width on this page can visually resolve as distinct points.
+ */
+const MAX_CHART_POINTS = 300;
+
 export async function getProjectPriceHistory(
   coingeckoId: string,
   period: PricePeriod
 ): Promise<SparklinePoint[] | null> {
   const result = await coingecko.getMarketChart(coingeckoId, PERIOD_DAYS[period]);
   if (!result.ok) return null;
-  return result.data.prices;
+  return downsampleSparkline(result.data.prices, MAX_CHART_POINTS);
 }
 
 /**
@@ -45,5 +55,5 @@ export async function getProjectVolumeHistory(
 ): Promise<SparklinePoint[] | null> {
   const result = await coingecko.getMarketChart(coingeckoId, PERIOD_DAYS[period]);
   if (!result.ok) return null;
-  return result.data.volumes;
+  return downsampleSparkline(result.data.volumes, MAX_CHART_POINTS);
 }

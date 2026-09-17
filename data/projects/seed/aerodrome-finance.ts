@@ -35,6 +35,14 @@ export const aerodromeFinance: Project = {
   providerIds: {
     coingeckoId: "aerodrome-finance",
     dexscreenerChainId: "base",
+    // Trading Discovery Strategy — verified live against real DexScreener
+    // Base pair data (`dexId: "aerodrome"`). Aerodrome also has its own
+    // AERO token contract below, so its Pools page worked before this
+    // strategy existed — this makes it consistent with every other
+    // DEX-category project (Uniswap, Balancer): pools discovered via
+    // exchange identity, the pools this DEX actually hosts, not just pairs
+    // where AERO itself is one leg. See `lib/trading/discoveryStrategy.ts`.
+    dexscreenerDexIds: ["aerodrome"],
     // PR-074 FINAL REVIEW — was "aerodrome-finance", a guess that doesn't
     // exist on DefiLlama (confirmed via a live `api.llama.fi/protocol/`
     // lookup) and silently produced "TVL Not Tracked" for one of Base's

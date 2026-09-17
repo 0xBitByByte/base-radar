@@ -47,6 +47,12 @@ export const defillamaDiscoveryProvider: DiscoveryProvider = {
       logoUrl: protocol.logoUrl ?? undefined,
       socials: {},
       contracts: [],
+      // PR-085.13B — `getBaseProtocols()` (see this file's own header
+      // comment) queries DefiLlama for protocols with TVL on the `base`
+      // chain — every candidate it returns is Base-scoped by construction
+      // of the query itself, independent of the (always-empty, see above)
+      // contract-level evidence.
+      knownChains: ["base"],
       discoveredAt: fetchedAt,
       confidence: SOURCE_CONFIDENCE[SOURCE],
       providerMetadata: { ...protocol },

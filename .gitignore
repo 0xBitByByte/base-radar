@@ -13,9 +13,20 @@
 # testing
 /coverage
 
+# Playwright (PR-097.04) — real run output, never committed. Visual
+# regression baseline images (`e2e/**/*-snapshots/`) are NOT covered by
+# this and stay tracked — they're the reference the suite diffs against.
+/test-results/
+/playwright-report/
+/blob-report/
+
 # next.js
 /.next/
 /out/
+
+# local SQLite backend database (Release 1 Phase C) — a real per-machine
+# data file, never something to check in, same as any other local database
+/.data/
 
 # production
 /build

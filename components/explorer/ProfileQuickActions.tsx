@@ -1,15 +1,15 @@
 "use client";
 
-import { BarChart3, Bell, Share2, Star } from "lucide-react";
+import { Bell, Share2, Star } from "lucide-react";
 
+import { CompareToggleButton } from "@/components/compare/CompareToggleButton";
 import { useWatchlist } from "@/lib/hooks/useWatchlist";
 import { cn } from "@/lib/utils";
 
-/** PR-079 Section 1 — `Share` added between `Alert` and `Compare`, UI-only per spec ("export implementation comes later"); same disabled idiom as the other two placeholders. */
+/** PR-079 Section 1 — `Share` added between `Alert` and `Compare`, UI-only per spec ("export implementation comes later"); same disabled idiom as the other two placeholders. PR-091 wired "Compare" for real (`CompareToggleButton`, rendered separately below) — it's no longer one of these still-disabled placeholders. */
 const DISABLED_ACTIONS = [
   { key: "alert", label: "Alert", icon: Bell },
   { key: "share", label: "Share", icon: Share2 },
-  { key: "compare", label: "Compare", icon: BarChart3 },
 ] as const;
 
 type ProfileQuickActionsProps = {
@@ -47,6 +47,8 @@ export function ProfileQuickActions({ projectId, projectName }: ProfileQuickActi
         <Star className={cn("size-3.5", watched && "fill-current")} aria-hidden="true" />
         {watched ? "Watching" : "Watchlist"}
       </button>
+
+      <CompareToggleButton projectId={projectId} projectName={projectName} />
 
       {DISABLED_ACTIONS.map((action) => (
         <button

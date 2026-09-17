@@ -52,7 +52,14 @@ export function buildPortfolioIntelligence(
   const overallHealth = buildOverallHealth(stats, securityRisks, projectsNeedingAttention);
 
   return {
-    id: `portfolio:${generatedAt}`,
+    // V3-NOTIFICATION-001 — day-truncated, not the full `generatedAt`
+    // timestamp — same fix, same reasoning as `lib/brief/engine.ts`'s
+    // identical `id` construction (see its own comment): `storage.ts`
+    // rebuilds this with a fresh `new Date()` on every browser refresh,
+    // and every downstream id derived from `.id` (Timeline, Notifications'
+    // read-state overlay) inherited that instability. Still deterministic
+    // given `generatedAt`, just coarser. `generatedAt` itself is untouched.
+    id: `portfolio:${generatedAt.slice(0, 10)}`,
     generatedAt,
     headline: buildPortfolioHeadline(),
     summary: buildPortfolioSummary(stats, topPerformers),

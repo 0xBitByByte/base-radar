@@ -1,34 +1,42 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { ArrowRight, Star } from "lucide-react";
 
-import { ProjectLogo } from "@/components/branding/ProjectLogo";
-import { ChangeValue } from "@/components/explorer/ChangeValue";
-import { ScoreBadge } from "@/components/explorer/ScoreBadge";
+import { WatchedProjectRow } from "@/components/dashboard/WatchedProjectRow";
 import { WidgetCard } from "@/components/dashboard/WidgetCard";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { formatPrice } from "@/lib/data/format";
-import { useWatchedProjects } from "@/lib/hooks/useWatchedProjects";
-import type { ProjectIntelligence } from "@/lib/intelligence/types";
+import { useWatchlist } from "@/lib/hooks/useWatchlist";
+import type { LiveProject } from "@/lib/projects/types";
 
 type WatchlistWidgetProps = {
-  /** The full registry's intelligence, already resolved by `app/dashboard/page.tsx` via `getAllProjectIntelligence()` — never fetched here, only filtered down to whatever's watched. */
-  projects: ProjectIntelligence[];
+  /** The full `LiveProject[]`, already fetched by `app/dashboard/page.tsx` via `getLiveProjects()` — never fetched here, only filtered down to whatever's watched. */
+  liveProjects: LiveProject[];
   lastUpdated: string;
 };
 
 /**
- * PR13.1 — replaces the previous mock "pinned wallets/tokens/narratives"
- * concept with the real, `localStorage`-backed project watchlist. Reuses
- * `getAllProjectIntelligence()`'s already-computed data (health, confidence,
- * price, 24h change) — never rebuilds intelligence, only filters an
- * already-fetched array down to watched project IDs via
- * `useWatchedProjects`. Live: adding/removing a project anywhere in the app
- * updates this widget on the same tick, no refresh.
+ * Universal Project Card, PR-6 — retired `ProjectIntelligence[]` for the
+ * canonical `LiveProject` model, per §3's "one source of truth." Filters
+ * via `useWatchlist()` directly (not the `ProjectIntelligence`-typed
+ * `useWatchedProjects`, left untouched for its one remaining consumer,
+ * `AlertsPageClient`) — the same local-filter-over-canonical-data pattern
+ * PR-4's `WatchlistsWorkspace` already established.
+ *
+ * Bug fix (visual formatting) — rows render via `WatchedProjectRow`, this
+ * dashboard's own two-line row (name+grade, then chain+value+24h trend),
+ * not `LiveProjectCard`'s `variant="micro"` — see that file's own doc
+ * comment for why 24h change specifically isn't part of `micro`'s
+ * canonical anatomy, and `WatchedProjectRow`'s for why a host-owned row is
+ * the correct extension point rather than reopening that anatomy.
  */
-export function WatchlistWidget({ projects, lastUpdated }: WatchlistWidgetProps) {
-  const watched = useWatchedProjects(projects);
+export function WatchlistWidget({ liveProjects, lastUpdated }: WatchlistWidgetProps) {
+  const { projectIds } = useWatchlist();
+  const watched = useMemo(() => {
+    const watchedIds = new Set(projectIds);
+    return liveProjects.filter((project) => watchedIds.has(project.id));
+  }, [liveProjects, projectIds]);
 
   return (
     <WidgetCard
@@ -46,60 +54,11 @@ export function WatchlistWidget({ projects, lastUpdated }: WatchlistWidgetProps)
           description="Star a project from Projects or its profile page to track it here — and unlock personalized intelligence, notifications, and automation across the dashboard."
         />
       ) : (
-        <ul className="flex flex-col gap-3">
-          {watched.map((project) => {
-            const priceAvailable = project.market.available && project.market.priceUsd !== null;
-            // PR-072 — same registry → CoinGecko → DefiLlama → GitHub avatar
-            // priority as every other logo consumer; all already part of this
-            // same `ProjectIntelligence` object, no new fetch.
-            const logoCandidates = [
-              project.identity.logoUrl,
-              project.market.available ? project.market.imageUrl : null,
-              project.tvl.available ? project.tvl.imageUrl : null,
-              project.github.available ? project.github.avatarUrl : null,
-            ].filter((url): url is string => Boolean(url));
-
-            return (
-              <li key={project.identity.id}>
-                <Link
-                  href={`/dashboard/projects/${project.identity.slug}`}
-                  className="flex items-center gap-3 rounded-lg p-1 outline-none transition-colors hover:bg-radar-light-surface focus-visible:ring-2 focus-visible:ring-radar-primary/50 dark:hover:bg-white/5"
-                >
-                  <ProjectLogo logoUrl={logoCandidates[0] ?? null} fallbackUrls={logoCandidates.slice(1)} name={project.identity.name} size={32} />
-
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-semibold text-radar-light-text dark:text-radar-white">
-                      {project.identity.name}
-                    </p>
-                    <div className="flex items-center gap-1.5">
-                      <ScoreBadge
-                        type="health"
-                        score={project.health.score}
-                        label={project.health.label}
-                        showLabel={false}
-                        bare
-                      />
-                      <ScoreBadge
-                        type="confidence"
-                        score={project.confidence.score}
-                        label={project.confidence.level}
-                        showLabel={false}
-                        bare
-                      />
-                    </div>
-                  </div>
-
-                  <div className="shrink-0 text-right">
-                    <p className="text-xs font-semibold tabular-nums text-radar-light-text dark:text-radar-white">
-                      {priceAvailable ? formatPrice(project.market.priceUsd as number) : "—"}
-                    </p>
-                    <ChangeValue value={project.market.changePct24h} className="text-[11px]" />
-                  </div>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="flex flex-col gap-2">
+          {watched.map((project) => (
+            <WatchedProjectRow key={project.id} project={project} />
+          ))}
+        </div>
       )}
 
       <Link

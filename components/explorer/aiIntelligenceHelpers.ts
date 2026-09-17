@@ -16,7 +16,7 @@ import type { Contracts, TradingPool } from "@/lib/intelligence/types";
 import type { GovernanceEvent } from "@/lib/governance/types";
 import type { WhaleEvent } from "@/lib/whale/types";
 
-/** `buildHealthScorecard` already returns all 8 tiles in a stable, sensible order — this exists only so the report page reads "every tile, in the engine's own order" from one named call, not a magic array index. */
+/** `buildHealthScorecard` already returns all 11 tiles in a stable, sensible order — this exists only so the report page reads "every tile, in the engine's own order" from one named call, not a magic array index. */
 export function getAllScorecardTiles(tiles: ScorecardTile[]): ScorecardTile[] {
   return tiles;
 }

@@ -5,6 +5,13 @@ repository. These are not suggestions — they hold across every task,
 regardless of what a given prompt asks for, unless the user explicitly
 overrides one in that specific instance.
 
+This document governs *code* — architecture, coding standards, component
+rules. For *process* — how a PR moves from assignment through Engineering
+Notes, validation, reporting, and Product Owner approval to done — see
+[CLAUDE_PR_WORKFLOW.md](CLAUDE_PR_WORKFLOW.md). For minimizing tool-call/
+investigation overhead without cutting corners, see
+[CLAUDE_EFFICIENCY_STANDARD.md](CLAUDE_EFFICIENCY_STANDARD.md).
+
 ## Before Starting Work
 
 - **Always read documentation first.** Read the relevant files in `/docs`

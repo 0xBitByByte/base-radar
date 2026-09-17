@@ -3,6 +3,7 @@
 import { Bell, BellOff } from "lucide-react";
 
 import { useProjectAlertPreference } from "@/lib/hooks/useProjectAlertPreference";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";
 
 type AlertToggleProps = {
@@ -10,6 +11,27 @@ type AlertToggleProps = {
   /** Used only for the accessible label. */
   projectName: string;
   className?: string;
+  /**
+   * V2-UX-001, revised — a lighter-weight rendering for contexts where the
+   * full labeled control (`"Alert Toggle" ... "Enabled"/"Disabled"`, a
+   * bordered box) is too heavy relative to its neighbors (e.g. a compact
+   * project row sized to match `LiveProjectCard`'s `micro` variant). Not
+   * icon-only: an icon-swap alone (a lone Bell/BellOff button) requires
+   * interpreting which icon shape means "on" before you can trust it —
+   * reviewed and rejected for exactly that reason. This keeps the real
+   * switch track+thumb (the same `role="switch"` element and
+   * `h-5 w-9`/translate values the full variant already uses) so on/off is
+   * legible from position and color alone, at a glance, with zero
+   * interaction required — a fixed Bell icon beside it only adds *what*
+   * this control is for, never *whether* it's on. Same
+   * `useProjectAlertPreference` read/write, same `aria-checked`/
+   * `aria-label` semantics; the "Alert Toggle"/"Enabled"/"Disabled" text
+   * moves into a `Tooltip` (the same pattern already used for
+   * Health/Confidence/Risk elsewhere in this app) as a bonus for anyone who
+   * hovers, not as the only way to know the state. Defaults to `false` so
+   * the one pre-existing caller's appearance is completely unchanged.
+   */
+  compact?: boolean;
 };
 
 /**
@@ -23,8 +45,43 @@ type AlertToggleProps = {
  * `WatchButton` reading `useWatchlist()` directly — no parent needs to
  * prop-drill preference state.
  */
-export function AlertToggle({ projectId, projectName, className }: AlertToggleProps) {
+export function AlertToggle({ projectId, projectName, className, compact = false }: AlertToggleProps) {
   const { enabled, toggle } = useProjectAlertPreference(projectId);
+
+  if (compact) {
+    return (
+      <Tooltip content={enabled ? `Alerts enabled for ${projectName}` : `Alerts disabled for ${projectName}`}>
+        <div className={cn("flex shrink-0 items-center gap-1.5", className)}>
+          <Bell
+            className={cn("size-3 shrink-0", enabled ? "text-radar-primary dark:text-radar-accent" : "text-radar-light-muted dark:text-radar-muted")}
+            aria-hidden="true"
+          />
+          <button
+            type="button"
+            role="switch"
+            aria-checked={enabled}
+            aria-label={enabled ? `Disable alerts for ${projectName}` : `Enable alerts for ${projectName}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              toggle();
+            }}
+            className={cn(
+              "relative flex h-5 w-9 shrink-0 items-center rounded-full outline-none transition-colors focus-visible:ring-2 focus-visible:ring-radar-primary/50",
+              enabled ? "bg-radar-primary dark:bg-radar-accent" : "bg-radar-light-border dark:bg-white/10"
+            )}
+          >
+            <span
+              aria-hidden="true"
+              className={cn(
+                "absolute size-3.5 rounded-full bg-white shadow transition-transform",
+                enabled ? "translate-x-[18px]" : "translate-x-0.5"
+              )}
+            />
+          </button>
+        </div>
+      </Tooltip>
+    );
+  }
 
   return (
     <div

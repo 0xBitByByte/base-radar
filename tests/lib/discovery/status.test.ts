@@ -48,6 +48,28 @@ describe("computeDiscoveryStatus", () => {
     expect(result.status).toBe("recently-updated");
   });
 
+  it("returns 'verified' for a renamed match against an already-verified registry project (V1-FIX-004)", () => {
+    // Real-world shape: DefiLlama reports "Aave V3" (a unique-identifier
+    // match on `defillamaSlug`) against the registry's own shorter "Aave" —
+    // a real, unique-identifier-backed match with only the display name
+    // differing, not evidence anything is wrong with the project.
+    const project = registryProject({ id: "aave", name: "Aave", providerIds: { coingeckoId: "aave" }, verification: { status: "verified" } });
+    const c = candidate({ displayName: "Aave V3", normalizedName: "aave v3", coingeckoId: "aave" });
+    const match = matchAgainstRegistry(c, [project]);
+    expect(match.type).toBe("renamed");
+    const result = computeDiscoveryStatus(c, match, noEvidence);
+    expect(result.status).toBe("verified");
+  });
+
+  it("returns 'needs-review' for a renamed match against a not-yet-verified registry project", () => {
+    const project = registryProject({ id: "x", name: "X", providerIds: { coingeckoId: "x" }, verification: { status: "community" } });
+    const c = candidate({ displayName: "X V2", normalizedName: "x v2", coingeckoId: "x" });
+    const match = matchAgainstRegistry(c, [project]);
+    expect(match.type).toBe("renamed");
+    const result = computeDiscoveryStatus(c, match, noEvidence);
+    expect(result.status).toBe("needs-review");
+  });
+
   it("returns 'needs-review' for an ambiguous match", () => {
     const project = registryProject({ id: "x", name: "X" });
     const c = candidate({ displayName: "X", normalizedName: "x" });

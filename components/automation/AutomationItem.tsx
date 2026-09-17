@@ -4,12 +4,28 @@ import { AutomationActionBadge, AutomationTriggerBadge } from "@/components/auto
 import { getResultActions, getResultTrigger } from "@/components/automation/filters";
 import { NotificationBadge } from "@/components/notifications/NotificationBadge";
 import { RelativeTime } from "@/components/shared/RelativeTime";
+import { ExplainAutomationAction } from "@/components/wallet/ExplainAutomationAction";
+import type { AIChatQuestionId } from "@/lib/ai-chat/types";
 import type { AutomationResult } from "@/lib/automation/types";
+import type { CrossFeatureIntelligence } from "@/lib/cross-feature/types";
+import type { PortfolioAI } from "@/lib/portfolio-ai/types";
+import type { WalletAnalytics } from "@/lib/wallet-analytics/types";
 
 type AutomationItemProps = {
   result: AutomationResult;
   /** Trims the row for compact previews — no summary line. */
   compact?: boolean;
+  /**
+   * V4-FUTURE-001E — optional wallet-explain context. All four are
+   * optional together: when supplied, `ExplainAutomationAction` itself
+   * decides whether `result` is wallet-sourced and worth rendering an
+   * "Explain" button for — every non-wallet (watchlist/project) result
+   * simply renders nothing extra, exactly as before this phase.
+   */
+  crossFeature?: CrossFeatureIntelligence;
+  ai?: PortfolioAI | null;
+  analytics?: WalletAnalytics;
+  onAskQuestion?: (questionId: AIChatQuestionId) => void;
 };
 
 /**
@@ -21,7 +37,7 @@ type AutomationItemProps = {
  * `NotificationBadge` directly (`AutomationResult.priority` is the exact
  * same `NotificationPriority` union) rather than a second priority chip.
  */
-export function AutomationItem({ result, compact = false }: AutomationItemProps) {
+export function AutomationItem({ result, compact = false, crossFeature, ai = null, analytics, onAskQuestion }: AutomationItemProps) {
   const trigger = getResultTrigger(result);
   const actions = getResultActions(result);
 
@@ -68,6 +84,17 @@ export function AutomationItem({ result, compact = false }: AutomationItemProps)
           {actions.map((action) => (
             <AutomationActionBadge key={action} action={action} />
           ))}
+        </div>
+      )}
+
+      {/*
+        V4-FUTURE-001E (Phase 4) — "Explain," only for wallet automation
+        events, via the shared `ExplainAutomationAction` — renders nothing
+        for every watchlist/project result, exactly as before this phase.
+      */}
+      {crossFeature && analytics && (
+        <div className="relative z-[1]">
+          <ExplainAutomationAction result={result} crossFeature={crossFeature} ai={ai} analytics={analytics} askQuestion={onAskQuestion} />
         </div>
       )}
     </li>

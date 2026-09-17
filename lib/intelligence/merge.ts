@@ -129,6 +129,7 @@ export function mergeMarket(sources: ProjectSources, genesisDate: string | null 
     sparkline7d: market?.sparkline7d ?? [],
     genesisDate,
     priceResolution,
+    stale: sources.market.stale ?? false,
   };
 }
 
@@ -150,7 +151,9 @@ export function pairToTradingPool(p: Pair): TradingPool {
     volume24hUsd: p.volume24hUsd,
     pairCreatedAt: p.pairCreatedAt,
     baseTokenSymbol: p.baseToken.symbol,
+    baseTokenAddress: p.baseToken.address,
     quoteTokenSymbol: p.quoteTokenSymbol,
+    quoteTokenAddress: p.quoteTokenAddress,
     pairAddress: p.pairAddress,
     url: p.url,
     volume6hUsd: p.volume6hUsd,
@@ -204,16 +207,25 @@ export function mergeTrading(sources: ProjectSources): Trading {
  * resolution shape as price/volume/liquidity for a consistent UI contract,
  * even though there's currently only one real candidate.
  */
+/**
+ * PR-102 — `available`/`tvlUsd` now key off the protocol's Base-specific
+ * TVL (`baseTvlUsd`), not merely whether a protocol was matched at all. A
+ * project whose DefiLlama entry was found but carries no real Base
+ * breakdown is honestly unavailable here — never silently reported via its
+ * `globalTvlUsd` (kept, separately, as real secondary context only).
+ */
 export function mergeTvl(sources: ProjectSources, tvlHistory: SparklinePoint[] | null = null): Tvl {
   const protocol = sources.tvl.data;
+  const baseTvlUsd = protocol?.baseTvlUsd ?? null;
 
   const tvlResolution = resolveMetric<number>([
-    { provider: "defillama", value: protocol?.tvlUsd ?? null, attribution: sliceAttribution("defillama", sources.tvl) },
+    { provider: "defillama", value: baseTvlUsd, attribution: sliceAttribution("defillama", sources.tvl) },
   ]);
 
   return {
-    available: sources.tvl.status === "live" && protocol !== null,
-    tvlUsd: protocol?.tvlUsd ?? null,
+    available: sources.tvl.status === "live" && protocol !== null && baseTvlUsd !== null,
+    tvlUsd: baseTvlUsd,
+    globalTvlUsd: protocol?.globalTvlUsd ?? null,
     changePct24h: protocol?.changePct24h ?? null,
     changePct7d: changePctOverDays(tvlHistory, 7),
     changePct30d: changePctOverDays(tvlHistory, 30),
@@ -255,6 +267,7 @@ export function mergeGithub(sources: ProjectSources, commitActivity: CommitActiv
     commitsLast7d: commitActivity?.commitsLast7d ?? null,
     commitsPrev7d: commitActivity?.commitsPrev7d ?? null,
     commitTrendPct: commitActivity?.trendPct ?? null,
+    developerCadence: commitActivity?.cadence ?? null,
     avatarUrl: repo?.avatarUrl ?? null,
     stale: sources.github.stale ?? false,
     dataFetchedAt: repo !== null ? sources.github.fetchedAt : null,

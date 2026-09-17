@@ -1,5 +1,13 @@
 import { BriefMetric } from "@/components/brief/BriefMetric";
 import { RelativeTime } from "@/components/shared/RelativeTime";
+import {
+  EXECUTIVE_SUMMARY_CARD_CLASS,
+  EXECUTIVE_SUMMARY_HEADER_GROUP_CLASS,
+  EXECUTIVE_SUMMARY_METRICS_ROW_CLASS,
+  EXECUTIVE_SUMMARY_SUBTITLE_CLASS,
+  EXECUTIVE_SUMMARY_TIMESTAMP_CLASS,
+  EXECUTIVE_SUMMARY_TITLE_CLASS,
+} from "@/components/shared/executiveSummaryCardStyles";
 import type { DailyBrief } from "@/lib/brief/types";
 
 type BriefCardProps = {
@@ -16,18 +24,18 @@ type BriefCardProps = {
  */
 export function BriefCard({ brief }: BriefCardProps) {
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-radar-light-border bg-radar-light-card p-5 dark:border-white/10 dark:bg-white/[0.02]">
-      <div className="flex flex-col gap-1">
+    <div className={EXECUTIVE_SUMMARY_CARD_CLASS}>
+      <div className={EXECUTIVE_SUMMARY_HEADER_GROUP_CLASS}>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h1 className="text-xl font-semibold text-radar-light-text dark:text-radar-white">{brief.headline}</h1>
-          <span className="text-[10.5px] whitespace-nowrap text-radar-light-muted dark:text-radar-muted">
+          <h1 className={EXECUTIVE_SUMMARY_TITLE_CLASS}>{brief.headline}</h1>
+          <span className={EXECUTIVE_SUMMARY_TIMESTAMP_CLASS}>
             Generated <RelativeTime iso={brief.generatedAt} />
           </span>
         </div>
-        <p className="text-sm leading-relaxed text-radar-light-muted dark:text-radar-muted">{brief.summary}</p>
+        <p className={EXECUTIVE_SUMMARY_SUBTITLE_CLASS}>{brief.summary}</p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-radar-light-border pt-4 dark:border-white/10">
+      <div className={EXECUTIVE_SUMMARY_METRICS_ROW_CLASS}>
         <BriefMetric label="Average Confidence" value={`${brief.averageConfidence}%`} />
         <BriefMetric label="Highest Score" value={brief.highestScore} />
         <BriefMetric label="Projects" value={brief.projectCount} />

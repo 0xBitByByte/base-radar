@@ -2,7 +2,7 @@ import { ArrowRight, Waypoints } from "lucide-react";
 import Link from "next/link";
 
 import { MetricItem } from "@/components/explorer/MetricItem";
-import { PairCard } from "@/components/explorer/PairCard";
+import { PoolCardGrid } from "@/components/explorer/PoolCardGrid";
 import { formatDexName, getPoolsForCategory, getPoolStatus } from "@/components/explorer/pairIntelligenceHelpers";
 import { ProfileSectionCard } from "@/components/explorer/ProfileSectionCard";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -12,6 +12,10 @@ import type { TradingPool } from "@/lib/intelligence/types";
 type ProfilePairIntelligenceProps = {
   pools: TradingPool[];
   tokenSymbol: string | null;
+  /** PR-085.xx — this project's own real token image (`market.imageUrl`, the exact same field `ProfileTokenAndPrice`'s `TokenLogo` already renders elsewhere on this page) — reused here, not refetched, for each Featured Pool card's base-token icon. `null` when CoinGecko has no image for this token; `PairCard`/`TokenLogo` fall back to `tokenLogos`, then an honest initials badge, never a fabricated logo. */
+  tokenLogoUrl: string | null;
+  /** Token Logo System — one canonical resolved logo per base/quote token across these pools (`resolveTokenLogosForPools()`), resolved once by `page.tsx`. */
+  tokenLogos?: Record<string, string>;
   /** PR-084.02 — the real Pool Explorer route for this project (`/dashboard/projects/{slug}/pools`), built once in `page.tsx` from `slug`. */
   poolsHref: string;
 };
@@ -26,7 +30,7 @@ type ProfilePairIntelligenceProps = {
  * fallback) the original single-pool `trading.pools` — this component has no
  * opinion on which, it just renders whatever real pools it's given.
  */
-export function ProfilePairIntelligence({ pools, tokenSymbol, poolsHref }: ProfilePairIntelligenceProps) {
+export function ProfilePairIntelligence({ pools, tokenSymbol, tokenLogoUrl, tokenLogos, poolsHref }: ProfilePairIntelligenceProps) {
   if (pools.length === 0) {
     return (
       <ProfileSectionCard id="trading" title="Token Pair Intelligence" icon={Waypoints}>
@@ -86,16 +90,20 @@ export function ProfilePairIntelligence({ pools, tokenSymbol, poolsHref }: Profi
         />
       </div>
       <span className="text-[10px] font-semibold tracking-wide text-radar-light-muted uppercase dark:text-radar-muted">Featured Pools</span>
-      <ul className="flex flex-col gap-2">
-        {featuredPools.map((pool, index) => (
-          <PairCard
-            key={`${pool.dexId}-${pool.pairAddress ?? index}`}
-            pool={pool}
-            isTopVolume={pool === highestVolumePool}
-            sharePct={totalLiquidityUsd > 0 ? ((pool.liquidityUsd ?? 0) / totalLiquidityUsd) * 100 : null}
-          />
-        ))}
-      </ul>
+      {/* PR-086 — now the shared `PoolCardGrid` (same adaptive 1/2/3-column
+          breakpoints as before: 1 mobile, 2 tablet/laptop via `sm:`, 3 only
+          past this page's real `max-w-[1600px]` content-width plateau via
+          the `3xl:` token registered in `globals.css`) — extracted so this
+          and the Pool Explorer page's grid can never diverge again. See
+          `PoolCardGrid.tsx`'s own doc comment for the full breakpoint
+          history (including why `3xl:` needs its trailing `!`). */}
+      <PoolCardGrid
+        pools={featuredPools}
+        topVolumePool={highestVolumePool}
+        totalLiquidityUsd={totalLiquidityUsd}
+        tokenLogoUrl={tokenLogoUrl}
+        tokenLogos={tokenLogos}
+      />
       {pools.length > featuredPools.length && (
         <Link
           href={poolsHref}

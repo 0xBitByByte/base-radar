@@ -63,7 +63,12 @@ export function CollapsibleSection({ id, title, summary, headerAccessory, childr
   }
 
   return (
-    <div className={cn("flex flex-col gap-3", className)}>
+    // PR-086 — `id` was already this section's real, stable identity (used
+    // above as the localStorage key); rendering it as a real DOM id too
+    // (plus `scroll-mt-24` to clear the sticky Topbar) makes `#kpi-pulse`/
+    // `#smart-views` genuinely work as anchors for the new floating
+    // section-jump helper, at zero cost to the existing collapse behavior.
+    <div id={id} className={cn("flex scroll-mt-24 flex-col gap-3", className)}>
       <div className="flex items-center justify-between gap-3">
         <button
           type="button"

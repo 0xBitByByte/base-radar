@@ -8,6 +8,8 @@ export type Pair = {
   baseToken: { address: string; name: string; symbol: string };
   /** PR-084 — the pool's quote-side token symbol, e.g. `"USDC"`; `null` when DexScreener didn't return one for this pair. */
   quoteTokenSymbol: string | null;
+  /** Token Logo System — the quote token's own on-chain contract address, present on the raw response alongside its symbol but previously discarded here. Distinct from `baseToken.address`; `null` when DexScreener didn't return a quote token for this pair. Powers address-first token logo resolution — the most collision-safe way to look up a token's real logo. */
+  quoteTokenAddress: string | null;
   /** PR-084.01 — the pool's own on-chain contract address; `null` when DexScreener didn't return one for this pair. */
   pairAddress: string | null;
   /** PR-084.01 — the pair's real DexScreener page URL; `null` when unavailable. */
@@ -29,6 +31,7 @@ export function mapPair(raw: RawDexScreenerPair): Pair {
     dexId: raw.dexId,
     baseToken: raw.baseToken,
     quoteTokenSymbol: raw.quoteToken?.symbol ?? null,
+    quoteTokenAddress: raw.quoteToken?.address ?? null,
     pairAddress: raw.pairAddress ?? null,
     url: raw.url ?? null,
     priceUsd: Number(raw.priceUsd),

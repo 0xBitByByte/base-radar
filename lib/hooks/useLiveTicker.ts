@@ -5,10 +5,19 @@
  * before this, only Block/Gas refreshed after mount (`useLiveNetworkStatus`);
  * ETH/BTC/TVL/Transactions stayed frozen at whatever the initial SSR fetch
  * returned. Same "UI -> Hooks -> Services -> Providers" pattern as that
- * hook: calls the Provider Layer's own cache-backed service functions
- * directly (no server action needed — these are public, unauthenticated
- * fetches), and merges only the fields a given poll actually returns live
- * data for, so a single failed provider never blanks out the others.
+ * hook, with one correction (Final Production Readiness PR): each poll now
+ * calls `pollLiveTicker` (`lib/hooks/liveActions.ts`), a Server Action, not
+ * `lib/providers` service modules directly — importing the provider layer into
+ * this `"use client"` hook meant every poll ran as a browser-origin fetch
+ * straight to CoinGecko/DefiLlama/Blockscout, none of which permit
+ * cross-origin browser requests; confirmed live, every poll silently failed
+ * (a CORS error in the console) so those three fields never actually
+ * refreshed after the initial SSR paint. Base's own public RPC (block
+ * height/gas) genuinely is CORS-open and was the one field really
+ * refreshing. `pollLiveTicker` runs the same four providers server-side,
+ * where this restriction doesn't apply — same merge-only-what-succeeded
+ * logic below, unchanged, so a single failed provider still never blanks
+ * out the others.
  *
  * Built on `usePolling` (PR12.2) — same public signature and return shape
  * as before, now additionally pausing while the tab is hidden and skipping
@@ -17,10 +26,7 @@
 
 import { useRef } from "react";
 
-import * as baseRpc from "@/lib/providers/base/service";
-import * as coingecko from "@/lib/providers/coingecko/service";
-import * as defillama from "@/lib/providers/defillama/service";
-import * as blockscout from "@/lib/providers/blockscout/service";
+import { pollLiveTicker } from "@/lib/hooks/liveActions";
 import { usePolling } from "@/lib/hooks/usePolling";
 import type { LiveTicker } from "@/lib/data/types";
 
@@ -37,24 +43,17 @@ export function useLiveTicker(initial: LiveTicker, pollMs: number = DEFAULT_POLL
 
   const { data, updatedAt } = usePolling<LiveTicker>(
     async () => {
-      const [netRes, pricesRes, tvlRes, chainStatsRes] = await Promise.allSettled([
-        baseRpc.getBaseNetworkStatus(),
-        coingecko.getMajorPrices(),
-        defillama.getBaseChainTvl(),
-        blockscout.getChainStats(),
-      ]);
+      const { net, prices, tvl, chainStats } = await pollLiveTicker();
 
       let anyLive = false;
       const next: LiveTicker = { ...tickerRef.current };
 
-      const net = netRes.status === "fulfilled" && netRes.value.ok ? netRes.value.data : null;
       if (net) {
         next.blockHeight = net.blockHeight;
         next.gasGwei = net.gasGwei;
         anyLive = true;
       }
 
-      const prices = pricesRes.status === "fulfilled" && pricesRes.value.ok ? pricesRes.value.data : null;
       if (prices) {
         next.ethPriceUsd = prices.eth.usd;
         next.ethChangePct24h = prices.eth.changePct24h;
@@ -63,13 +62,11 @@ export function useLiveTicker(initial: LiveTicker, pollMs: number = DEFAULT_POLL
         anyLive = true;
       }
 
-      const tvl = tvlRes.status === "fulfilled" && tvlRes.value.ok ? tvlRes.value.data : null;
       if (tvl) {
         next.tvlUsd = tvl.tvlUsd;
         anyLive = true;
       }
 
-      const chainStats = chainStatsRes.status === "fulfilled" && chainStatsRes.value.ok ? chainStatsRes.value.data : null;
       if (chainStats) {
         next.transactionsToday = chainStats.transactionsToday;
         anyLive = true;

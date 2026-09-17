@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+
 import { AlertTriangle } from "lucide-react";
 
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -12,8 +14,16 @@ import { EmptyState } from "@/components/ui/EmptyState";
  * `page.tsx` can't fully cover (a render error in a child component, not
  * just a data-fetch rejection), so this is real, additive coverage, not a
  * redundant abstraction. Same visual language as `ExplorerErrorState`.
+ *
+ * PR-097.03 (Observability) — the caught `error` is now actually logged
+ * rather than silently discarded; see `app/dashboard/error.tsx` for the
+ * same fix applied to the general Dashboard boundary.
  */
-export default function ProjectProfileError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function ProjectProfileError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => {
+    console.error(error);
+  }, [error]);
+
   return (
     <div className="flex min-h-[70vh] items-center justify-center">
       <EmptyState

@@ -4,6 +4,25 @@
  * or the Project Registry.
  */
 
+import type { VerificationStatus } from "@/data/projects/enums";
+
+/**
+ * PR-084.06 (final completion) — the one shared verification-status label
+ * map, consolidated from three identical private copies found during a
+ * duplication audit (`lib/intelligence/report.ts`,
+ * `components/explorer/ProjectHealthScorecard.tsx`, and this file's own new
+ * `transparency` scorecard tile in `scorecard.ts`) into this neutral shared
+ * location — both `report.ts` and `scorecard.ts` already import from here,
+ * and importing from either of *them* instead would create a circular
+ * dependency (`report.ts` imports from `scorecard.ts`).
+ */
+export const VERIFICATION_STATUS_LABEL: Record<VerificationStatus, string> = {
+  verified: "Verified",
+  community: "Community-Reviewed",
+  unverified: "Unverified",
+  flagged: "Flagged",
+};
+
 /** Lowercases and trims for loose, order-independent string comparison. */
 export function normalizeName(value: string): string {
   return value.trim().toLowerCase();

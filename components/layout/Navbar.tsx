@@ -29,8 +29,24 @@ export function Navbar() {
     const target = document.querySelector(link.href);
     if (!target) return;
     event.preventDefault();
-    target.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" });
+    // Bug fix (mobile nav anchor scroll) — closing the mobile drawer and
+    // starting `scrollIntoView` in the same tick used to race each other:
+    // the drawer sits above the target inside the `sticky` header, so its
+    // 0.2s collapse (`AnimatePresence`'s exit animation, "auto" height ->
+    // 0) shifts the whole page's layout while a smooth scroll toward a
+    // now-stale target position is still in flight — confirmed live, this
+    // left the page back at the very top instead of at the clicked
+    // section, for every in-page anchor link (not specific to "How It
+    // Works" — reproduced identically with "Features"). Closing the
+    // drawer first and waiting for its own collapse duration before
+    // scrolling lets the layout settle first, matching the desktop nav's
+    // already-correct immediate-scroll behavior (`isOpen` is always false
+    // there, so `delay` is 0 and nothing changes for it).
+    const delay = isOpen ? 220 : 0;
     setIsOpen(false);
+    window.setTimeout(() => {
+      target.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" });
+    }, delay);
   }
 
   function renderNavLink(link: NavLink, className: string) {
@@ -77,23 +93,23 @@ export function Navbar() {
             <HeaderLogo height={41} className="transition-transform duration-200 ease-out group-hover:scale-105" />
           </Link>
 
-          <div className="hidden items-center gap-11 md:flex">
+          <div className="hidden items-center gap-6 lg:flex lg:gap-11">
             {NAV_LINKS.map((link) =>
               renderNavLink(
                 link,
-                "text-sm font-medium text-radar-light-muted transition-colors hover:text-radar-light-text dark:text-radar-muted dark:hover:text-radar-white"
+                "text-sm font-medium whitespace-nowrap text-radar-light-muted transition-colors hover:text-radar-light-text dark:text-radar-muted dark:hover:text-radar-white"
               )
             )}
           </div>
 
-          <div className="hidden items-center gap-3 md:flex">
+          <div className="hidden items-center gap-3 lg:flex">
             <ThemeToggle variant="icon" />
             <GradientButton href="/dashboard" className="px-5 py-2.5 text-sm">
               Launch App
             </GradientButton>
           </div>
 
-          <div className="flex items-center gap-2 md:hidden">
+          <div className="flex items-center gap-2 lg:hidden">
             <ThemeToggle variant="icon" />
             <button
               type="button"
@@ -114,7 +130,7 @@ export function Navbar() {
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="overflow-hidden border-t border-radar-light-border md:hidden dark:border-white/5"
+              className="overflow-hidden border-t border-radar-light-border lg:hidden dark:border-white/5"
             >
               <div className="flex flex-col gap-1 px-6 py-4">
                 {NAV_LINKS.map((link) =>

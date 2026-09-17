@@ -74,7 +74,32 @@ export function computeDiscoveryStatus(
     return { status: "recently-updated", reason: registryMatch.reason };
   }
 
-  if (registryMatch.type === "renamed" || registryMatch.type === "alias" || registryMatch.type === "needs-review") {
+  // "renamed" means a UNIQUE identifier matched (contract/coingeckoId/
+  // github/defillamaSlug — see `registryMatch.ts`'s own doc comment: "essentially
+  // never a coincidence when it matches") while only the reported display
+  // name differs — e.g. DefiLlama reporting "Aave V3" against the registry's
+  // "Aave". That's real evidence THIS project, not evidence something is
+  // wrong with it. Bug fix (V1-FIX-004) — this branch previously always
+  // returned "needs-review" here regardless of the matched project's own
+  // verification status, unlike "duplicate" immediately above it, which
+  // already made exactly this check. Confirmed live: every one of this
+  // registry's blue-chip verified projects with a version-qualified
+  // DefiLlama slug (Aave, Balancer, Compound, Curve Finance, Morpho) plus
+  // USD Coin (CoinGecko reporting "USDC" against the registry's "USD Coin")
+  // were being surfaced under "Needs Review" for this reason alone — a
+  // benign display-name variance from a third-party listing, not a real
+  // trust concern. The registry's own editorial verification is the
+  // authoritative signal here, exactly as "duplicate" already treats it;
+  // an unverified match is still real evidence worth flagging for a human
+  // look, so "needs-review" stays the honest read for that case.
+  if (registryMatch.type === "renamed") {
+    if (project?.verification.status === "verified") {
+      return { status: "verified", reason: `Matches registry project "${project.name}", editorially verified (${registryMatch.reason})` };
+    }
+    return { status: "needs-review", reason: registryMatch.reason };
+  }
+
+  if (registryMatch.type === "alias" || registryMatch.type === "needs-review") {
     return { status: "needs-review", reason: registryMatch.reason };
   }
 

@@ -1,11 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { Activity, BarChart3, Code2, ListChecks, ShieldAlert, Target, TrendingUp, Vote } from "lucide-react";
 
-import { NarrativeBadge } from "@/components/alerts/NarrativeBadge";
-import { SeverityBadge } from "@/components/alerts/SeverityBadge";
 import { BriefCard } from "@/components/brief/BriefCard";
 import { BriefFilters } from "@/components/brief/BriefFilters";
 import { BriefSection } from "@/components/brief/BriefSection";
@@ -19,12 +16,12 @@ import {
   type SectionFilterValue,
 } from "@/components/brief/filters";
 import { NarrativeTrend } from "@/components/brief/NarrativeTrend";
+import { ProjectHighlightCard } from "@/components/brief/ProjectHighlightCard";
+import { ProjectOpportunityCard } from "@/components/brief/ProjectOpportunityCard";
 import { RecommendationCard } from "@/components/brief/RecommendationCard";
-import { ProjectLogo } from "@/components/branding/ProjectLogo";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { getProject } from "@/data/projects/helpers";
 import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
-import type { BriefHighlight, BriefOpportunity } from "@/lib/brief/types";
+import type { ProjectLogoEntry } from "@/lib/branding/resolveProjectLogos";
 
 const DEFAULT_SEARCH = "";
 const DEFAULT_SECTION_FILTER: SectionFilterValue = "all";
@@ -41,79 +38,6 @@ const FILTER_SECTION_ID: Partial<Record<SectionFilterValue, string>> = {
   recommendations: "recommendations",
 };
 
-function OpportunityRow({ opportunity }: { opportunity: BriefOpportunity }) {
-  const project = getProject(opportunity.projectId);
-
-  return (
-    <li className="group relative flex h-full flex-col gap-2 rounded-xl border border-radar-light-border bg-radar-light-card p-4 transition-colors hover:bg-radar-light-surface dark:border-white/10 dark:bg-white/[0.02] dark:hover:bg-white/[0.05]">
-      {project && (
-        <Link
-          href={`/dashboard/projects/${project.slug}`}
-          aria-label={`${opportunity.headline}. View ${opportunity.projectName}'s Project Profile.`}
-          className="absolute inset-0 z-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-radar-primary/50"
-        />
-      )}
-
-      <div className="relative z-[1] flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <span className="flex max-w-[160px] items-center gap-1.5 rounded-full border border-radar-light-border bg-radar-light-surface px-2 py-0.5 text-[10.5px] font-medium text-radar-light-text dark:border-white/10 dark:bg-white/[0.03] dark:text-radar-white">
-            <ProjectLogo logoUrl={project?.logoUrl} name={opportunity.projectName} size={14} />
-            <span className="truncate">{opportunity.projectName}</span>
-          </span>
-          <NarrativeBadge narrative={opportunity.narrative} />
-        </div>
-        <span className="shrink-0 text-[10.5px] font-medium text-radar-light-muted dark:text-radar-muted">
-          {opportunity.confidence}% confidence
-        </span>
-      </div>
-
-      <div className="relative z-[1] flex flex-1 flex-col gap-1">
-        <p className="line-clamp-1 text-sm font-semibold text-radar-light-text dark:text-radar-white">
-          {opportunity.headline}
-        </p>
-        <p className="line-clamp-2 text-xs leading-relaxed text-radar-light-muted dark:text-radar-muted">
-          {opportunity.reason}
-        </p>
-      </div>
-
-      <div className="relative z-[1] flex items-center justify-end gap-1.5 text-[10.5px] text-radar-light-muted dark:text-radar-muted">
-        Score <span className="font-semibold text-radar-light-text dark:text-radar-white">{opportunity.score}</span>
-      </div>
-    </li>
-  );
-}
-
-function HighlightRow({ highlight }: { highlight: BriefHighlight }) {
-  const project = getProject(highlight.projectId);
-
-  return (
-    <li className="group relative flex h-full flex-col gap-1.5 rounded-xl border border-radar-light-border bg-radar-light-card p-4 transition-colors hover:bg-radar-light-surface dark:border-white/10 dark:bg-white/[0.02] dark:hover:bg-white/[0.05]">
-      {project && (
-        <Link
-          href={`/dashboard/projects/${project.slug}`}
-          aria-label={`${highlight.headline}. View ${highlight.projectName}'s Project Profile.`}
-          className="absolute inset-0 z-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-radar-primary/50"
-        />
-      )}
-
-      <div className="relative z-[1] flex min-w-0 flex-wrap items-center gap-1.5">
-        <span className="flex max-w-[160px] items-center gap-1.5 rounded-full border border-radar-light-border bg-radar-light-surface px-2 py-0.5 text-[10.5px] font-medium text-radar-light-text dark:border-white/10 dark:bg-white/[0.03] dark:text-radar-white">
-          <ProjectLogo logoUrl={project?.logoUrl} name={highlight.projectName} size={14} />
-          <span className="truncate">{highlight.projectName}</span>
-        </span>
-        <SeverityBadge severity={highlight.severity} />
-      </div>
-
-      <p className="line-clamp-1 text-sm font-semibold text-radar-light-text dark:text-radar-white">
-        {highlight.headline}
-      </p>
-      <p className="line-clamp-2 flex-1 text-xs leading-relaxed text-radar-light-muted dark:text-radar-muted">
-        {highlight.detail}
-      </p>
-    </li>
-  );
-}
-
 const CARD_GRID_CLASS = "grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2";
 
 /**
@@ -129,7 +53,7 @@ const CARD_GRID_CLASS = "grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2";
  * placeholder rows. Scalar fields (`projectCount`, `averageConfidence`,
  * `highestScore`, etc.) stay read off the raw engine output.
  */
-export function DailyBrief() {
+export function DailyBrief({ logoMap }: { logoMap: Record<string, ProjectLogoEntry> }) {
   const { dailyBrief: brief, isPersonalized, activeWatchlist } = usePersonalizedDashboard();
 
   const [search, setSearch] = useState(DEFAULT_SEARCH);
@@ -233,7 +157,7 @@ export function DailyBrief() {
             <BriefSection id="top-opportunities" title="Top Opportunities" icon={Target}>
               <ul className={CARD_GRID_CLASS}>
                 {sections.topOpportunities.map((opportunity) => (
-                  <OpportunityRow key={opportunity.projectId} opportunity={opportunity} />
+                  <ProjectOpportunityCard key={opportunity.projectId} opportunity={opportunity} logoMap={logoMap} />
                 ))}
               </ul>
             </BriefSection>
@@ -243,7 +167,7 @@ export function DailyBrief() {
             <BriefSection id="security-highlights" title="Security Highlights" icon={ShieldAlert}>
               <ul className={CARD_GRID_CLASS}>
                 {sections.securityHighlights.map((highlight) => (
-                  <HighlightRow key={highlight.projectId} highlight={highlight} />
+                  <ProjectHighlightCard key={highlight.projectId} highlight={highlight} logoMap={logoMap} />
                 ))}
               </ul>
             </BriefSection>
@@ -253,7 +177,7 @@ export function DailyBrief() {
             <BriefSection id="governance-highlights" title="Governance Highlights" icon={Vote}>
               <ul className={CARD_GRID_CLASS}>
                 {sections.governanceHighlights.map((highlight) => (
-                  <HighlightRow key={highlight.projectId} highlight={highlight} />
+                  <ProjectHighlightCard key={highlight.projectId} highlight={highlight} logoMap={logoMap} />
                 ))}
               </ul>
             </BriefSection>
@@ -263,7 +187,7 @@ export function DailyBrief() {
             <BriefSection id="development-highlights" title="Development Highlights" icon={Code2}>
               <ul className={CARD_GRID_CLASS}>
                 {sections.developmentHighlights.map((highlight) => (
-                  <HighlightRow key={highlight.projectId} highlight={highlight} />
+                  <ProjectHighlightCard key={highlight.projectId} highlight={highlight} logoMap={logoMap} />
                 ))}
               </ul>
             </BriefSection>
@@ -273,7 +197,7 @@ export function DailyBrief() {
             <BriefSection id="tvl-highlights" title="TVL Highlights" icon={TrendingUp}>
               <ul className={CARD_GRID_CLASS}>
                 {sections.tvlHighlights.map((highlight) => (
-                  <HighlightRow key={highlight.projectId} highlight={highlight} />
+                  <ProjectHighlightCard key={highlight.projectId} highlight={highlight} logoMap={logoMap} />
                 ))}
               </ul>
             </BriefSection>

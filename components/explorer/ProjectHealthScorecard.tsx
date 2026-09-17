@@ -7,6 +7,7 @@ import { RelativeTime } from "@/components/shared/RelativeTime";
 import { RichTooltip } from "@/components/ui/RichTooltip";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";
+import { VERIFICATION_STATUS_LABEL } from "@/lib/intelligence/helpers";
 import type { ScorecardSeverity, ScorecardTile } from "@/lib/intelligence/scorecard";
 import type { Confidence, Health, Risk } from "@/lib/intelligence/types";
 import type { VerificationStatus } from "@/data/projects/enums";
@@ -77,13 +78,6 @@ const VERIFICATION_SEVERITY: Record<VerificationStatus, ScorecardSeverity> = {
   community: "strong",
   unverified: "moderate",
   flagged: "weak",
-};
-
-const VERIFICATION_LABEL: Record<VerificationStatus, string> = {
-  verified: "Verified",
-  community: "Community-Reviewed",
-  unverified: "Unverified",
-  flagged: "Flagged",
 };
 
 export type MetaCard = {
@@ -177,7 +171,12 @@ export function ScorecardCardView({ card }: { card: MetaCard }) {
   return (
     <div
       role="listitem"
-      className="flex flex-col gap-2 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 dark:border-white/10 dark:bg-white/[0.02]"
+      // PR-086 — the same shared hover formula this pass already applied to
+      // `PairCard`/`SourceCard` (2px lift, primary-tinted shadow,
+      // brightened border, `duration-300 ease-out`) — "Health Cards" named
+      // explicitly in this pass's motion-language requirement, previously
+      // the one card type on this page with no hover reaction at all.
+      className="group flex flex-col gap-2 rounded-xl border border-radar-light-border bg-radar-light-surface p-3 transition-[transform,box-shadow,border-color,background-color] duration-300 ease-out hover:-translate-y-0.5 hover:border-radar-primary/30 hover:bg-radar-light-card hover:shadow-[0_8px_24px_-12px_rgba(var(--color-radar-primary-rgb),0.18)] motion-reduce:hover:translate-y-0 dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-radar-border-hover dark:hover:bg-white/[0.04]"
     >
       <div className="flex items-start gap-2.5">
         <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg", SEVERITY_ICON_BG[card.severity])}>
@@ -309,7 +308,7 @@ export function ProjectHealthScorecard({
       id: "verification",
       icon: BadgeCheck,
       title: "Verification",
-      value: VERIFICATION_LABEL[verificationStatus],
+      value: VERIFICATION_STATUS_LABEL[verificationStatus],
       helper: "Registry status",
       severity: VERIFICATION_SEVERITY[verificationStatus],
       progress: null,

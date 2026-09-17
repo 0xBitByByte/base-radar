@@ -15,7 +15,16 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { GlowBadge } from "@/components/ui/GlowBadge";
 import { RelativeTime } from "@/components/shared/RelativeTime";
 import { usePersonalizedDashboard } from "@/lib/hooks/usePersonalizedDashboard";
+import { useWallet } from "@/lib/hooks/useWallet";
+import { useWalletAutomation } from "@/lib/hooks/useWalletAutomation";
+import { useWalletPortfolioAI } from "@/lib/hooks/useWalletPortfolioAI";
+import { useWalletAnalytics } from "@/lib/hooks/useWalletAnalytics";
+import { useCrossFeatureIntelligence } from "@/lib/hooks/useCrossFeatureIntelligence";
+import { useAIChat } from "@/lib/hooks/useAIChat";
 import { DEFAULT_AUTOMATION_RULES } from "@/lib/automation/rules";
+import { DEFAULT_WALLET_AUTOMATION_RULES } from "@/lib/wallet-automation/rules";
+import { ExplainAutomationAction } from "@/components/wallet/ExplainAutomationAction";
+import type { AutomationResult } from "@/lib/automation/types";
 
 /**
  * "Create Automation" is a Coming Soon placeholder (PR-048 requirement 4) —
@@ -118,12 +127,44 @@ function CreateAutomationButton() {
 export function AutomationWidget() {
   const { automationResults: results, automationEnabled: enabled, hasAutomationResults, isPersonalized, activeWatchlist } =
     usePersonalizedDashboard();
-  const latest = results[0];
-  const highPriorityCount = results.filter(
+  const { isConnected } = useWallet();
+  const walletAutomation = useWalletAutomation();
+  // V4-AUTOMATION-001 (Phase 7) — the same shared `PortfolioAI` object the
+  // Dashboard's Portfolio widget and the Wallet page's Executive Summary/AI
+  // Summary cards all read, reused here for the one new line ("Recommended")
+  // and the confidence badge — never a second, independently-formatted
+  // explanation.
+  const { ai } = useWalletPortfolioAI();
+  // V4-FUTURE-001 (Notification Explainability, Phase 7) — "Latest
+  // notification shows Explain available only when an explanation
+  // exists." Built via the SAME `useCrossFeatureIntelligence()`/
+  // `useWalletAnalytics()` the Wallet page's own Explain buttons use —
+  // never a second correlation pass.
+  const { analytics } = useWalletAnalytics();
+  const crossFeature = useCrossFeatureIntelligence();
+
+  // V3-WALLET-004 — "if wallet connected, blend existing automations +
+  // wallet automations; otherwise retain existing behaviour" (verbatim from
+  // the brief). Disconnected: every value below is byte-identical to what
+  // this widget already computed pre-V3-WALLET-004 — zero behavior change.
+  const combinedResults: AutomationResult[] = isConnected
+    ? [...results, ...walletAutomation.results].sort((a, b) => b.triggeredAt.localeCompare(a.triggeredAt))
+    : results;
+  const ruleCount = isConnected ? DEFAULT_AUTOMATION_RULES.length + DEFAULT_WALLET_AUTOMATION_RULES.length : DEFAULT_AUTOMATION_RULES.length;
+  const hasAnyResults = hasAutomationResults || (isConnected && walletAutomation.results.length > 0);
+  const showWatchlistEmpty = isPersonalized && results.length === 0 && !(isConnected && walletAutomation.results.length > 0);
+
+  const latest = combinedResults[0];
+  const highPriorityCount = combinedResults.filter(
     (result) => result.priority === "high" || result.priority === "critical"
   ).length;
   const latestTrigger = latest ? getResultTrigger(latest) : null;
   const latestActions = latest ? getResultActions(latest) : [];
+  // V4-FUTURE-001E (Phase 5) — "reuse the same component... no custom
+  // implementation." `ExplainAutomationAction` itself decides whether
+  // `latest` is wallet-sourced and worth an "Explain" button — this widget
+  // no longer builds its own explanation or its own availability check.
+  const chat = useAIChat();
 
   return (
     <WidgetCard
@@ -135,14 +176,18 @@ export function AutomationWidget() {
     >
       {!enabled ? (
         <EmptyState icon={Zap} title="Automation is disabled." description="No rule can fire while Automation is turned off." />
-      ) : !hasAutomationResults ? (
+      ) : !hasAnyResults ? (
         <EmptyState
           icon={Zap}
           title="No automations configured."
-          description="Automation monitors your Watchlist and notifies you when a configured condition is met — nothing has matched yet."
+          description={
+            isConnected
+              ? "Automation monitors your Watchlist and connected wallet, and notifies you when a configured condition is met — nothing has matched yet."
+              : "Automation monitors your Watchlist and notifies you when a configured condition is met — nothing has matched yet."
+          }
           action={<CreateAutomationButton />}
         />
-      ) : isPersonalized && results.length === 0 ? (
+      ) : showWatchlistEmpty ? (
         <EmptyState
           icon={Zap}
           title="No automation results for this Watchlist."
@@ -152,12 +197,14 @@ export function AutomationWidget() {
       ) : (
         <div className="flex flex-col gap-3.5">
           <p className="text-[11px] text-radar-light-muted dark:text-radar-muted">
-            Results from {DEFAULT_AUTOMATION_RULES.length} built-in rules — no custom rules configured yet.
+            Results from {ruleCount} built-in rules{isConnected ? " (including your wallet)" : ""} — no custom rules configured yet.
           </p>
 
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <AutomationMetric label="Triggered" value={results.length} />
+            <AutomationMetric label="Triggered" value={combinedResults.length} />
             <AutomationMetric label="High Priority" value={highPriorityCount} />
+            {/* V4-AUTOMATION-001 (Phase 7) — the same `confidenceScore` the Wallet page's Health card and Dashboard's Portfolio widget already show, not a new metric. */}
+            {isConnected && ai && <AutomationMetric label="Confidence" value={`${ai.conversationContext.scores.confidenceScore}%`} />}
           </div>
 
           {latest && (
@@ -186,10 +233,28 @@ export function AutomationWidget() {
                   ))}
                 </div>
               )}
-              <time dateTime={latest.triggeredAt} className="relative z-[1] text-[10.5px] text-radar-light-muted dark:text-radar-muted">
-                <RelativeTime iso={latest.triggeredAt} />
-              </time>
+              <div className="relative z-[1] flex items-center justify-between gap-2">
+                <time dateTime={latest.triggeredAt} className="text-[10.5px] text-radar-light-muted dark:text-radar-muted">
+                  <RelativeTime iso={latest.triggeredAt} />
+                </time>
+                <ExplainAutomationAction result={latest} crossFeature={crossFeature} ai={ai} analytics={analytics} askQuestion={chat.ask} />
+              </div>
             </div>
+          )}
+
+          {/*
+            V4-AUTOMATION-001 (Phase 7) — "recommended action," reusing
+            `ai.overview.nextAction` (the same top-priority recommendation
+            the Wallet page's Executive Summary card already shows) rather
+            than re-deriving one from `combinedResults` — this stays a
+            single compact line, not a second card, per "Dashboard remains
+            compact."
+          */}
+          {isConnected && ai?.overview.nextAction && (
+            <p className="line-clamp-2 text-[11px] text-radar-light-muted dark:text-radar-muted">
+              <span className="font-medium text-radar-light-text dark:text-radar-white">Recommended: </span>
+              {ai.overview.nextAction}
+            </p>
           )}
         </div>
       )}

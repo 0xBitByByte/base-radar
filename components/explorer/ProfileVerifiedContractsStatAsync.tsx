@@ -6,7 +6,7 @@ import { ShieldCheck } from "lucide-react";
 import { NetworkStat } from "@/components/explorer/ProfileNetworkLive";
 import { formatPercent } from "@/lib/data/format";
 import type { Contracts } from "@/lib/intelligence/types";
-import { contractDetailsByAddress, type ContractDetailEntry } from "@/lib/providers/blockscout/service";
+import { contractDetailsByAddress, type ContractDetailEntry } from "@/lib/providers/blockscout/contractDetails";
 
 type ProfileVerifiedContractsStatAsyncProps = {
   contracts: Contracts;
