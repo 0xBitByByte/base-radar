@@ -3,10 +3,12 @@
 Permanent rules for minimizing Claude's usage on this repository (tool
 calls, redundant investigation, redundant validation) **without reducing
 engineering quality**. This document does not relax anything in
-[CLAUDE_PR_WORKFLOW.md](CLAUDE_PR_WORKFLOW.md) or
-[CLAUDE_RULES.md](CLAUDE_RULES.md) — it governs *how efficiently* that
-process is carried out, never *whether* a required step happens. Where this
-document and either of those conflict, they win.
+[CLAUDE_PR_WORKFLOW.md](CLAUDE_PR_WORKFLOW.md),
+[CLAUDE_RULES.md](CLAUDE_RULES.md), or
+[CLAUDE_EXECUTION_AUTHORITY.md](CLAUDE_EXECUTION_AUTHORITY.md) — it governs
+*how efficiently* that process is carried out, never *whether* a required
+step happens or who may authorize skipping one. Where this document and any
+of those conflict, they win.
 
 The Universal Project Card initiative (PR-1–PR-10) is the source for every
 rule below — both the genuine inefficiencies it contained and the patterns

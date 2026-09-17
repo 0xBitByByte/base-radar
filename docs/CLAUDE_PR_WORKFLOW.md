@@ -5,8 +5,12 @@ repository, distilled from the Universal Project Card initiative (PR-1
 through PR-10) — the first initiative run end-to-end under this discipline.
 This document governs *process* (how a PR gets from assignment to done);
 [CLAUDE_RULES.md](CLAUDE_RULES.md) governs *code* (architecture, coding
-standards, component rules). Both apply to every task; neither repeats the
-other.
+standards, component rules); [CLAUDE_EXECUTION_AUTHORITY.md](CLAUDE_EXECUTION_AUTHORITY.md)
+governs *authority and interruption policy* — including which tasks this
+document's own Planning/wait-for-approval step actually applies to (see
+that document's [§15](CLAUDE_EXECUTION_AUTHORITY.md#15-highest-priority-rule)
+for the resolved scope boundary between the two). All three apply; none
+repeats another.
 
 This is not a suggestion set. It holds for every future implementation PR
 in this repository unless the user explicitly overrides a specific rule for
