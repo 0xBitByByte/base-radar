@@ -10,8 +10,25 @@ const nextConfig: NextConfig = {
    * it's already part of the `node:22` base image the Dockerfile runs on.
    * Has no effect on `next dev`/local `next build` — this only changes
    * what `next build` additionally emits for Docker to copy.
+   *
+   * Vercel build failure fix — gated on `process.env.VERCEL` (Vercel's own
+   * system env var, set unconditionally during every Vercel build, never
+   * needed to be configured here). Confirmed live: with `output:
+   * "standalone"` set unconditionally, Vercel's own build completes
+   * TypeScript compilation and static generation successfully, then fails
+   * in its own `onBuildComplete` step with `ENOENT: no such file or
+   * directory, open '/vercel/path0/.next/next-server.js.nft.json'` — a
+   * known Next.js 16.3 + Vercel incompatibility: Vercel's builder does its
+   * own output-file-tracing/packaging and expects the standard build
+   * output shape, which `output: "standalone"` changes. Vercel never reads
+   * `.next/standalone` at all (it has no `Dockerfile` step to copy it
+   * into), so disabling standalone output specifically when `VERCEL` is
+   * set costs Vercel nothing and fixes the crash; every other environment
+   * (local `next build`, the Fly.io `Dockerfile` build, which does not set
+   * `VERCEL`) is completely unaffected and still gets the real
+   * `.next/standalone` directory the `Dockerfile` copies from.
    */
-  output: "standalone",
+  output: process.env.VERCEL ? undefined : "standalone",
 
   /**
    * PR-097.05 (Security) — baseline security response headers, applied to
