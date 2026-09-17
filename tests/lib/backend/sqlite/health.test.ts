@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { createDatabase } from "@/lib/backend/sqlite/db";
 import { createHealthService } from "@/lib/backend/sqlite/health";
@@ -33,5 +33,48 @@ describe("createHealthService (real SQLite health check)", () => {
     expect(result.healthy).toBe(false);
     expect(result.message).toBe("Database is unreachable");
     expect(result.message).not.toContain("disk full");
+  });
+
+  describe("PR-108.2 — reason field distinguishes 'not-configured' from a real error", () => {
+    const originalVercel = process.env.VERCEL;
+    afterEach(() => {
+      if (originalVercel === undefined) delete process.env.VERCEL;
+      else process.env.VERCEL = originalVercel;
+    });
+
+    it("reports reason: 'error' when persistence is expected (VERCEL unset) and the connection fails", async () => {
+      delete process.env.VERCEL;
+      const health = createHealthService(() => {
+        throw new Error("simulated failure");
+      });
+
+      const result = await health.check();
+      expect(result.healthy).toBe(false);
+      expect(result.reason).toBe("error");
+      expect(result.message).toBe("Database is unreachable");
+    });
+
+    it("reports reason: 'not-configured' when persistence is intentionally unavailable (VERCEL set) and the connection fails", async () => {
+      process.env.VERCEL = "1";
+      const health = createHealthService(() => {
+        throw new Error("simulated: no persistent volume on Vercel");
+      });
+
+      const result = await health.check();
+      expect(result.healthy).toBe(false);
+      expect(result.reason).toBe("not-configured");
+      expect(result.message).not.toContain("no persistent volume");
+      expect(result.message).not.toMatch(/\.db|sqlite3|ENOENT|EACCES/i);
+    });
+
+    it("never reports a reason when genuinely healthy, regardless of VERCEL", async () => {
+      process.env.VERCEL = "1";
+      const db = createDatabase(":memory:");
+      const health = createHealthService(() => db);
+
+      const result = await health.check();
+      expect(result).toEqual({ healthy: true });
+      db.close();
+    });
   });
 });

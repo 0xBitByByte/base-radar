@@ -27,6 +27,27 @@ import { runMigrations } from "@/lib/backend/sqlite/migrations";
 
 const DEFAULT_DB_PATH = path.join(process.cwd(), ".data", "backend.db");
 
+/**
+ * PR-108.2 — true when a persistent, writable SQLite volume is expected to
+ * exist in this process; false on Vercel, where it deliberately isn't
+ * configured (confirmed: `SQLITE_DB_PATH` is set only in `fly.toml`/
+ * `Dockerfile`, never for Vercel — see `docs/DEPLOYMENT.md`'s "Vercel
+ * (stateless deployment)" section). `VERCEL` is Vercel's own system env
+ * var, present at both build and runtime — the same signal `next.config.ts`
+ * already uses for the standalone-output fix, reused here for consistency
+ * rather than inventing a second way to detect the platform.
+ *
+ * This does not change what `getDb()`/`createDatabase()` actually do —
+ * SQLite is still attempted exactly the same way everywhere. It only lets
+ * a caller distinguish "persistence was never expected to work here" (an
+ * intentional, documented deployment characteristic) from "persistence
+ * was expected to work and didn't" (a real problem worth an operational
+ * alarm) when a connection attempt fails.
+ */
+export function isPersistenceExpected(): boolean {
+  return !process.env.VERCEL;
+}
+
 /** No secret involved — a local file path, safe to default without any `.env` configuration, matching this repo's "runs with zero environment variables set" convention (`.env.example`'s own framing). */
 export function resolveDbPath(): string {
   const configured = process.env.SQLITE_DB_PATH?.trim();

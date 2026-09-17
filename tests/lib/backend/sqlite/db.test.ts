@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-import { createDatabase, resolveDbPath } from "@/lib/backend/sqlite/db";
+import { createDatabase, isPersistenceExpected, resolveDbPath } from "@/lib/backend/sqlite/db";
 
 describe("createDatabase", () => {
   let db: DatabaseSync | null = null;
@@ -138,5 +138,23 @@ describe("resolveDbPath", () => {
   it("falls back to the default when SQLITE_DB_PATH is set but blank", () => {
     process.env.SQLITE_DB_PATH = "   ";
     expect(resolveDbPath()).toMatch(/\.data[\\/]backend\.db$/);
+  });
+});
+
+describe("isPersistenceExpected (PR-108.2)", () => {
+  const originalEnv = process.env.VERCEL;
+  afterEach(() => {
+    if (originalEnv === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = originalEnv;
+  });
+
+  it("is true when VERCEL is unset — Fly.io/local, where a real persistent volume is expected", () => {
+    delete process.env.VERCEL;
+    expect(isPersistenceExpected()).toBe(true);
+  });
+
+  it("is false when VERCEL is set — Vercel's own system env var, no persistent volume there", () => {
+    process.env.VERCEL = "1";
+    expect(isPersistenceExpected()).toBe(false);
   });
 });

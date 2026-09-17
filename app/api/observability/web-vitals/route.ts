@@ -18,11 +18,20 @@
  * covers a real page's own Web Vitals volume (5 metrics per page load)
  * across normal browsing while bounding how fast one IP can grow the
  * `performance_metrics` table.
+ *
+ * PR-108.2 (Vercel Stateless Deployment Hardening): the final persistence
+ * call is wrapped in a try/catch. On Vercel (`isPersistenceExpected() ===
+ * false`, no persistent SQLite volume — see docs/DEPLOYMENT.md) a failure
+ * here is expected, so this responds `202` with `persisted: false` instead
+ * of fabricating success or surfacing a noisy unhandled 500 — this never
+ * claims a sample was stored when it wasn't. On Fly/local, where
+ * persistence IS expected to work, the original error is re-thrown
+ * unchanged, preserving today's loud failure behavior exactly.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getDb } from "@/lib/backend/sqlite/db";
+import { getDb, isPersistenceExpected } from "@/lib/backend/sqlite/db";
 import { isKnownPerformanceMetricName, isPerformanceMetricRating, recordPerformanceMetric } from "@/lib/backend/sqlite/performanceMetrics";
 import { isRequestRateLimited } from "@/lib/security/requestRateLimit";
 
@@ -58,6 +67,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "path must be a real, non-empty string." }, { status: 400 });
   }
 
-  recordPerformanceMetric(getDb(), { metricName: name, value, rating, path, recordedAt: new Date().toISOString() });
+  try {
+    recordPerformanceMetric(getDb(), { metricName: name, value, rating, path, recordedAt: new Date().toISOString() });
+  } catch (error) {
+    if (isPersistenceExpected()) {
+      throw error;
+    }
+    return NextResponse.json({ ok: false, persisted: false, reason: "not-configured" }, { status: 202 });
+  }
   return NextResponse.json({ ok: true }, { status: 201 });
 }

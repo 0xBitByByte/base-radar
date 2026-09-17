@@ -94,4 +94,28 @@ describe("POST /api/observability/events", () => {
     expect(summary.totalPageViews).toBe(2);
     expect(summary.topPaths).toEqual([{ path: "/dashboard", eventCount: 2 }]);
   });
+
+  describe("PR-108.2 — graceful degradation when persistence fails", () => {
+    afterEach(() => {
+      delete process.env.VERCEL;
+    });
+
+    it("on Vercel (VERCEL set), a persistence failure responds 202 with persisted: false — never a fabricated 201, never an unhandled 500", async () => {
+      process.env.VERCEL = "1";
+      process.env.SQLITE_DB_PATH = "/dev/null/not-a-real-directory/backend.db";
+      resetDbSingletonForTests();
+
+      const response = await POST(postRequest({ name: "page_view", path: "/dashboard" }));
+      expect(response.status).toBe(202);
+      expect(await response.json()).toEqual({ ok: false, persisted: false, reason: "not-configured" });
+    });
+
+    it("off Vercel (Fly/local), a persistence failure still throws — today's loud failure behavior is preserved unchanged", async () => {
+      delete process.env.VERCEL;
+      process.env.SQLITE_DB_PATH = "/dev/null/not-a-real-directory/backend.db";
+      resetDbSingletonForTests();
+
+      await expect(POST(postRequest({ name: "page_view", path: "/dashboard" }))).rejects.toThrow();
+    });
+  });
 });

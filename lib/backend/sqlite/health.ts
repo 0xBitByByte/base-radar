@@ -11,6 +11,7 @@
 
 import type { DatabaseSync } from "node:sqlite";
 
+import { isPersistenceExpected } from "@/lib/backend/sqlite/db";
 import type { BackendHealth, HealthService } from "@/lib/backend/services/health";
 
 export function createHealthService(getDb: () => DatabaseSync): HealthService {
@@ -20,14 +21,26 @@ export function createHealthService(getDb: () => DatabaseSync): HealthService {
         const db = getDb();
         const row = db.prepare("SELECT 1 AS ok").get() as { ok: number } | undefined;
         if (!row || row.ok !== 1) {
-          return { healthy: false, message: "Database returned an unexpected result" };
+          return { healthy: false, message: "Database returned an unexpected result", reason: "error" };
         }
         return { healthy: true };
       } catch {
         // The real error (file path, driver internals) is deliberately not
         // included — this message is safe to surface to any future caller,
         // server-side or otherwise, without leaking deployment detail.
-        return { healthy: false, message: "Database is unreachable" };
+        //
+        // PR-108.2 — on Vercel, `SQLITE_DB_PATH` is never configured (no
+        // persistent volume exists there — see docs/DEPLOYMENT.md), so this
+        // catch is an expected, documented deployment characteristic, not
+        // an operational alarm. Everywhere else (Fly.io, local dev), the
+        // same catch means real persistence broke.
+        return isPersistenceExpected()
+          ? { healthy: false, message: "Database is unreachable", reason: "error" }
+          : {
+              healthy: false,
+              message: "Persistent SQLite is not configured in this deployment — see docs/DEPLOYMENT.md.",
+              reason: "not-configured",
+            };
       }
     },
   };

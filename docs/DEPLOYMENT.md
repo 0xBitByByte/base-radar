@@ -19,6 +19,58 @@ that volume — this is a deliberate, documented single-instance tradeoff
 not an oversight: a Fly Volume attaches to exactly one Machine at a time,
 which is what makes one SQLite file safe here at all.
 
+## Deployment targets: Fly.io vs. Vercel
+
+This app currently has **two live deployments with two different roles**
+— this is an intentional architecture decision (PR-108.2), not an
+inconsistency to fix:
+
+- **Fly.io (`base-radar-staging`) — the persistent, authoritative
+  deployment.** Everything else in this document describes Fly.io unless
+  stated otherwise: a real Fly Volume mounted at `/data`, `SQLITE_DB_PATH`
+  set to `/data/backend.db`, one long-running Machine. This is the only
+  deployment where persistent SQLite-backed functionality (authenticated
+  accounts/sessions, linked wallets, cloud sync, saved searches, analytics
+  events, performance metrics, admin role management) is expected to work.
+- **Vercel (`base-radar-one.vercel.app`) — a stateless, read-mostly
+  deployment.** Vercel's serverless functions have no persistent volume
+  and no writable filesystem outside an ephemeral, per-invocation `/tmp`
+  that is wiped on cold start and never shared across concurrent
+  instances — so this app deliberately does **not** attempt to run SQLite
+  there. `SQLITE_DB_PATH` is never configured for Vercel (confirmed:
+  absent from every Vercel-facing config), and `isPersistenceExpected()`
+  (`lib/backend/sqlite/db.ts`) — gated on Vercel's own `VERCEL` system
+  environment variable, the same signal `next.config.ts` already uses for
+  its standalone-output fix — is how server code distinguishes "no
+  persistence here, on purpose" from "persistence broke."
+
+  **What works on Vercel:** every provider-backed public/read-only
+  surface (project discovery, dashboard data, Compare, provider-sourced
+  pages) and guest-session behavior — `resolveRequestSession()`
+  (`lib/auth/request-session.ts`) returns `{state: "guest"}` immediately
+  for any request with no session cookie, without ever touching the
+  database.
+
+  **What does not work on Vercel:** anything that genuinely requires
+  persistent SQLite — authenticated sign-in/session validation, linked
+  wallets, cloud sync (`/api/sync/pull`, `/api/sync/push`), saved-search
+  sync, analytics/performance telemetry storage, and admin role
+  management. These fail **honestly**, not silently: `/api/health`
+  reports `{healthy: false, reason: "not-configured"}` with a real `503`
+  (never `200` — persistence being intentionally unavailable is still not
+  "healthy"), and an authenticated request that reaches the database
+  (`resolveRequestSession`'s `getDb()` call) surfaces a real, loud error
+  rather than a silently fabricated session. `/api/observability/events`
+  and `/api/observability/web-vitals` are the one deliberate exception:
+  since they're telemetry-only and already tolerant of dropped data, a
+  failed write there degrades to a `202 {ok: false, persisted: false,
+  reason: "not-configured"}` response instead of an unhandled `500` —
+  never claiming an event was stored when it wasn't.
+
+  **This is not a temporary bug** — it is documented, honest behavior.
+  Nothing in this app pretends persistence works on Vercel, and nothing
+  silently degrades authentication to make it look like it does.
+
 ## Deploying
 
 Deploys are **manual only** (`.github/workflows/deploy-staging.yml`,
@@ -103,9 +155,16 @@ back.
 
 `GET /api/health` (`lib/backend/sqlite/health.ts`) — the only real
 readiness signal this app exposes. Runs a real `SELECT 1` against the
-live connection; returns `200 {healthy: true}` or `503
-{healthy: false, message}`. Deliberately narrow: no request body, no
-account data, safe to expose before authentication exists at all. It does
+live connection; returns `200 {healthy: true}` or `503 {healthy: false,
+message, reason}`. On Fly.io/local, where persistence is expected,
+`reason: "error"` means a real connection/migration failure worth
+alarming on. On Vercel, where persistence is never configured (see
+"Deployment targets" above), the same `503` instead carries `reason:
+"not-configured"` — an intentional, documented deployment characteristic.
+Either way the status stays `503`, never `200`: persistence being
+intentionally unavailable is still not "healthy." Deliberately narrow: no
+request body, no account data, safe to expose before authentication
+exists at all. It does
 **not** verify external provider reachability (CoinGecko/DefiLlama/
 Blockscout/GitHub/Snapshot/DexScreener) — those already fail gracefully
 per-request (rate limiting, circuit breaking — see `lib/providers/
