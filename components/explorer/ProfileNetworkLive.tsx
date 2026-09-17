@@ -2,7 +2,7 @@
 
 import { Activity, Fuel, Gauge, Globe, Radio, ShieldCheck, Zap } from "lucide-react";
 
-import { useLiveNetworkStatus } from "@/lib/hooks/useLiveNetworkStatus";
+import { useSharedNetworkStatus } from "@/components/dashboard/NetworkStatusProvider";
 import { formatNumber } from "@/lib/data/format";
 import { cn } from "@/lib/utils";
 
@@ -16,8 +16,6 @@ type ProfileNetworkLiveProps = {
   /** PR-074 FINAL POLISH — additional `NetworkStat`-shaped cells appended to this same divided strip (e.g. Verified Contracts), so a section-adjacent fact doesn't need its own separately-bordered box with its own surrounding whitespace below the strip. */
   children?: React.ReactNode;
 };
-
-const POLL_MS = 45_000;
 
 /**
  * PR-074 REVIEW #6 — replaces six separately-bordered, separately-padded
@@ -69,26 +67,25 @@ export function VerifiedContractsFallback({ value, unavailable }: { value: strin
 
 /**
  * Live-polling Network row (PR12.2, redesigned PR13.6 Goal 10 into one
- * equal-width row of Network/Status/Block Height/Gas) — reuses
- * `useLiveNetworkStatus` and the exact same underlying
- * `base.getBaseNetworkStatus()` call `sources.ts`'s `matchNetwork()`
- * already made for this page's first paint, zero new provider surface,
- * mirroring `MarketWidgetLive`'s relationship to the dashboard's Market
- * widget. "Status" is a real derived value (whether this page's own
- * network data resolved), never fabricated.
+ * equal-width row of Network/Status/Block Height/Gas) — reuses the exact
+ * same underlying `base.getBaseNetworkStatus()` call `sources.ts`'s
+ * `matchNetwork()` already made for this page's first paint, zero new
+ * provider surface. "Status" is a real derived value (whether this page's
+ * own network data resolved), never fabricated.
  *
- * Unlike `MarketWidgetLive`, this doesn't seed `useLiveNetworkStatus`'s
- * `initial` — `ChainInfo.network` (this page's merged shape) only carries
- * the 3 fields this section renders, not the full `NetworkStatus` the
- * hook's `initial` option expects. The hook polls immediately on mount
- * instead, and this component shows the SSR snapshot as a fallback until
- * that first poll resolves — one extra Base RPC call on page load, on the
- * cheapest and most generously-limited provider in this codebase (20s TTL,
- * 30 req/60s), not worth widening the shared `usePolling` seed contract to
- * avoid.
+ * PR-107 — reads the ONE shared poll from `<NetworkStatusProvider>`
+ * (mounted at the dashboard layout) via `useSharedNetworkStatus()`, rather
+ * than running its own independent `useLiveNetworkStatus` instance as it
+ * used to. `Topbar` is mounted on every `/dashboard/*` page including this
+ * one, so the old per-component call meant 2 separate Base RPC polling
+ * loops (and 2 separate requests every 45s) on this exact page — confirmed
+ * live in the PR-106/106.1 audits. `status` falls back to this component's
+ * own SSR-rendered props (`gasGwei`/`blockHeight`/`estimatedTps` below)
+ * exactly as before whenever the shared value is `null`, so the fallback
+ * behavior and first paint are unchanged.
  */
 export function ProfileNetworkLive({ chainLabel, gasGwei, blockHeight, estimatedTps, finality, children }: ProfileNetworkLiveProps) {
-  const { status } = useLiveNetworkStatus(POLL_MS);
+  const { status } = useSharedNetworkStatus();
 
   const live = {
     gasGwei: status?.gasGwei ?? gasGwei,
