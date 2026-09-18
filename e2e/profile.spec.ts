@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { randomTestWallet, signIn } from "./fixtures/auth";
+import { gotoAndWaitForAccountSync, randomTestWallet, signIn } from "./fixtures/auth";
 
 /**
  * PR-097.04 (Testing) — Profile page smoke coverage: the page loads, the
@@ -27,7 +27,11 @@ test.describe("Profile", () => {
   test("Identity fields (Display Name, Username) accept real input", async ({ page }) => {
     const wallet = randomTestWallet();
     await signIn(page.request, wallet);
-    await page.goto("/dashboard/profile");
+    // Not a plain `page.goto` — the Identity form seeds its editable state
+    // from `account.name` exactly once on mount, so interacting with it
+    // before the real post-sign-in account sync resolves races a genuine
+    // async chain (see `gotoAndWaitForAccountSync`'s own doc comment).
+    await gotoAndWaitForAccountSync(page, "/dashboard/profile");
 
     const nameInput = page.locator("#account-name");
     const usernameInput = page.locator("#account-username");
