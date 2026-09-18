@@ -10,10 +10,17 @@ rules. For *process* — how a PR moves from assignment through Engineering
 Notes, validation, reporting, and Product Owner approval to done — see
 [CLAUDE_PR_WORKFLOW.md](CLAUDE_PR_WORKFLOW.md). For minimizing tool-call/
 investigation overhead without cutting corners, see
-[CLAUDE_EFFICIENCY_STANDARD.md](CLAUDE_EFFICIENCY_STANDARD.md).
+[CLAUDE_EFFICIENCY_STANDARD.md](CLAUDE_EFFICIENCY_STANDARD.md). For *who
+decides what* and when Claude executes autonomously versus stops to ask —
+including the full Git-mutation policy this document's own Strict DO NOT
+list is one part of — see [CLAUDE_EXECUTION_AUTHORITY.md](CLAUDE_EXECUTION_AUTHORITY.md).
 
 ## Before Starting Work
 
+- **Always read [CLAUDE_EXECUTION_AUTHORITY.md](CLAUDE_EXECUTION_AUTHORITY.md)
+  first**, for every task — it governs when to execute autonomously versus
+  when to stop and ask, and is the authoritative reference for the Git
+  policy this document's own Strict DO NOT list only partially restates.
 - **Always read documentation first.** Read the relevant files in `/docs`
   — especially [ARCHITECTURE.md](ARCHITECTURE.md),
   [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md), and [PROJECT_REGISTRY.md](PROJECT_REGISTRY.md)
