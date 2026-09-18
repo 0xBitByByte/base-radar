@@ -1,4 +1,4 @@
-import type { APIRequestContext } from "@playwright/test";
+import type { APIRequestContext, Page } from "@playwright/test";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
 /**
@@ -84,4 +84,49 @@ export async function signIn(request: APIRequestContext, wallet: TestWallet): Pr
 /** Real server-side session revocation — the same `/api/auth/signout` route Bug 3's fix wired `AccountMenu`'s Sign Out into. */
 export async function signOutViaApi(request: APIRequestContext): Promise<void> {
   await request.post("/api/auth/signout");
+}
+
+/**
+ * Navigates to `url` and waits for the real post-sign-in account sync to
+ * settle before returning — closes a genuine race, not a flaky-test
+ * workaround.
+ *
+ * `signIn()` above only sets the real, server-side session cookie via raw
+ * HTTP — it never touches the browser's own local Account store
+ * (`lib/account/service.ts`), the same store `useAccount()`
+ * (`lib/hooks/useAccount.ts`) reads. On the very first render after
+ * navigation, `useAccount()` deliberately returns a hardcoded SSR-safe
+ * placeholder (`SERVER_SNAPSHOT_ACCOUNT`, `isGuest: true`) — by that
+ * hook's own design, "the client re-renders with the real cached account
+ * immediately after mount." That "immediately after" is a REAL async
+ * chain, not instant: `useAuthSession()` resolves the real session via
+ * `GET /api/auth/session`, which — once authenticated — triggers
+ * `useCloudSyncActivation()`'s effect (mounted globally in
+ * `app/layout.tsx`) to call `performPull()`, which issues the real
+ * `GET /api/sync/pull` and only then calls `applyRemoteAccountFields()`
+ * to update the local store (and flip `isGuest` to `false`).
+ *
+ * Any UI that seeds its own local state from `account` data exactly once
+ * on mount (e.g. `components/account/ProfilePage.tsx`'s `IdentitySection`,
+ * `const [name, setName] = useState(account.name)`, with no later
+ * re-sync) is therefore racing this real network round trip: interacting
+ * with that UI before the pull resolves risks a stale/placeholder value
+ * being read at mount, or — if a fill happens to land in the same window
+ * the pull's resulting re-render commits — being silently overwritten by
+ * React's own controlled-input reconciliation.
+ *
+ * Waiting for the real `GET /api/sync/pull` response (the one true signal
+ * that this async chain has completed) is a direct, deterministic fix for
+ * that race — not a sleep, not a raised timeout, and not a weakened
+ * assertion. `resp.ok()` is required, not just a URL match: a failed pull
+ * still resolves the request/response cycle but does NOT call
+ * `applyRemoteAccountFields()` (see `performPull()`'s own conflict/error
+ * handling in `lib/sync/service.ts`), so waiting on any response
+ * regardless of status could resolve before the account store is actually
+ * updated.
+ */
+export async function gotoAndWaitForAccountSync(page: Page, url: string): Promise<void> {
+  const pullResponse = page.waitForResponse((response) => response.url().includes("/api/sync/pull") && response.ok());
+  await page.goto(url);
+  await pullResponse;
 }
