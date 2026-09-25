@@ -1,83 +1,122 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { BrainCircuit, Blocks, LineChart, Radar, Wallet } from "lucide-react";
+import { ArrowRight, BrainCircuit, Blocks, LineChart, Radar, Wallet, type LucideIcon } from "lucide-react";
 
-import { PipelineFlow, type PipelineInputNode } from "@/components/landing/PipelineFlow";
+import { CircuitTraces, HubChip } from "@/components/landing/HubChip";
 
-type EngineInput = { key: string; label: string; Icon: typeof Blocks; gradient: [string, string] };
+type EngineInput = { key: string; label: string; description: string; Icon: LucideIcon };
 
-const ENGINE_INPUTS: EngineInput[] = [
-  { key: "onchain", label: "On-chain Data", Icon: Blocks, gradient: ["var(--color-radar-primary)", "var(--color-radar-accent)"] },
-  { key: "market", label: "Market Data", Icon: LineChart, gradient: ["#a3e635", "#10b981"] },
-  { key: "project", label: "Project Data", Icon: Radar, gradient: ["#22d3ee", "#3b82f6"] },
-  { key: "wallet", label: "Wallet Data", Icon: Wallet, gradient: ["#a855f7", "#3b82f6"] },
+const LEFT_INPUTS: EngineInput[] = [
+  { key: "onchain", label: "On-chain Data", description: "Real-time blockchain activity and network insights", Icon: Blocks },
+  { key: "market", label: "Market Data", description: "Live prices, trends and market intelligence", Icon: LineChart },
+];
+
+const RIGHT_INPUTS: EngineInput[] = [
+  { key: "project", label: "Project Data", description: "Deep project intelligence and ecosystem insights", Icon: Radar },
+  { key: "wallet", label: "Wallet Data", description: "Wallet activity, holdings and on-chain behavior", Icon: Wallet },
 ];
 
 const OUTPUT_STAGES = ["Verified", "Scored", "Decision-Ready Intelligence"];
 
+/** One input IC module — solid dark surface (never the translucent `GlassCard` treatment), a cyan border, icon, title, and a concrete one-line description of what it actually feeds the hub. */
+function InputCard({ input, side }: { input: EngineInput; side: "left" | "right" }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: side === "left" ? -16 : 16 }}
+      whileInView={{ opacity: 1, x: 0 }}
+      viewport={{ once: true, margin: "-60px" }}
+      transition={{ duration: 0.4 }}
+      className="relative rounded-2xl border border-radar-accent/40 bg-radar-card p-5 shadow-[0_0_34px_-10px_rgba(6,184,212,0.55)]"
+    >
+      <div className="flex items-start gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-radar-primary/25 to-radar-accent/25 text-radar-accent">
+          <input.Icon className="size-4.5" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-white">{input.label}</p>
+          <p className="mt-1 text-sm text-radar-muted">{input.description}</p>
+        </div>
+        <ArrowRight className="mt-1 hidden size-4 shrink-0 text-radar-accent sm:block" aria-hidden="true" />
+      </div>
+    </motion.div>
+  );
+}
+
 /**
  * Landing Page V2, Section 3 — "One intelligence layer. Everything
- * connected." On-chain, market, project, and wallet data converge on Base
- * Radar's AI analysis layer, which turns them into decision-ready
- * intelligence — the same `PipelineFlow` visual `TrustedDataSources.tsx`
- * uses for its own 7-provider convergence, reused here rather than
- * duplicated. Copy is deliberately about aggregation and analysis, never
- * ownership — Base Radar doesn't control or own any of the underlying
- * on-chain/market/project/wallet data it reads.
+ * connected." On-chain, market, project, and wallet data feed Base Radar's
+ * AI analysis layer, which turns them into decision-ready intelligence.
+ *
+ * Visual-review reference: this section was rebuilt from a generic
+ * "4-cards-in-a-row above a hub" pipeline (the shared `PipelineFlow`
+ * component `TrustedDataSources.tsx` still uses for its own, genuinely
+ * different 7-provider case) into a bespoke, fixed composition — two input
+ * modules flanking the hub on the left, two on the right — specifically
+ * because that left/right relationship and the opaque "IC module" card
+ * treatment don't generalize to N inputs the way `PipelineFlow` needs to for its other caller. Kept local to this
+ * file rather than folded back into `PipelineFlow` for that reason.
  */
 export function IntelligenceEngine() {
-  const pipelineInputs: PipelineInputNode[] = ENGINE_INPUTS.map((input) => ({ key: input.key, gradient: input.gradient }));
-
   return (
-    <section id="intelligence-engine" className="relative mx-auto max-w-7xl px-6 py-16 sm:py-24 lg:px-8">
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-80px" }}
-        transition={{ duration: 0.5 }}
-        className="mx-auto max-w-2xl text-center"
-      >
-        <h2 className="text-3xl font-semibold tracking-tight text-radar-light-text sm:text-4xl dark:text-radar-white">
-          One intelligence layer. Everything connected.
-        </h2>
-        <p className="mt-3 text-lg text-radar-light-muted dark:text-radar-muted">
-          On-chain activity, market data, project intelligence, and wallet activity — read, cross-checked, and
-          turned into a single, decision-ready view.
-        </p>
-      </motion.div>
+    <section id="intelligence-engine" className="relative isolate mx-auto max-w-7xl overflow-x-hidden px-6 py-16 sm:py-24 lg:px-8">
+      <div className="relative">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.5 }}
+          className="mx-auto max-w-2xl text-center"
+        >
+          <h2 className="text-3xl font-semibold tracking-tight text-radar-light-text sm:text-4xl dark:text-radar-white">
+            One intelligence layer. Everything
+            <br />
+            <span className="text-radar-primary dark:text-radar-accent">connected.</span>
+          </h2>
+          <p className="mt-3 text-lg text-radar-light-muted dark:text-radar-muted">
+            On-chain activity, market data, project intelligence, and wallet activity — read, cross-checked and
+            turned into a single, decision-ready view.
+          </p>
+        </motion.div>
 
-      {/*
-        Visual refinement pass — the "charging" fill overlay this section
-        used to have was removed per explicit feedback ("remove the fill
-        animation"). Plain static cards again; the convergence particles
-        below already carry the "data flows to AI Analysis" idea.
-      */}
-      <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {ENGINE_INPUTS.map((input, index) => (
-          <motion.div
-            key={input.key}
-            initial={{ opacity: 0, y: 16 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-60px" }}
-            transition={{ duration: 0.4, delay: index * 0.06 }}
-            className="flex flex-col items-center gap-2 rounded-2xl border border-radar-light-border bg-radar-light-text/[0.02] p-4 text-center dark:border-white/10 dark:bg-white/[0.03]"
-          >
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-radar-primary/15 to-radar-accent/15 text-radar-primary dark:text-radar-accent">
-              <input.Icon className="size-4.5" aria-hidden="true" />
+        <div className="mt-14 grid grid-cols-1 items-center gap-4 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:grid-rows-2 lg:gap-x-16 lg:gap-y-6 xl:gap-x-24">
+          <div className="lg:col-start-1 lg:row-start-1">
+            <InputCard input={LEFT_INPUTS[0]} side="left" />
+          </div>
+          <div className="lg:col-start-1 lg:row-start-2">
+            <InputCard input={LEFT_INPUTS[1]} side="left" />
+          </div>
+
+          <div className="relative lg:col-start-2 lg:row-span-2 lg:row-start-1">
+            <CircuitTraces />
+            <HubChip icon={BrainCircuit} title="AI Analysis" subtitle="Cross-checked, scored, decision-ready" pinsFromTraces />
+          </div>
+
+          <div className="lg:col-start-3 lg:row-start-1">
+            <InputCard input={RIGHT_INPUTS[0]} side="right" />
+          </div>
+          <div className="lg:col-start-3 lg:row-start-2">
+            <InputCard input={RIGHT_INPUTS[1]} side="right" />
+          </div>
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true, margin: "-60px" }}
+          transition={{ duration: 0.4, delay: 0.3 }}
+          className="mx-auto mt-14 flex max-w-full flex-wrap items-center justify-center gap-x-2 gap-y-2 px-1 lg:mt-20"
+        >
+          {OUTPUT_STAGES.map((stage, index) => (
+            <span key={stage} className="flex shrink-0 items-center gap-2">
+              <span className="rounded-full border border-radar-accent/25 bg-radar-elevated px-3 py-1 text-xs font-medium whitespace-nowrap text-white">
+                {stage}
+              </span>
+              {index < OUTPUT_STAGES.length - 1 && <span className="text-radar-muted/60" aria-hidden="true">→</span>}
             </span>
-            <span className="text-sm font-medium text-radar-light-text dark:text-radar-white">{input.label}</span>
-          </motion.div>
-        ))}
+          ))}
+        </motion.div>
       </div>
-
-      <PipelineFlow
-        inputs={pipelineInputs}
-        hubIcon={BrainCircuit}
-        hubTitle="AI Analysis"
-        hubSubtitle="Cross-checked, scored, decision-ready"
-        outputStages={OUTPUT_STAGES}
-      />
     </section>
   );
 }

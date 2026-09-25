@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { BrainCircuit, Vote } from "lucide-react";
 
-import { PipelineFlow, type PipelineInputNode } from "@/components/landing/PipelineFlow";
+import { PipelineFlow } from "@/components/landing/PipelineFlow";
 import { PROVIDER_BRANDING } from "@/lib/branding/providers";
 import type { BrandIconComponent } from "@/lib/branding/types";
 import type { ProviderName } from "@/lib/providers/common/types";
@@ -106,16 +106,13 @@ function ProviderIcon({ Icon }: { Icon: BrandIconComponent }) {
 /**
  * Landing Page V2, Section 8 — "Built on trusted Base ecosystem data."
  * Seven real providers (six from the app's canonical provider registry plus
- * Snapshot, see `SOURCE_CARDS`' own doc comment), each its own animated
- * gradient particle converging on the Base Radar AI hub
- * (`PipelineFlow`) — never implies ownership of any third-party dataset,
- * only that Base Radar aggregates and cross-checks them.
+ * Snapshot, see `SOURCE_CARDS`' own doc comment) feeding the Base Radar AI
+ * hub (`PipelineFlow`) — never implies ownership of any third-party
+ * dataset, only that Base Radar aggregates and cross-checks them.
  */
 export function TrustedDataSources() {
-  const pipelineInputs: PipelineInputNode[] = SOURCE_CARDS.map((card) => ({ key: card.key, gradient: card.gradient }));
-
   return (
-    <section id="trusted-data" className="relative mx-auto max-w-7xl px-6 py-16 sm:py-24 lg:px-8">
+    <section id="trusted-data" className="relative isolate mx-auto max-w-7xl overflow-x-hidden px-6 py-16 sm:py-24 lg:px-8">
       <TrustedDataSourcesBackground />
 
       <motion.div
@@ -170,14 +167,7 @@ export function TrustedDataSources() {
             >
               <ProviderIcon Icon={card.Icon} />
               <span className="text-xs font-medium whitespace-nowrap text-radar-light-text dark:text-radar-white">{card.label}</span>
-              {/*
-                The role tag's dot is tinted with this provider's own
-                convergence-particle gradient (see `PROVIDER_GRADIENT`,
-                `pipelineInputs` below) — the same color that carries this
-                provider's particle into the AI hub, so the tag reads as
-                "the one signal Base Radar AI actually extracts from this
-                source," not just a label.
-              */}
+              {/* The role tag's dot is tinted with this provider's own gradient (`PROVIDER_GRADIENT`) — a quick per-source color cue, matching the same gradient `ProviderIcon` and the card's other accents already use. */}
               <span className="flex items-center gap-1 text-xs whitespace-nowrap text-radar-light-muted dark:text-radar-muted">
                 <span className="size-1 shrink-0 rounded-full" style={{ background: card.gradient[0] }} aria-hidden="true" />
                 {card.role}
@@ -188,7 +178,6 @@ export function TrustedDataSources() {
       </div>
 
       <PipelineFlow
-        inputs={pipelineInputs}
         hubIcon={BrainCircuit}
         hubTitle="Base Radar AI"
         hubSubtitle="Cross-provider Intelligence Engine"
