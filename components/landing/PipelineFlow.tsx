@@ -96,7 +96,7 @@ export function PipelineFlow({ hubIcon: HubIcon, hubTitle, hubSubtitle, outputSt
         <div className="mx-auto flex w-max flex-nowrap items-center gap-x-2">
           {outputStages.map((stage, index) => (
             <span key={stage} className="flex shrink-0 items-center gap-2">
-              <span className="rounded-full border border-radar-accent/25 bg-radar-elevated px-3 py-1 text-xs font-medium whitespace-nowrap text-white">
+              <span className="rounded-full border border-radar-primary/25 bg-radar-light-elevated px-3 py-1 text-xs font-medium whitespace-nowrap text-radar-light-text dark:border-radar-accent/25 dark:bg-radar-elevated dark:text-white">
                 {stage}
               </span>
               {index < outputStages.length - 1 && (
