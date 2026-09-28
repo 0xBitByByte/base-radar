@@ -19,7 +19,7 @@ const RIGHT_INPUTS: EngineInput[] = [
 
 const OUTPUT_STAGES = ["Verified", "Scored", "Decision-Ready Intelligence"];
 
-/** One input IC module — solid dark surface (never the translucent `GlassCard` treatment), a cyan border, icon, title, and a concrete one-line description of what it actually feeds the hub. */
+/** One input IC module — solid surface (never the translucent `GlassCard` treatment), a cyan border, icon, title, and a concrete one-line description of what it actually feeds the hub. Theme-adaptive like the rest of the page. */
 function InputCard({ input, side }: { input: EngineInput; side: "left" | "right" }) {
   return (
     <motion.div
@@ -27,17 +27,17 @@ function InputCard({ input, side }: { input: EngineInput; side: "left" | "right"
       whileInView={{ opacity: 1, x: 0 }}
       viewport={{ once: true, margin: "-60px" }}
       transition={{ duration: 0.4 }}
-      className="relative rounded-2xl border border-radar-accent/40 bg-radar-card p-5 shadow-[0_0_34px_-10px_rgba(6,184,212,0.55)]"
+      className="relative rounded-2xl border border-radar-primary/30 bg-radar-light-card p-5 shadow-[0_0_34px_-10px_rgba(6,184,212,0.25)] dark:border-radar-accent/40 dark:bg-radar-card dark:shadow-[0_0_34px_-10px_rgba(6,184,212,0.55)]"
     >
       <div className="flex items-start gap-3">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-radar-primary/25 to-radar-accent/25 text-radar-accent">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-radar-primary/25 to-radar-accent/25 text-radar-primary dark:text-radar-accent">
           <input.Icon className="size-4.5" aria-hidden="true" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-white">{input.label}</p>
-          <p className="mt-1 text-sm text-radar-muted">{input.description}</p>
+          <p className="font-semibold text-radar-light-text dark:text-white">{input.label}</p>
+          <p className="mt-1 text-sm text-radar-light-muted dark:text-radar-muted">{input.description}</p>
         </div>
-        <ArrowRight className="mt-1 hidden size-4 shrink-0 text-radar-accent sm:block" aria-hidden="true" />
+        <ArrowRight className="mt-1 hidden size-4 shrink-0 text-radar-primary dark:text-radar-accent sm:block" aria-hidden="true" />
       </div>
     </motion.div>
   );
@@ -59,7 +59,7 @@ function InputCard({ input, side }: { input: EngineInput; side: "left" | "right"
  */
 export function IntelligenceEngine() {
   return (
-    <section id="intelligence-engine" className="relative isolate mx-auto max-w-7xl overflow-x-hidden px-6 py-16 sm:py-24 lg:px-8">
+    <section id="intelligence-engine" className="relative isolate mx-auto max-w-7xl overflow-hidden px-6 py-16 sm:py-24 lg:px-8">
       <div className="relative">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -109,10 +109,14 @@ export function IntelligenceEngine() {
         >
           {OUTPUT_STAGES.map((stage, index) => (
             <span key={stage} className="flex shrink-0 items-center gap-2">
-              <span className="rounded-full border border-radar-accent/25 bg-radar-elevated px-3 py-1 text-xs font-medium whitespace-nowrap text-white">
+              <span className="rounded-full border border-radar-primary/25 bg-radar-light-elevated px-3 py-1 text-xs font-medium whitespace-nowrap text-radar-light-text dark:border-radar-accent/25 dark:bg-radar-elevated dark:text-white">
                 {stage}
               </span>
-              {index < OUTPUT_STAGES.length - 1 && <span className="text-radar-muted/60" aria-hidden="true">→</span>}
+              {index < OUTPUT_STAGES.length - 1 && (
+                <span className="text-radar-light-muted/60 dark:text-radar-muted/60" aria-hidden="true">
+                  →
+                </span>
+              )}
             </span>
           ))}
         </motion.div>

@@ -112,7 +112,7 @@ function ProviderIcon({ Icon }: { Icon: BrandIconComponent }) {
  */
 export function TrustedDataSources() {
   return (
-    <section id="trusted-data" className="relative isolate mx-auto max-w-7xl overflow-x-hidden px-6 py-16 sm:py-24 lg:px-8">
+    <section id="trusted-data" className="relative isolate mx-auto max-w-7xl overflow-hidden px-6 py-16 sm:py-24 lg:px-8">
       <TrustedDataSourcesBackground />
 
       <motion.div
