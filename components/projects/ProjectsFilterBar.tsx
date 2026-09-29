@@ -130,6 +130,8 @@ type ProjectsFilterBarProps = {
   availableDiscoveryStatuses: DiscoveryStatus[];
   /** Per-metric range options, already narrowed to real, non-empty buckets server-side. An empty array for a metric means "hide this filter entirely" — no reliable provider data exists for it right now. */
   financialRangeOptions: Record<FinancialMetric, FinancialRangeDef[]>;
+  /** See `ProjectsSearchInput.tsx`'s own doc comment for this prop. */
+  onNavigate?: (href: string) => void;
 };
 
 /**
@@ -230,7 +232,7 @@ type ProjectsFilterBarProps = {
  * shared link is still visible and still clearable — never a silent,
  * un-actionable state — even though nothing in this panel can set it again.
  */
-export function ProjectsFilterBar({ state, availableDiscoveryStatuses, financialRangeOptions }: ProjectsFilterBarProps) {
+export function ProjectsFilterBar({ state, availableDiscoveryStatuses, financialRangeOptions, onNavigate }: ProjectsFilterBarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
@@ -302,8 +304,13 @@ export function ProjectsFilterBar({ state, availableDiscoveryStatuses, financial
   }
 
   function applyAndNavigate(overrides: Partial<ProjectsQueryState>) {
+    const href = `${pathname}${buildProjectsQuery(state, overrides)}`;
+    if (onNavigate) {
+      onNavigate(href);
+      return;
+    }
     startTransition(() => {
-      router.push(`${pathname}${buildProjectsQuery(state, overrides)}`, { scroll: false });
+      router.push(href, { scroll: false });
     });
   }
 

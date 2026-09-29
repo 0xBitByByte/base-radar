@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * PR-058 — Task 5: real pagination, replacing PR-057's static placeholder.
  * `paginateLiveProjects()` (`app/dashboard/projects/page.tsx`) already
@@ -5,8 +7,17 @@
  * component only decides which page *numbers* to render as links and
  * builds their hrefs via `buildProjectsQuery()`. Plain `<Link>`s throughout,
  * no client state: paging is pure navigation.
+ *
+ * Vercel production-hotspot follow-up — `"use client"` added so an
+ * `onClick` handler can be attached (needed for the optional `onNavigate`
+ * escape hatch below). This makes the component a small hydrated client
+ * island wherever it's used — including the 11 unmodified collection
+ * routes, where `onNavigate` is never passed, `handleClick` is a no-op, and
+ * every `<Link>` behaves exactly as it did before: a plain navigation, no
+ * behavior change.
  */
 
+import type { MouseEvent } from "react";
 import Link from "next/link";
 
 import { buildProjectsQuery, PROJECTS_PATH, type ProjectsQueryState } from "@/components/projects/queryState";
@@ -18,6 +29,8 @@ type ProjectsPaginationProps = {
   totalPages: number;
   hasPreviousPage: boolean;
   hasNextPage: boolean;
+  /** See `ProjectsSearchInput.tsx`'s own doc comment for this prop. When provided, every page link is intercepted (`preventDefault`) and handed to this callback instead of a real `<Link>` navigation. */
+  onNavigate?: (href: string) => void;
 };
 
 /** First, last, current, and one neighbor on each side — with an ellipsis for any real gap. Standard, bounded window regardless of how many total pages exist (PR-054's own "future-ready at 10,000+ projects" scalability goal — a 1,000-page directory still renders ~7 controls, never 1,000 links). */
@@ -47,15 +60,26 @@ const controlClass =
 const enabledClass = "text-radar-light-text hover:bg-radar-light-surface dark:text-radar-white dark:hover:bg-white/5";
 const disabledClass = "text-radar-light-muted opacity-50 dark:text-radar-muted";
 
-export function ProjectsPagination({ state, currentPage, totalPages, hasPreviousPage, hasNextPage }: ProjectsPaginationProps) {
+export function ProjectsPagination({ state, currentPage, totalPages, hasPreviousPage, hasNextPage, onNavigate }: ProjectsPaginationProps) {
   if (totalPages <= 1) return null;
 
   const pageWindow = buildPageWindow(currentPage, totalPages);
 
+  function handleClick(event: MouseEvent<HTMLAnchorElement>, href: string) {
+    if (!onNavigate) return;
+    event.preventDefault();
+    onNavigate(href);
+  }
+
   return (
     <nav aria-label="Projects pagination" className="flex flex-wrap items-center justify-center gap-2 pt-2">
       {hasPreviousPage ? (
-        <Link href={hrefForPage(state, currentPage - 1)} aria-label="Previous page" className={cn(controlClass, enabledClass)}>
+        <Link
+          href={hrefForPage(state, currentPage - 1)}
+          onClick={(event) => handleClick(event, hrefForPage(state, currentPage - 1))}
+          aria-label="Previous page"
+          className={cn(controlClass, enabledClass)}
+        >
           Previous
         </Link>
       ) : (
@@ -74,6 +98,7 @@ export function ProjectsPagination({ state, currentPage, totalPages, hasPrevious
             <Link
               key={entry}
               href={hrefForPage(state, entry)}
+              onClick={(event) => handleClick(event, hrefForPage(state, entry))}
               aria-label={`Page ${entry}`}
               aria-current={entry === currentPage ? "page" : undefined}
               className={cn(
@@ -90,7 +115,12 @@ export function ProjectsPagination({ state, currentPage, totalPages, hasPrevious
       </div>
 
       {hasNextPage ? (
-        <Link href={hrefForPage(state, currentPage + 1)} aria-label="Next page" className={cn(controlClass, enabledClass)}>
+        <Link
+          href={hrefForPage(state, currentPage + 1)}
+          onClick={(event) => handleClick(event, hrefForPage(state, currentPage + 1))}
+          aria-label="Next page"
+          className={cn(controlClass, enabledClass)}
+        >
           Next
         </Link>
       ) : (

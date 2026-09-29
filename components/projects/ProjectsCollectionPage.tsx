@@ -34,6 +34,8 @@ type ProjectsCollectionPageProps = {
   emptyState: Parameters<typeof DirectoryEmptyState>[0];
   financialSummary: FinancialSummaryEntry[];
   allProjects: LiveProject[];
+  /** See `ProjectsSearchInput.tsx`'s own doc comment for this prop. */
+  onNavigate?: (href: string) => void;
 };
 
 /**
@@ -91,6 +93,7 @@ export function ProjectsCollectionPage({
   emptyState,
   financialSummary,
   allProjects,
+  onNavigate,
 }: ProjectsCollectionPageProps) {
   return (
     // PR-085.05, Task 6 — gap-8 → gap-10, matching Discover's own outer
@@ -112,10 +115,18 @@ export function ProjectsCollectionPage({
         resultCount={directoryPage.totalItems}
         availableDiscoveryStatuses={availableDiscoveryStatuses(allProjects)}
         financialRangeOptions={financialRangeOptions(allProjects)}
+        onNavigate={onNavigate}
       />
 
       <FinancialSummary entries={financialSummary} />
-      <ProjectsDirectory title={directoryTitle} subtitle={directorySubtitle} page={directoryPage} state={state} emptyState={emptyState} />
+      <ProjectsDirectory
+        title={directoryTitle}
+        subtitle={directorySubtitle}
+        page={directoryPage}
+        state={state}
+        emptyState={emptyState}
+        onNavigate={onNavigate}
+      />
 
       {/* PR-085.04A — "all" only; the other 11 collection views keep their
           simple header back-link unchanged. Same container pattern, width,
