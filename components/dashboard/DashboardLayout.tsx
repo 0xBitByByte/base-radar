@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { MotionConfig } from "framer-motion";
 
 import type { LiveTicker, WithSource } from "@/lib/data/types";
@@ -15,19 +15,6 @@ import { NetworkStatusProvider } from "@/components/dashboard/NetworkStatusProvi
 type DashboardLayoutProps = {
   children: ReactNode;
   /**
-   * Passed unresolved (PR9.3.4 §3) — Sidebar/Topbar below render immediately
-   * regardless of how long the ticker's provider calls take; only the
-   * `LiveStatusBarAsync` strip suspends on it, behind its own boundary.
-   */
-  tickerPromise: Promise<WithSource<LiveTicker>>;
-  /**
-   * Universal Project Card, PR-8 — same unresolved-Promise pattern as
-   * `tickerPromise` immediately above. Forwarded to `Topbar` → `CommandPalette`,
-   * whose own `CommandResultsAsync` boundary is the only thing that
-   * actually suspends on it.
-   */
-  liveProjectsPromise: Promise<LiveProject[]>;
-  /**
    * Reserved for the future Intelligence Rail (breaking news, whale alerts,
    * governance, GitHub releases, AI insights, new launches, watchlist
    * activity). Desktop-only by design; hidden on tablet/mobile. No page
@@ -37,8 +24,68 @@ type DashboardLayoutProps = {
   intelligenceRail?: ReactNode;
 };
 
-export function DashboardLayout({ children, tickerPromise, liveProjectsPromise, intelligenceRail }: DashboardLayoutProps) {
+/**
+ * Vercel-incident follow-up — `tickerPromise`/`liveProjectsPromise` used to
+ * arrive as PROPS, started server-side by `app/dashboard/layout.tsx`. That
+ * layout wraps every `/dashboard/*` route, so a server-side `no-store`
+ * fetch there forced the ENTIRE dashboard (not just the six public project
+ * routes) into per-request dynamic rendering — see that file's own doc
+ * comment. Both values are fetched here instead, via the two small Route
+ * Handlers this same change adds (`app/api/dashboard/ticker`,
+ * `app/api/dashboard/live-projects`).
+ *
+ * Deliberately plain `useState<T | null>` + `useEffect`, matching this
+ * codebase's own established pattern for CLIENT-originated data
+ * (`usePortfolio.ts`), not the previous `use()`/`<Suspense>` pattern —
+ * that pattern only ever worked here because the promise was started
+ * server-side (part of the same render pass Suspense could stream around).
+ * Two real problems were hit trying to keep it for a client-originated
+ * fetch, both confirmed by an actual failed production build, not
+ * theorized: (1) `DashboardLayout` is `"use client"`, but Next still
+ * server-renders client components for their initial HTML — calling
+ * `fetch("/api/...")` (a relative URL, no implicit base outside a browser)
+ * during that server render threw `TypeError: Failed to parse URL`. (2)
+ * Replacing the eager fetch with a promise that starts `new Promise(() =>
+ * {})` (never resolves) and only becomes real inside `useEffect` avoided
+ * that crash but then hung the build's own prerender/page-data-collection
+ * pass instead (`Failed to build .../page ... because it took more than 60
+ * seconds`) — that pass needs a determinate result per route, not a
+ * Suspense boundary that can legitimately stay pending forever. A plain
+ * `null` default sidesteps both: nothing async happens during any
+ * server-rendered pass at all, and the real `fetch()` only ever runs after
+ * this component has actually mounted in a browser.
+ */
+function useDashboardLiveData() {
+  const [ticker, setTicker] = useState<WithSource<LiveTicker> | null>(null);
+  const [liveProjects, setLiveProjects] = useState<LiveProject[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/dashboard/ticker")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) setTicker(data);
+      })
+      .catch(() => {});
+    fetch("/api/dashboard/live-projects")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) setLiveProjects(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // Empty deps — this dashboard shell mounts once per session; there is
+    // no input this effect needs to re-run on.
+  }, []);
+
+  return { ticker, liveProjects };
+}
+
+export function DashboardLayout({ children, intelligenceRail }: DashboardLayoutProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const { ticker, liveProjects } = useDashboardLiveData();
 
   return (
     // PR-107 — mounted once, here, wrapping both `Topbar` and `{children}`
@@ -83,10 +130,8 @@ export function DashboardLayout({ children, tickerPromise, liveProjectsPromise, 
             <Sidebar />
 
             <div className="relative flex min-h-dvh min-w-0 flex-1 flex-col">
-              <Topbar onOpenMobileNav={() => setMobileNavOpen(true)} liveProjectsPromise={liveProjectsPromise} />
-              <Suspense fallback={<WidgetSkeleton className="h-10 rounded-none border-x-0 border-t-0" />}>
-                <LiveStatusBarAsync tickerPromise={tickerPromise} />
-              </Suspense>
+              <Topbar onOpenMobileNav={() => setMobileNavOpen(true)} liveProjects={liveProjects} />
+              {ticker ? <LiveStatusBarAsync ticker={ticker} /> : <WidgetSkeleton className="h-10 rounded-none border-x-0 border-t-0" />}
               <main className="min-w-0 flex-1 px-4 py-8 sm:px-6 lg:px-10">{children}</main>
             </div>
 

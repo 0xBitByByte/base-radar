@@ -30,14 +30,14 @@ describe("Topbar — PR-091 Compare entry point", () => {
   });
 
   it("Compare is a real, always-enabled link to /dashboard/compare, not a disabled 'coming soon' placeholder", () => {
-    render(<Topbar onOpenMobileNav={() => {}} liveProjectsPromise={Promise.resolve([])} />);
+    render(<Topbar onOpenMobileNav={() => {}} liveProjects={[]} />);
     const link = screen.getByRole("link", { name: "Compare projects" });
     expect(link).toHaveAttribute("href", "/dashboard/compare");
     expect(link).not.toHaveAttribute("aria-disabled");
   });
 
   it("shows no count badge when the Compare list is empty", () => {
-    render(<Topbar onOpenMobileNav={() => {}} liveProjectsPromise={Promise.resolve([])} />);
+    render(<Topbar onOpenMobileNav={() => {}} liveProjects={[]} />);
     expect(screen.getByRole("link", { name: "Compare projects" })).toBeInTheDocument();
     expect(screen.queryByText("2")).not.toBeInTheDocument();
   });
@@ -45,7 +45,7 @@ describe("Topbar — PR-091 Compare entry point", () => {
   it("shows a real, live count badge once projects are selected", () => {
     addToCompare("aave");
     addToCompare("compound");
-    render(<Topbar onOpenMobileNav={() => {}} liveProjectsPromise={Promise.resolve([])} />);
+    render(<Topbar onOpenMobileNav={() => {}} liveProjects={[]} />);
     expect(screen.getByRole("link", { name: "Compare, 2 projects selected" })).toBeInTheDocument();
   });
 });

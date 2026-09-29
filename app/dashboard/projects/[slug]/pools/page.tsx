@@ -3,10 +3,7 @@ import { Waypoints } from "lucide-react";
 
 import { getProject } from "@/data/projects/helpers";
 import { ProjectSubpageBreadcrumb } from "@/components/explorer/ProjectSubpageBreadcrumb";
-import { pairToTradingPool } from "@/lib/intelligence/merge";
-import * as dexscreener from "@/lib/providers/dexscreener/service";
-import * as coingecko from "@/lib/providers/coingecko/service";
-import { resolveTokenLogosForPools } from "@/lib/branding/resolveTokenLogo";
+import { getCachedPoolsPageData } from "@/lib/data/projectSubpageCache";
 import { resolveLogoUrl } from "@/lib/projects/build";
 import { resolveTradingDiscoveryStrategies } from "@/lib/trading/discoveryStrategy";
 import { paginateLiveProjects } from "@/lib/projects/pagination";
@@ -22,6 +19,19 @@ import { formatCompactCurrency, formatPercent } from "@/lib/data/format";
 import { parsePoolsQueryState, type RawSearchParams } from "@/lib/pools/queryState";
 import { PAGE_HEADER_GROUP_CLASS, PAGE_HEADER_TITLE_CLASS, PAGE_HEADER_SUBTITLE_CLASS } from "@/components/dashboard/pageHeaderStyles";
 import type { TradingPool } from "@/lib/intelligence/types";
+
+// ISR — see app/dashboard/projects/[slug]/page.tsx for the full rationale
+// (public, no cookies/headers/session; confirmed root cause of a Vercel
+// fair-use suspension without this).
+export const revalidate = 300;
+
+/**
+ * Vercel-incident follow-up — `generateStaticParams` was tried and
+ * reverted here; see `[slug]/contracts/page.tsx`'s own doc comment for the
+ * full explanation — the same confirmed, reproducible `DYNAMIC_SERVER_USAGE`
+ * 500 on real registry projects with real pool data, once this route was
+ * statically classified. `revalidate` is kept (harmless on its own).
+ */
 
 type PoolExplorerPageProps = {
   params: Promise<{ slug: string }>;
@@ -91,18 +101,9 @@ export default async function PoolExplorerPage({ params, searchParams }: PoolExp
   // trending-only search can legitimately miss a real DEX's real pools
   // (confirmed live for Curve during this audit) without that meaning the
   // project has no pools at all.
-  const strategies = resolveTradingDiscoveryStrategies(project);
-  let richerPairsResult: Awaited<ReturnType<typeof dexscreener.getPairsForToken>> | null = null;
-  for (const strategy of strategies) {
-    if (strategy.kind === "token") {
-      richerPairsResult = await dexscreener.getPairsForToken(strategy.tokenAddress);
-    } else if (strategy.kind === "dex") {
-      richerPairsResult = await dexscreener.getPairsByDexId(strategy.dexIds);
-    } else {
-      continue;
-    }
-    if (richerPairsResult.ok && richerPairsResult.data.length > 0) break;
-  }
+  const cachedPoolsData = await getCachedPoolsPageData(slug);
+  const strategies = cachedPoolsData?.strategies ?? resolveTradingDiscoveryStrategies(project);
+  const richerPairsResult = cachedPoolsData?.richerPairsResult ?? null;
 
   if (!richerPairsResult) {
     // Only reachable when every strategy in the list is
@@ -133,7 +134,7 @@ export default async function PoolExplorerPage({ params, searchParams }: PoolExp
     );
   }
 
-  const pools: TradingPool[] = richerPairsResult.ok ? richerPairsResult.data.map(pairToTradingPool) : [];
+  const pools: TradingPool[] = cachedPoolsData?.pools ?? [];
   const attemptedDexStrategy = strategies.some((s) => s.kind === "dex");
 
   if (pools.length === 0) {
@@ -159,22 +160,12 @@ export default async function PoolExplorerPage({ params, searchParams }: PoolExp
     );
   }
 
-  // Token Logo System — this page previously never fetched CoinGecko data at
-  // all (see this file's git history), which is why the project's own token
-  // showed the generic initials badge here while Project Details, fetching
-  // the same data, showed the real logo. Both fetches below are small and
-  // independent of each other and of the pools already resolved above, so
-  // they run in parallel rather than serially.
-  const coingeckoId = project.providerIds?.coingeckoId ?? null;
-  const [primaryMarketResult, tokenLogos] = await Promise.all([
-    coingeckoId ? coingecko.getMarketsByIds([coingeckoId]) : Promise.resolve({ ok: true as const, data: [] }),
-    resolveTokenLogosForPools(
-      pools.flatMap((pool) => [
-        { symbol: pool.baseTokenSymbol, address: pool.baseTokenAddress },
-        { symbol: pool.quoteTokenSymbol, address: pool.quoteTokenAddress },
-      ])
-    ),
-  ]);
+  // Token Logo System — both the CoinGecko market lookup and the token-logo
+  // resolution now happen inside `getCachedPoolsPageData` (only once real
+  // pools are found, matching this page's original control flow exactly) —
+  // see `lib/data/projectSubpageCache.ts`.
+  const primaryMarketResult = cachedPoolsData?.primaryMarketResult ?? { ok: true as const, data: [] };
+  const tokenLogos = cachedPoolsData?.tokenLogos ?? {};
   // Token Logo System — routed through the one shared `resolveLogoUrl()`
   // priority function (registry -> CoinGecko -> ...), not a locally
   // reimplemented `??` chain. The previous version here checked CoinGecko

@@ -12,7 +12,7 @@ type CommandItemProps = {
   active: boolean;
   onSelect: (item: SearchableItem) => void;
   onHover: () => void;
-  /** Universal Project Card, PR-8 — populated only once `CommandResultsAsync`'s `liveProjectsPromise` resolves; `undefined` (or a miss) falls back to the generic row below, never fabricated. */
+  /** Universal Project Card, PR-8 — populated only once `DashboardLayout`'s client-side live-projects fetch resolves (`CommandPalette` computes this map); `undefined` (or a miss) falls back to the generic row below, never fabricated. */
   liveProjectById?: Map<string, LiveProject>;
 };
 

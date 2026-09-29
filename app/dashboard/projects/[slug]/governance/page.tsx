@@ -3,7 +3,7 @@ import { Landmark } from "lucide-react";
 
 import { getProject } from "@/data/projects/helpers";
 import { ProjectSubpageBreadcrumb } from "@/components/explorer/ProjectSubpageBreadcrumb";
-import { getGovernanceProvider } from "@/lib/governance";
+import { getCachedGovernanceEvents } from "@/lib/data/projectSubpageCache";
 import { paginateLiveProjects } from "@/lib/projects/pagination";
 import { GovernanceCategoryTabs } from "@/components/explorer/GovernanceCategoryTabs";
 import { GovernanceExplorerFilterBar } from "@/components/explorer/GovernanceExplorerFilterBar";
@@ -22,6 +22,19 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { parseGovernanceQueryState, type RawSearchParams } from "@/lib/governance/queryState";
 import { PAGE_HEADER_GROUP_CLASS, PAGE_HEADER_TITLE_CLASS, PAGE_HEADER_SUBTITLE_CLASS } from "@/components/dashboard/pageHeaderStyles";
 import type { GovernanceEvent } from "@/lib/governance";
+
+// ISR — see app/dashboard/projects/[slug]/page.tsx for the full rationale
+// (public, no cookies/headers/session; confirmed root cause of a Vercel
+// fair-use suspension without this).
+export const revalidate = 300;
+
+/**
+ * Vercel-incident follow-up — `generateStaticParams` was tried and
+ * reverted here; see `[slug]/contracts/page.tsx`'s own doc comment for the
+ * full explanation — the same confirmed, reproducible `DYNAMIC_SERVER_USAGE`
+ * 500 on real registry projects with real governance data, once this route
+ * was statically classified. `revalidate` is kept (harmless on its own).
+ */
 
 type GovernanceExplorerPageProps = {
   params: Promise<{ slug: string }>;
@@ -106,9 +119,7 @@ export default async function GovernanceExplorerPage({ params, searchParams }: G
     );
   }
 
-  const events: GovernanceEvent[] = await getGovernanceProvider().fetchEvents({
-    projects: [{ projectId: project.id, projectName: project.name, snapshotSpace }],
-  });
+  const events: GovernanceEvent[] = await getCachedGovernanceEvents(project.id, project.name, snapshotSpace);
 
   if (events.length === 0) {
     return (
