@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, type KeyboardEvent } from "react";
+import { useMemo, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@base-ui/react/dialog";
 import { Bookmark, History, Search, X } from "lucide-react";
@@ -11,12 +11,17 @@ import type { SearchableItem } from "@/lib/search/types";
 import type { LiveProject } from "@/lib/projects/types";
 import { CommandSearch } from "@/components/command/CommandSearch";
 import { CommandResults } from "@/components/command/CommandResults";
-import { CommandResultsAsync } from "@/components/command/CommandResultsAsync";
 
 type CommandPaletteProps = {
   className?: string;
-  /** Universal Project Card, PR-8 — see `app/dashboard/layout.tsx`. */
-  liveProjectsPromise: Promise<LiveProject[]>;
+  /**
+   * Universal Project Card, PR-8. Vercel-incident follow-up — `null` until
+   * `DashboardLayout`'s client-side fetch resolves; see its own doc
+   * comment. No longer an unresolved Promise — `CommandResults` itself
+   * already renders correctly with an empty `liveProjectById` map, so this
+   * palette needs no loading state of its own beyond that.
+   */
+  liveProjects: LiveProject[] | null;
 };
 
 /**
@@ -31,8 +36,9 @@ type CommandPaletteProps = {
  * established, including focus trap and return-focus-to-trigger, which Base
  * UI's Dialog provides for free.
  */
-export function CommandPalette({ className, liveProjectsPromise }: CommandPaletteProps) {
+export function CommandPalette({ className, liveProjects }: CommandPaletteProps) {
   const router = useRouter();
+  const liveProjectById = useMemo(() => new Map((liveProjects ?? []).map((project) => [project.id, project])), [liveProjects]);
   const {
     open,
     query,
@@ -188,30 +194,16 @@ export function CommandPalette({ className, liveProjectsPromise }: CommandPalett
             </section>
           )}
 
-          <Suspense
-            fallback={
-              <CommandResults
-                results={results}
-                activeItemId={activeItem?.id ?? null}
-                onSelect={navigateTo}
-                onHover={(itemId) => {
-                  const index = results.findIndex((item) => item.id === itemId);
-                  if (index !== -1) setSelectedIndex(index);
-                }}
-              />
-            }
-          >
-            <CommandResultsAsync
-              liveProjectsPromise={liveProjectsPromise}
-              results={results}
-              activeItemId={activeItem?.id ?? null}
-              onSelect={navigateTo}
-              onHover={(itemId) => {
-                const index = results.findIndex((item) => item.id === itemId);
-                if (index !== -1) setSelectedIndex(index);
-              }}
-            />
-          </Suspense>
+          <CommandResults
+            results={results}
+            activeItemId={activeItem?.id ?? null}
+            onSelect={navigateTo}
+            onHover={(itemId) => {
+              const index = results.findIndex((item) => item.id === itemId);
+              if (index !== -1) setSelectedIndex(index);
+            }}
+            liveProjectById={liveProjectById}
+          />
         </Dialog.Popup>
       </Dialog.Portal>
     </Dialog.Root>

@@ -3,7 +3,7 @@ import { Fish } from "lucide-react";
 
 import { getProject } from "@/data/projects/helpers";
 import { ProjectSubpageBreadcrumb } from "@/components/explorer/ProjectSubpageBreadcrumb";
-import { getRawWhaleEvents } from "@/lib/data/aggregate";
+import { getCachedRawWhaleEvents } from "@/lib/data/projectSubpageCache";
 import { CHAIN_BRANDING } from "@/lib/branding/chains";
 import { paginateLiveProjects } from "@/lib/projects/pagination";
 import { WhaleCategoryTabs } from "@/components/explorer/WhaleCategoryTabs";
@@ -18,6 +18,25 @@ import { formatCompactCurrency } from "@/lib/data/format";
 import { parseWhaleQueryState, type RawSearchParams } from "@/lib/whale/queryState";
 import { PAGE_HEADER_GROUP_CLASS, PAGE_HEADER_TITLE_CLASS, PAGE_HEADER_SUBTITLE_CLASS } from "@/components/dashboard/pageHeaderStyles";
 import type { WhaleEvent } from "@/lib/whale";
+
+// ISR — see app/dashboard/projects/[slug]/page.tsx for the full rationale
+// (public, no cookies/headers/session; confirmed root cause of a Vercel
+// fair-use suspension without this).
+export const revalidate = 300;
+
+/**
+ * Vercel-incident follow-up — see `[slug]/ai/page.tsx`'s own doc comment
+ * for the full explanation of why `generateStaticParams` (even returning
+ * `[]`) is required here, and why `[]` rather than the real project slug
+ * list. Verified working the same way: production build, real requests
+ * against `node .next/standalone/server.js`, `x-nextjs-cache: MISS` then
+ * `HIT` with `Cache-Control: s-maxage=300`, clean across 5 real registry
+ * project slugs, zero errors. This is the other of the two routes (with
+ * `[slug]/ai`) where it's confirmed safe to keep.
+ */
+export async function generateStaticParams() {
+  return [];
+}
 
 type WhaleExplorerPageProps = {
   params: Promise<{ slug: string }>;
@@ -98,7 +117,7 @@ export default async function WhaleExplorerPage({ params, searchParams }: WhaleE
     );
   }
 
-  const allEvents = await getRawWhaleEvents();
+  const allEvents = await getCachedRawWhaleEvents();
   const events: WhaleEvent[] = allEvents.filter((event) => event.projectId === project.id);
 
   if (events.length === 0) {

@@ -58,8 +58,12 @@ const CommandPalette = dynamic(
 
 type TopbarProps = {
   onOpenMobileNav: () => void;
-  /** Universal Project Card, PR-8 — forwarded unresolved to `CommandPalette`; see `app/dashboard/layout.tsx`. */
-  liveProjectsPromise: Promise<LiveProject[]>;
+  /**
+   * Universal Project Card, PR-8 — forwarded to `CommandPalette`. Vercel-
+   * incident follow-up — `null` until `DashboardLayout`'s client-side fetch
+   * resolves (see its own doc comment); no longer an unresolved Promise.
+   */
+  liveProjects: LiveProject[] | null;
 };
 
 /**
@@ -107,7 +111,7 @@ function NetworkBadge() {
   );
 }
 
-export function Topbar({ onOpenMobileNav, liveProjectsPromise }: TopbarProps) {
+export function Topbar({ onOpenMobileNav, liveProjects }: TopbarProps) {
   const { watchlists, activeWatchlist, setActiveWatchlist } = useWatchlists();
   const { preferences } = usePersonalizationPreferences();
   const { syncStatus } = useSyncStatus();
@@ -165,7 +169,7 @@ export function Topbar({ onOpenMobileNav, liveProjectsPromise }: TopbarProps) {
           not a change to the app's shared breakpoint tokens. */}
       <CommandPalette
         className="hidden min-w-0 max-w-[220px] flex-1 sm:flex xl:max-w-xs min-[1440px]:max-w-sm"
-        liveProjectsPromise={liveProjectsPromise}
+        liveProjects={liveProjects}
       />
 
       {/* PR22 Part 3: `showWatchlistSelectorInTopbar` is purely a Topbar

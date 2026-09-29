@@ -4,7 +4,7 @@ import { Blocks } from "lucide-react";
 import { getProject } from "@/data/projects/helpers";
 import { ProjectSubpageBreadcrumb } from "@/components/explorer/ProjectSubpageBreadcrumb";
 import { normalizeName } from "@/lib/intelligence/helpers";
-import * as blockscout from "@/lib/providers/blockscout/service";
+import { getCachedContractDetails } from "@/lib/data/projectSubpageCache";
 import { paginateLiveProjects } from "@/lib/projects/pagination";
 import { ContractCategoryTabs } from "@/components/explorer/ContractCategoryTabs";
 import { ContractExplorerFilterBar } from "@/components/explorer/ContractExplorerFilterBar";
@@ -26,6 +26,31 @@ import { MetricItem } from "@/components/explorer/MetricItem";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { parseContractsQueryState, type RawSearchParams } from "@/lib/contracts/queryState";
 import { PAGE_HEADER_GROUP_CLASS, PAGE_HEADER_TITLE_CLASS, PAGE_HEADER_SUBTITLE_CLASS } from "@/components/dashboard/pageHeaderStyles";
+
+// ISR — see app/dashboard/projects/[slug]/page.tsx for the full rationale
+// (public, no cookies/headers/session; confirmed root cause of a Vercel
+// fair-use suspension without this).
+export const revalidate = 300;
+
+/**
+ * Vercel-incident follow-up — `generateStaticParams` was tried and
+ * reverted here. It makes `revalidate` above take effect (confirmed
+ * working for `[slug]/ai` and `[slug]/whale`, see their own doc comments),
+ * but for THIS page, real registry projects with actual registered
+ * contracts (confirmed on multiple real slugs, not project-specific)
+ * reproducibly 500'd once static classification was in effect: Next
+ * treats a `DYNAMIC_SERVER_USAGE` signal reached during a
+ * statically-classified route's render as a FATAL runtime error
+ * (`Page changed from static to dynamic at runtime`) rather than the
+ * graceful fallback a plain dynamic route gets. `getCachedContractDetails`
+ * (`lib/data/projectSubpageCache.ts`) is confirmed to only contain plain,
+ * already-serializable data with no remaining raw provider call outside
+ * it — the exact trigger inside that cached path wasn't fully isolated
+ * within this task's scope, so `generateStaticParams` stays off rather
+ * than shipping a route that can 500 for real projects. `revalidate` is
+ * kept (harmless on its own, and already measurably reduces real repeat
+ * provider calls via the cached data layer even without full-route ISR).
+ */
 
 type ContractExplorerPageProps = {
   params: Promise<{ slug: string }>;
@@ -94,10 +119,7 @@ export default async function ContractExplorerPage({ params, searchParams }: Con
     ...project.contracts.map((contract) => contract.address),
   ].filter((address, index, all) => all.findIndex((other) => normalizeName(other) === normalizeName(address)) === index);
 
-  const detailsResults = await Promise.all(
-    candidateAddresses.map((address) => blockscout.getContractDetail(address).then((result) => ({ address, result })))
-  );
-  const detailsByAddress = blockscout.contractDetailsByAddress(detailsResults);
+  const detailsByAddress = await getCachedContractDetails(candidateAddresses);
 
   const cards: ContractCard[] = project.contracts.map((contract) =>
     buildContractCard(

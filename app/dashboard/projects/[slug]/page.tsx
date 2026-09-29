@@ -52,6 +52,40 @@ import { ProjectHealthScorecard } from "@/components/explorer/ProjectHealthScore
 import { ProfileAIIntelligenceLinks } from "@/components/explorer/ProfileAIIntelligenceLinks";
 import type { SparklinePoint } from "@/lib/data/types";
 
+/**
+ * ISR, not fully dynamic — this page reads no cookies/headers/session (a
+ * real, public, evergreen project profile, exactly as `app/sitemap.ts`'s
+ * own doc comment already claims), so Vercel can safely cache the rendered
+ * output at the edge and serve repeat hits without re-invoking the
+ * function at all. Without this, `sitemap.xml` listing every project page
+ * (with `changeFrequency: "daily"`) plus `robots.ts` explicitly allowing
+ * crawlers here meant every single crawl of every project re-ran this
+ * page's full provider-fetching pipeline from scratch — confirmed root
+ * cause of a real Vercel Hobby-plan fair-use suspension (Fast Origin
+ * Transfer + Fluid Active CPU both over limit) with zero real visitors.
+ * Five minutes balances real freshness against not repeating that incident.
+ */
+export const revalidate = 300;
+
+/**
+ * Vercel-incident follow-up — `generateStaticParams` (needed to make
+ * `revalidate` above take effect at all; see `[slug]/ai/page.tsx`'s doc
+ * comment for the confirmed reason) was tried here and reverted. This
+ * page's ~15 provider calls are deliberately NOT `unstable_cache`-wrapped
+ * (its streaming architecture — see the page component's own doc comment —
+ * is incompatible with it), so real, uncached `no-store` fetches
+ * (`github.getCommitActivity` confirmed in testing, likely others) still
+ * run during its render. Once `generateStaticParams` commits a route to
+ * static/SSG classification, Next treats hitting ANY of those as a FATAL
+ * runtime error (`Page changed from static to dynamic at runtime`, digest
+ * `DYNAMIC_SERVER_USAGE`) instead of the graceful per-request fallback a
+ * plain dynamic route gets — confirmed with a real 500 on every real
+ * project tested. `revalidate` is kept (harmless on its own);
+ * `generateStaticParams` is not, until this page's fetches are made safe
+ * for it — a real architecture decision (see this task's final report),
+ * not one made unilaterally here.
+ */
+
 type ProjectProfilePageProps = {
   params: Promise<{ slug: string }>;
 };

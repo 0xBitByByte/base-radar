@@ -4,12 +4,10 @@ import Link from "next/link";
 
 import { getProject } from "@/data/projects/helpers";
 import { ProjectSubpageBreadcrumb } from "@/components/explorer/ProjectSubpageBreadcrumb";
-import { getRawWhaleEvents } from "@/lib/data/aggregate";
-import { buildProjectIntelligence } from "@/lib/intelligence/engine";
+import { getCachedProjectIntelligence, getCachedRawWhaleEvents, getCachedLiveProjects } from "@/lib/data/projectSubpageCache";
 import { buildHealthScorecard, type ScorecardSeverity, type ScorecardTile } from "@/lib/intelligence/scorecard";
 import { buildIntelligenceReport } from "@/lib/intelligence/report";
 import { filterLiveProjects } from "@/lib/projects/filter";
-import { getLiveProjects } from "@/lib/projects/service";
 import { sortLiveProjects } from "@/lib/projects/sort";
 import {
   getAllScorecardTiles,
@@ -24,6 +22,41 @@ import { RelativeTime } from "@/components/shared/RelativeTime";
 import { formatCompactCurrency, formatDate } from "@/lib/data/format";
 import { PROVIDER_DISPLAY_NAME } from "@/lib/intelligence/scorecard";
 import type { ProviderName } from "@/lib/providers/common/types";
+
+// ISR — see app/dashboard/projects/[slug]/page.tsx for the full rationale
+// (public, no cookies/headers/session; confirmed root cause of a Vercel
+// fair-use suspension without this).
+export const revalidate = 300;
+
+/**
+ * Vercel-incident follow-up — `generateStaticParams` (even returning `[]`,
+ * as here) is REQUIRED for `revalidate` above to have any effect at all.
+ * Confirmed empirically: a `[slug]` route with no `generateStaticParams`
+ * is classified fully dynamic by Next.js — no ISR, no edge caching — even
+ * with every provider call `unstable_cache`-wrapped and the shared
+ * `app/dashboard/layout.tsx` fetching nothing itself. `dynamicParams`
+ * stays at its default `true`, so a slug not in the returned list still
+ * renders — on-demand, on its first real hit, cached for `revalidate`'s
+ * 300s after that, exactly the "first request renders, repeated requests
+ * within the window are served from cache" behavior this exists for. `[]`
+ * rather than the real project slug list is deliberate — prerendering
+ * every real project at BUILD time would mean the build itself makes real
+ * provider network calls for the whole registry, a materially bigger,
+ * riskier change than asked for here.
+ *
+ * Verified working at runtime (production build, `node
+ * .next/standalone/server.js`, real requests): first hit to a real slug
+ * returns `x-nextjs-cache: MISS`, every repeat hit within the window
+ * returns `x-nextjs-cache: HIT` with `Cache-Control: s-maxage=300` —
+ * confirmed clean (zero errors) across 5 different real registry project
+ * slugs. This is one of only two of the six routes (with `[slug]/whale`)
+ * where `generateStaticParams` is safe to keep — see
+ * `[slug]/contracts/page.tsx`'s doc comment for the other four, which
+ * reproducibly 500 with it and had it reverted.
+ */
+export async function generateStaticParams() {
+  return [];
+}
 
 type AIIntelligenceReportPageProps = {
   params: Promise<{ slug: string }>;
@@ -105,11 +138,19 @@ export default async function AIIntelligenceReportPage({ params }: AIIntelligenc
   // sequentially after `buildProjectIntelligence` (the previous shape here)
   // only added latency on top instead of overlapping with it.
   const whalePromise = Promise.race([
-    getRawWhaleEvents(),
+    getCachedRawWhaleEvents(),
     new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Whale detection timed out")), 5_000)),
   ]).catch(() => []);
 
-  const profile = await buildProjectIntelligence(registryProject, undefined, { extended: false });
+  const profile = await getCachedProjectIntelligence(slug);
+  if (!profile) {
+    return (
+      <div className="flex flex-col gap-6">
+        {breadcrumb}
+        <EmptyState icon={FileSearch} title="Project not found" description="This project isn't in the Base Radar registry." />
+      </div>
+    );
+  }
   const allWhaleEvents = await whalePromise;
   const whaleEvents = allWhaleEvents.filter((event) => event.projectId === profile.identity.id);
 
@@ -138,7 +179,7 @@ export default async function AIIntelligenceReportPage({ params }: AIIntelligenc
   if (primaryCategory && profile.tvl.available && profile.tvl.tvlUsd !== null) {
     try {
       const liveProjects = await Promise.race([
-        getLiveProjects(),
+        getCachedLiveProjects(),
         new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Category rank comparison timed out")), 4_000)),
       ]);
       const categoryPeers = sortLiveProjects(filterLiveProjects(liveProjects, { category: primaryCategory, hasTvl: true }), "tvl", "desc");
