@@ -42,6 +42,8 @@ type ProjectsInteractionBarProps = {
   availableDiscoveryStatuses: DiscoveryStatus[];
   /** PR-063 — Task 1/2: passed straight through to `ProjectsFilterBar`; see that component's own prop doc. */
   financialRangeOptions: Record<FinancialMetric, FinancialRangeDef[]>;
+  /** See `ProjectsSearchInput.tsx`'s own doc comment for this prop. */
+  onNavigate?: (href: string) => void;
 };
 
 export function ProjectsInteractionBar({
@@ -49,24 +51,26 @@ export function ProjectsInteractionBar({
   resultCount,
   availableDiscoveryStatuses,
   financialRangeOptions,
+  onNavigate,
 }: ProjectsInteractionBarProps) {
   return (
     <div className="sticky top-16 z-20 -mx-4 flex flex-col gap-3 border-b border-radar-light-border bg-radar-light-card/90 px-4 py-4 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:-mx-10 lg:flex-row lg:items-center lg:px-10 dark:border-white/10 dark:bg-radar-bg/90">
       {/* Capped width on desktop so Search never crowds Filters/Sort off the row — Task 3's "everything fits naturally on one row on desktop." Stays full-width on mobile/tablet, where the row wraps instead. */}
       <div className="lg:w-80 lg:shrink-0">
-        <ProjectsSearchInput state={state} resultCount={resultCount} />
+        <ProjectsSearchInput state={state} resultCount={resultCount} onNavigate={onNavigate} />
       </div>
       {/* Task 2 — Search, Category, Confidence, Filters, Sort read left-to-right in one row on desktop, matching a compact trading-software toolbar; wraps naturally on smaller widths instead of stacking into separate blocks.
           Round 5 — Filters sits before Sort (not last) so its popover always has real
           room to open into, rather than being pinned against the row's right edge. */}
       <div className="flex flex-1 flex-wrap items-center gap-2">
-        <ProjectsQuickFilters state={state} />
+        <ProjectsQuickFilters state={state} onNavigate={onNavigate} />
         <ProjectsFilterBar
           state={state}
           availableDiscoveryStatuses={availableDiscoveryStatuses}
           financialRangeOptions={financialRangeOptions}
+          onNavigate={onNavigate}
         />
-        <ProjectsSortSelect state={state} />
+        <ProjectsSortSelect state={state} onNavigate={onNavigate} />
       </div>
     </div>
   );

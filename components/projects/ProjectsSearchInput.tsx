@@ -11,6 +11,16 @@ type ProjectsSearchInputProps = {
   state: ProjectsQueryState;
   /** The already-computed, real match count for `state.search` — never recomputed client-side (Task 10: no duplicated business logic). */
   resultCount: number;
+  /**
+   * Vercel production-hotspot follow-up — optional escape hatch used only
+   * by the client-side-filtering prototype on `/dashboard/projects`/
+   * `/dashboard/projects/all`. When provided, called with the new URL
+   * instead of `router.push` (which would otherwise force a server
+   * round-trip for these now-cached, search-param-free routes). Omitted
+   * everywhere else (the 11 other collection routes) — their behavior is
+   * completely unchanged.
+   */
+  onNavigate?: (href: string) => void;
 };
 
 const DEBOUNCE_MS = 300;
@@ -21,7 +31,7 @@ const DEBOUNCE_MS = 300;
  * runs here — this component only ever writes the `?search=` param; the
  * Server Component re-runs the real search on the resulting request.
  */
-export function ProjectsSearchInput({ state, resultCount }: ProjectsSearchInputProps) {
+export function ProjectsSearchInput({ state, resultCount, onNavigate }: ProjectsSearchInputProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
@@ -46,8 +56,13 @@ export function ProjectsSearchInput({ state, resultCount }: ProjectsSearchInputP
   }, []);
 
   function navigate(nextSearch: string) {
+    const href = `${pathname}${buildProjectsQuery(state, { search: nextSearch })}`;
+    if (onNavigate) {
+      onNavigate(href);
+      return;
+    }
     startTransition(() => {
-      router.push(`${pathname}${buildProjectsQuery(state, { search: nextSearch })}`, { scroll: false });
+      router.push(href, { scroll: false });
     });
   }
 

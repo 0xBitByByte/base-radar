@@ -174,17 +174,33 @@ export type BuildDirectoryPipelineInput = {
   pageSize?: number;
 };
 
-export function buildDirectoryPipeline({
-  rawSearchParams,
+export type BuildDirectoryPipelineFromStateInput = Omit<BuildDirectoryPipelineInput, "rawSearchParams"> & {
+  parsedState: ProjectsQueryState;
+};
+
+/**
+ * Vercel production-hotspot follow-up — the pure half of
+ * `buildDirectoryPipeline()` below, taking an already-parsed
+ * `ProjectsQueryState` instead of raw `searchParams`. Extracted so the
+ * `/dashboard/projects`/`/dashboard/projects/all` client-side-filtering
+ * prototype (which already has a parsed state from
+ * `useProjectsQueryState()`, itself built on the same
+ * `parseProjectsQueryState()`) can call this directly rather than
+ * re-serializing its state back into raw query params just to have this
+ * function re-parse them. `buildDirectoryPipeline()` itself is now a thin
+ * wrapper — parse, then call this — so every existing caller's behavior is
+ * unchanged (confirmed by the full Vitest suite).
+ */
+export function buildDirectoryPipelineFromState({
+  parsedState,
   projects,
   collections,
   leaderboards,
   smartViewLists,
   lockView,
   pageSize = DIRECTORY_PAGE_SIZE,
-}: BuildDirectoryPipelineInput): DirectoryPipelineResult {
-  const parsed = parseProjectsQueryState(rawSearchParams);
-  const state: ProjectsQueryState = lockView ? { ...parsed, view: lockView } : parsed;
+}: BuildDirectoryPipelineFromStateInput): DirectoryPipelineResult {
+  const state: ProjectsQueryState = lockView ? { ...parsedState, view: lockView } : parsedState;
 
   const base = baseListForView(state.view, projects, collections, leaderboards, smartViewLists);
 
@@ -238,4 +254,17 @@ export function buildDirectoryPipeline({
           };
 
   return { state, directoryPage, directoryTitle, directorySubtitle, emptyState, financialSummary };
+}
+
+export function buildDirectoryPipeline({
+  rawSearchParams,
+  projects,
+  collections,
+  leaderboards,
+  smartViewLists,
+  lockView,
+  pageSize = DIRECTORY_PAGE_SIZE,
+}: BuildDirectoryPipelineInput): DirectoryPipelineResult {
+  const parsedState = parseProjectsQueryState(rawSearchParams);
+  return buildDirectoryPipelineFromState({ parsedState, projects, collections, leaderboards, smartViewLists, lockView, pageSize });
 }

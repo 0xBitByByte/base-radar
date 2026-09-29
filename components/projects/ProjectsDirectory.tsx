@@ -31,9 +31,11 @@ type ProjectsDirectoryProps = {
   page: PaginatedResult<LiveProject>;
   state: ProjectsQueryState;
   emptyState: DirectoryEmptyStateProps;
+  /** See `ProjectsSearchInput.tsx`'s own doc comment for this prop. */
+  onNavigate?: (href: string) => void;
 };
 
-export function ProjectsDirectory({ title, subtitle, page, state, emptyState }: ProjectsDirectoryProps) {
+export function ProjectsDirectory({ title, subtitle, page, state, emptyState, onNavigate }: ProjectsDirectoryProps) {
   return (
     <div id="directory" className="flex scroll-mt-6 flex-col gap-5 border-t border-radar-light-border pt-8 dark:border-white/10">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -63,6 +65,7 @@ export function ProjectsDirectory({ title, subtitle, page, state, emptyState }: 
         totalPages={page.totalPages}
         hasPreviousPage={page.hasPreviousPage}
         hasNextPage={page.hasNextPage}
+        onNavigate={onNavigate}
       />
     </div>
   );

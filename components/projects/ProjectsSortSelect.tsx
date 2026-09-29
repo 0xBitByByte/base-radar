@@ -8,6 +8,8 @@ import { SORT_OPTIONS, buildProjectsQuery, sortValueFor, type ProjectsQueryState
 
 type ProjectsSortSelectProps = {
   state: ProjectsQueryState;
+  /** See `ProjectsSearchInput.tsx`'s own doc comment for this prop. */
+  onNavigate?: (href: string) => void;
 };
 
 /**
@@ -23,7 +25,7 @@ type ProjectsSortSelectProps = {
  * or would silently discard the relevance ranking (dishonest about what's
  * actually driving the order).
  */
-export function ProjectsSortSelect({ state }: ProjectsSortSelectProps) {
+export function ProjectsSortSelect({ state, onNavigate }: ProjectsSortSelectProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
@@ -33,8 +35,13 @@ export function ProjectsSortSelect({ state }: ProjectsSortSelectProps) {
   function handleChange(nextValue: string) {
     const option = SORT_OPTIONS.find((candidate) => candidate.value === nextValue);
     if (!option) return;
+    const href = `${pathname}${buildProjectsQuery(state, { sortField: option.field, sortOrder: option.order })}`;
+    if (onNavigate) {
+      onNavigate(href);
+      return;
+    }
     startTransition(() => {
-      router.push(`${pathname}${buildProjectsQuery(state, { sortField: option.field, sortOrder: option.order })}`, { scroll: false });
+      router.push(href, { scroll: false });
     });
   }
 

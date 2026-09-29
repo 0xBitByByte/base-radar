@@ -11,6 +11,8 @@ import type { ConfidenceLevel } from "@/lib/projects/types";
 
 type ProjectsQuickFiltersProps = {
   state: ProjectsQueryState;
+  /** See `ProjectsSearchInput.tsx`'s own doc comment for this prop. */
+  onNavigate?: (href: string) => void;
 };
 
 const SELECT_CLASS =
@@ -49,15 +51,20 @@ const CONFIDENCE_LABELS: Record<ConfidenceLevel, string> = {
  * rather than adding to it, matching what a one-line toolbar dropdown reads
  * as to a user.
  */
-export function ProjectsQuickFilters({ state }: ProjectsQuickFiltersProps) {
+export function ProjectsQuickFilters({ state, onNavigate }: ProjectsQuickFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
   const disabled = state.search.length > 0;
 
   function navigate(overrides: Partial<ProjectsQueryState>) {
+    const href = `${pathname}${buildProjectsQuery(state, overrides)}`;
+    if (onNavigate) {
+      onNavigate(href);
+      return;
+    }
     startTransition(() => {
-      router.push(`${pathname}${buildProjectsQuery(state, overrides)}`, { scroll: false });
+      router.push(href, { scroll: false });
     });
   }
 

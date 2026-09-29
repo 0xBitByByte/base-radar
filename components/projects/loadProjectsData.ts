@@ -59,8 +59,19 @@ export type ProjectsPageData = {
  * flagged as a real cost in the Performance Audit) would run three times
  * per request instead of once. No logic inside this function changed.
  */
-export const loadProjectsPageData = cache(async (): Promise<ProjectsPageData> => {
-  const projects = await getLiveProjects();
+/**
+ * Vercel production-hotspot follow-up (`/dashboard/projects`,
+ * `/dashboard/projects/all` client-side-filtering prototype) — the pure
+ * derivation half of `loadProjectsPageData()` below, extracted so a
+ * `"use client"` component can compute the exact same
+ * collections/leaderboards/smart-view-lists from a `LiveProject[]` it
+ * already has (shipped once from the server, PR #73's own
+ * `getLiveProjects()`/`getCachedLiveProjects()` data) without importing
+ * anything server-only. Pure, additive refactor — `loadProjectsPageData()`
+ * itself now just awaits the fetch and calls this; every existing caller's
+ * behavior is unchanged, confirmed by the full Vitest suite.
+ */
+export function computeProjectsPageData(projects: LiveProject[]): ProjectsPageData {
   const collections = buildCollections(projects);
 
   const leaderboards: ProjectsLeaderboards = {
@@ -101,6 +112,24 @@ export const loadProjectsPageData = cache(async (): Promise<ProjectsPageData> =>
   };
 
   return { projects, collections, leaderboards, smartViewLists, smartViewCounts };
+}
+
+/**
+ * One request-scoped fetch + derivation pass. `getLiveProjects()` is itself
+ * `cache()`-wrapped (`lib/projects/service.ts`), so calling this from
+ * multiple pages/components within the same request is free — it's the
+ * same guarantee `page.tsx` already relied on before this extraction.
+ *
+ * PR-085.02B — this function itself is now also `cache()`-wrapped. The
+ * Projects page splits into three independently-streamed Suspense
+ * boundaries, each calling this function; without memoizing here too, the
+ * ~22-pass `buildCollections()`/leaderboard/smart-view derivation (already
+ * flagged as a real cost in the Performance Audit) would run three times
+ * per request instead of once. No logic inside this function changed.
+ */
+export const loadProjectsPageData = cache(async (): Promise<ProjectsPageData> => {
+  const projects = await getLiveProjects();
+  return computeProjectsPageData(projects);
 });
 
 /** PR-085.02C — everything the Hero section (Header + Base Today + Executive Summary) actually reads: counts and single "highest" projects, never the full ranked collections/leaderboards Discovery's rails need. */
@@ -141,10 +170,15 @@ export type ProjectsHeroSnapshot = {
  * much cheaper way of reading its already-resolved result — and is itself
  * `cache()`-wrapped so multiple Hero-adjacent consumers within the same
  * request share one traversal, not one each.
+ *
+ * Vercel production-hotspot follow-up — same pure-extraction shape as
+ * `computeProjectsPageData()` above: this traversal is now
+ * `computeHeroSnapshot(projects)`, callable from a `"use client"`
+ * component with the `LiveProject[]` it already has, without importing
+ * `getLiveProjects()` (server-only). `getProjectsHeroSnapshot()` below is
+ * unchanged in behavior — still the one real fetch, still `cache()`-wrapped.
  */
-export const getProjectsHeroSnapshot = cache(async (): Promise<ProjectsHeroSnapshot> => {
-  const projects = await getLiveProjects();
-
+export function computeHeroSnapshot(projects: LiveProject[]): ProjectsHeroSnapshot {
   let lastUpdatedMs = -Infinity;
   let lastUpdated: string | null = null;
   let totalTvlUsd = 0;
@@ -231,4 +265,9 @@ export const getProjectsHeroSnapshot = cache(async (): Promise<ProjectsHeroSnaps
     highestVolume,
     highestActivity,
   };
+}
+
+export const getProjectsHeroSnapshot = cache(async (): Promise<ProjectsHeroSnapshot> => {
+  const projects = await getLiveProjects();
+  return computeHeroSnapshot(projects);
 });
