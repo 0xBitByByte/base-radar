@@ -9,6 +9,7 @@ import { CloudSyncActivation } from "@/components/sync/CloudSyncActivation";
 import { AnalyticsTracker } from "@/components/observability/AnalyticsTracker";
 import { WebVitalsReporter } from "@/components/observability/WebVitalsReporter";
 import { WalletProvider } from "@/components/wallet/WalletProvider";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -92,6 +93,7 @@ export default function RootLayout({
             <WebVitalsReporter />
             <AnalyticsTracker />
             {children}
+            <SpeedInsights />
           </WalletProvider>
         </ThemeProvider>
       </body>
